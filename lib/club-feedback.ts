@@ -29,6 +29,20 @@ export async function fetchClubFeedbackForEvent(): Promise<{
   };
 }
 
+/** Sandt hvis mindst én kommentar for arrangementet er oprettet inden for de seneste `hours` timer. */
+export async function hasClubFeedbackInLastHours(hours: number): Promise<boolean> {
+  const sinceMs = Date.now() - hours * 60 * 60 * 1000;
+  const sinceIso = new Date(sinceMs).toISOString();
+  const { count, error } = await supabase
+    .from("club_feedback")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", LYKKECUP_EVENT_ID)
+    .gte("created_at", sinceIso);
+
+  if (error) return false;
+  return (count ?? 0) > 0;
+}
+
 /** Kommentarer grupperet efter klub (matcher klubkort), nyeste først pr. klub. */
 export function indexFeedbackByClub(comments: ClubFeedbackRow[]): Map<string, ClubFeedbackRow[]> {
   const map = new Map<string, ClubFeedbackRow[]>();

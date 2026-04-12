@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
+import { fetchAssignedTeamNameForPlayer, LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
 import type { PlayerDetail } from "@/types/player";
 import { PlayerDetailContent } from "@/components/player-detail-content";
@@ -14,6 +14,7 @@ type Props = {
 
 export function PlayerDetailModal({ playerId, onClose }: Props) {
   const [player, setPlayer] = useState<PlayerDetail | null>(null);
+  const [assignedTeamName, setAssignedTeamName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -21,6 +22,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
   useEffect(() => {
     if (!playerId) {
       setPlayer(null);
+      setAssignedTeamName(null);
       setError(null);
       setLoading(false);
       return;
@@ -30,16 +32,20 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
     setLoading(true);
     setError(null);
     setPlayer(null);
+    setAssignedTeamName(null);
 
     (async () => {
-      const { data, error: supaError } = await supabase
-        .from("players")
-        .select(
-          "id, name, home_club, birthdate, age, gender, level, preferences, ticket_id",
-        )
-        .eq("id", playerId)
-        .eq("event_id", LYKKECUP_EVENT_ID)
-        .maybeSingle();
+      const [{ data, error: supaError }, teamName] = await Promise.all([
+        supabase
+          .from("players")
+          .select(
+            "id, name, home_club, birthdate, age, gender, level, preferences, ticket_id",
+          )
+          .eq("id", playerId)
+          .eq("event_id", LYKKECUP_EVENT_ID)
+          .maybeSingle(),
+        fetchAssignedTeamNameForPlayer(playerId),
+      ]);
 
       if (cancelled) return;
       if (supaError) {
@@ -53,6 +59,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
         return;
       }
       setPlayer(data as PlayerDetail);
+      setAssignedTeamName(teamName);
       setLoading(false);
     })();
 
@@ -134,7 +141,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
               {error}
             </div>
           ) : player ? (
-            <PlayerDetailContent player={player} />
+            <PlayerDetailContent player={player} assignedTeamName={assignedTeamName} />
           ) : null}
         </div>
       </div>

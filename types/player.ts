@@ -19,7 +19,7 @@ export type PlayerDetail = {
   ticket_id: string | null;
 };
 
-/** Row used for dashboard KPIs, charts, and “recent” list */
+/** Row used for dashboard KPIs and charts */
 export type DashboardPlayer = {
   id: string;
   name: string;
@@ -27,6 +27,5 @@ export type DashboardPlayer = {
   level: string | null;
   age: number | null;
   gender: string | null;
-  /** Used for “recent” ordering; null if not returned from API */
   created_at: string | null;
 };

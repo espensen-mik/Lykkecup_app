@@ -14,16 +14,23 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ClubCountRow, GenderSlice, LevelCountRow } from "@/lib/dashboard-compute";
+import type {
+  AgeCountRow,
+  ClubCountRow,
+  GenderSlice,
+  LevelCountRow,
+} from "@/lib/dashboard-compute";
 import { formatLevelChartLabel, wrapTextLines } from "@/lib/chart-format";
 import { AnalyticsChartCard, ChartPlotWell } from "@/components/dashboard/analytics-chart-card";
 import {
+  AgeBarTooltip,
   ClubBarTooltip,
   LevelBarTooltip,
   PieSliceTooltip,
 } from "@/components/dashboard/analytics-tooltip";
 
 const COLOR_LEVEL = "#14b8a6";
+const COLOR_AGE = "#0d9488";
 const COLOR_CLUB = "#3b82f6";
 const COLOR_CLUB_LEAD = "#2563eb";
 
@@ -86,6 +93,7 @@ type LevelChartRow = LevelCountRow & { shortLabel: string };
 type Props = {
   levelData: LevelCountRow[];
   clubData: ClubCountRow[];
+  ageData: AgeCountRow[];
   genderData: GenderSlice[];
 };
 
@@ -96,7 +104,7 @@ function clubValueLabel(value: string | number | boolean | null | undefined): st
   return `${n} spillere`;
 }
 
-export function DashboardCharts({ levelData, clubData, genderData }: Props) {
+export function DashboardCharts({ levelData, clubData, ageData, genderData }: Props) {
   const levelRows: LevelChartRow[] = levelData.map((row) => ({
     ...row,
     shortLabel: formatLevelChartLabel(row.name),
@@ -225,6 +233,67 @@ export function DashboardCharts({ levelData, clubData, genderData }: Props) {
                       }}
                     />
                   </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartPlotWell>
+        )}
+      </AnalyticsChartCard>
+
+      <AnalyticsChartCard
+        title="Aldersfordeling"
+        subtitle="Antal spillere pr. alder — 25 år og opefter samlet som 25+"
+        accentClassName="bg-[#0d9488]"
+        className="lg:col-span-2"
+      >
+        {ageData.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <ChartPlotWell>
+            <div className="h-[min(360px,52vh)] w-full min-h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={ageData}
+                  margin={{ top: 8, right: 12, left: 4, bottom: 52 }}
+                  barCategoryGap="12%"
+                  barGap={4}
+                >
+                  <CartesianGrid
+                    strokeDasharray="4 10"
+                    vertical={false}
+                    stroke={GRID_STROKE}
+                    strokeOpacity={1}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    tick={TICK_AXIS}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={0}
+                    angle={ageData.length > 14 ? -35 : 0}
+                    textAnchor={ageData.length > 14 ? "end" : "middle"}
+                    height={ageData.length > 14 ? 56 : 48}
+                    dy={10}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={TICK_AXIS}
+                    tickLine={false}
+                    axisLine={false}
+                    width={40}
+                  />
+                  <Tooltip
+                    content={AgeBarTooltip}
+                    cursor={{ fill: "rgb(13 148 136 / 0.06)" }}
+                    animationDuration={150}
+                  />
+                  <Bar
+                    dataKey="count"
+                    name="Antal"
+                    fill={COLOR_AGE}
+                    radius={[8, 8, 4, 4]}
+                    maxBarSize={40}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>

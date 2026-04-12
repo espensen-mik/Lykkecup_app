@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { DashboardCharts } from "@/components/dashboard-charts";
-import { OpenPlayerButton } from "@/components/open-player";
 import {
   computeKpis,
   genderDistribution,
+  playersByAgeBucket,
   playersPerLevel,
-  recentPlayers,
   topClubs,
 } from "@/lib/dashboard-compute";
 import { fetchPlayersForDashboard } from "@/lib/players";
@@ -16,11 +15,6 @@ export const metadata: Metadata = {
   title: "Overblik",
   description: "Overblik — LykkeCup KontrolCenter",
 };
-
-function formatCell(value: string | null): string {
-  if (value === null || value === "") return "—";
-  return value;
-}
 
 export default async function DashboardPage() {
   const { players, error } = await fetchPlayersForDashboard();
@@ -41,8 +35,8 @@ export default async function DashboardPage() {
   const kpis = computeKpis(players);
   const levelData = playersPerLevel(players);
   const clubData = topClubs(players, 5);
+  const ageData = playersByAgeBucket(players);
   const genderData = genderDistribution(players);
-  const recent = recentPlayers(players, 20);
 
   const kpiItems = [
     { label: "Spillere i alt", value: String(kpis.totalPlayers) },
@@ -83,76 +77,15 @@ export default async function DashboardPage() {
             Fordeling
           </h2>
           <p className="mt-1.5 text-sm leading-relaxed text-gray-400 dark:text-gray-500">
-            Spillere grupperet efter niveau, klub og køn.
+            Spillere grupperet efter niveau, klub, alder og køn.
           </p>
         </div>
         <DashboardCharts
           levelData={levelData}
           clubData={clubData}
+          ageData={ageData}
           genderData={genderData}
         />
-      </section>
-
-      <section className="overflow-hidden rounded-lg border border-lc-border bg-white shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
-        <div className="border-b border-lc-border px-5 py-4 dark:border-gray-700">
-          <h2 className="text-[0.9375rem] font-semibold tracking-tight text-gray-900 dark:text-white">
-            Seneste spillere
-          </h2>
-          <p className="mt-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-            De 20 senest registrerede (efter oprettelsestidspunkt, hvis tilgængeligt).
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[480px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-lc-border bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/50">
-                <th className="px-5 py-3 text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Navn
-                </th>
-                <th className="px-5 py-3 text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Klub
-                </th>
-                <th className="px-5 py-3 text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Niveau
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-lc-border dark:divide-gray-700">
-              {recent.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={3}
-                    className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400"
-                  >
-                    Ingen spillere endnu.
-                  </td>
-                </tr>
-              ) : (
-                recent.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="transition-colors hover:bg-lc-select dark:hover:bg-gray-800/50"
-                  >
-                    <td className="px-5 py-3.5">
-                      <OpenPlayerButton
-                        playerId={p.id}
-                        className="font-medium text-[#0d9488] hover:text-[#0f766e] hover:underline dark:text-teal-400 dark:hover:text-teal-300"
-                      >
-                        {p.name}
-                      </OpenPlayerButton>
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">
-                      {formatCell(p.home_club)}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">
-                      {formatCell(p.level)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
       </section>
     </div>
   );

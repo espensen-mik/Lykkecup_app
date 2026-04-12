@@ -12,9 +12,14 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
+import { hasClubFeedbackInLastHours } from "@/lib/club-feedback";
 import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
+import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
+
+const RECENT_COMMENTS_HOURS = 24;
+
+const APP_SIDEBAR_TITLE = "LykkeCup KontrolCenter 2026";
 
 const nav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard", label: "Overblik", icon: LayoutDashboard },
@@ -53,6 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [holdLevels, setHoldLevels] = useState<string[]>([]);
+  const [kommentarerNye, setKommentarerNye] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +73,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         keys.add(normalizeLevelKey(row.level));
       }
       setHoldLevels(sortLevelKeysForNav([...keys]));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const has = await hasClubFeedbackInLastHours(RECENT_COMMENTS_HOURS);
+      if (!cancelled) setKommentarerNye(has);
     })();
     return () => {
       cancelled = true;
@@ -96,7 +113,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandLogo />
         </Link>
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 border-b border-lc-border p-3 dark:border-gray-700 lg:p-4">
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain border-b border-lc-border p-3 dark:border-gray-700 lg:p-4">
         <p className="mb-1.5 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-lc-muted dark:text-gray-500">
           Menu
         </p>
@@ -154,11 +171,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           }
 
+          const showKommentarerNyeTag =
+            item.href === "/kommentarer" && kommentarerNye;
+
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
+              aria-label={
+                showKommentarerNyeTag
+                  ? `${item.label} — nye kommentarer inden for de seneste ${RECENT_COMMENTS_HOURS} timer`
+                  : undefined
+              }
               className={`flex items-center gap-3 rounded-md py-2.5 pr-3 text-[0.9375rem] font-medium transition-colors border-l-2 ${
                 active
                   ? "border-[#14b8a6] bg-teal-50/90 pl-[10px] text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
@@ -170,14 +195,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 strokeWidth={2}
                 aria-hidden
               />
-              {item.label}
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {showKommentarerNyeTag ? (
+                <span className="shrink-0 rounded-full bg-teal-100 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-[#0f766e] dark:bg-teal-900/50 dark:text-teal-200">
+                  Nye
+                </span>
+              ) : null}
             </Link>
           );
         })}
       </nav>
-      <div className="mt-auto p-4 lg:p-5">
-        <p className="px-3 text-xs leading-relaxed text-lc-muted dark:text-gray-500">
-          LykkeCup KontrolCenter — arrangement og deltagere.
+      <div className="shrink-0 border-t border-lc-border bg-white p-4 dark:border-gray-700 dark:bg-gray-900 lg:p-5">
+        <p className="px-1 text-[0.8125rem] font-semibold leading-snug text-gray-900 dark:text-gray-100">
+          {APP_SIDEBAR_TITLE}
+        </p>
+        <p className="mt-1.5 px-1 text-xs leading-relaxed text-lc-muted dark:text-gray-500">
+          Arrangement og deltagere.
         </p>
       </div>
     </>
@@ -196,8 +229,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <aside
         id="app-sidebar"
-        className={`fixed inset-y-0 left-0 z-50 flex w-[16.5rem] flex-col border-r border-lc-border bg-white transition-transform duration-200 ease-out dark:border-gray-700 dark:bg-gray-900 lg:static lg:translate-x-0 ${
-          mobileOpen ? "translate-x-0 shadow-lc-card" : "-translate-x-full"
+        className={`z-50 flex h-full min-h-0 w-[16.5rem] flex-col border-r border-lc-border bg-white dark:border-gray-700 dark:bg-gray-900 max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:transition-transform max-lg:duration-200 max-lg:ease-out lg:sticky lg:top-0 lg:h-svh lg:max-h-svh lg:shrink-0 lg:self-start ${
+          mobileOpen ? "max-lg:translate-x-0 max-lg:shadow-lc-card" : "max-lg:-translate-x-full"
         } `}
       >
         {sidebar}
@@ -215,9 +248,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="sr-only">Menu</span>
             <Menu className="h-5 w-5" strokeWidth={1.5} aria-hidden />
           </button>
-          <div className="flex min-h-[2.25rem] min-w-0 flex-1 items-center rounded-md bg-[#14b8a6] px-3 py-1.5 dark:bg-teal-600">
+          <Link
+            href="/dashboard"
+            className="flex min-h-[2.25rem] min-w-0 flex-1 items-center rounded-md bg-[#14b8a6] px-3 py-1.5 dark:bg-teal-600"
+          >
             <BrandLogo compact />
-          </div>
+          </Link>
         </header>
 
         <main className="flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-11 xl:px-12">

@@ -46,6 +46,30 @@ export async function fetchPlayerById(
   return { player: data as PlayerDetail, error: null };
 }
 
+/** Navn på hold spilleren er på i dette arrangement, hvis nogen. */
+export async function fetchAssignedTeamNameForPlayer(playerId: string): Promise<string | null> {
+  const { data: mem, error: memErr } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .eq("player_id", playerId)
+    .eq("event_id", LYKKECUP_EVENT_ID)
+    .limit(1)
+    .maybeSingle();
+
+  if (memErr || !mem?.team_id) return null;
+
+  const { data: team, error: teamErr } = await supabase
+    .from("teams")
+    .select("name")
+    .eq("id", mem.team_id)
+    .eq("event_id", LYKKECUP_EVENT_ID)
+    .maybeSingle();
+
+  if (teamErr || !team) return null;
+  const name = (team as { name: string }).name?.trim();
+  return name && name.length > 0 ? name : null;
+}
+
 /** All players for the event — dashboard aggregations and charts */
 export async function fetchPlayersForDashboard(): Promise<{
   players: DashboardPlayer[];

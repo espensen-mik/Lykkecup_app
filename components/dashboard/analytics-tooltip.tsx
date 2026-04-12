@@ -119,3 +119,25 @@ export function PieSliceTooltip({ active, payload }: TooltipContentProps) {
     />
   );
 }
+
+/** Tooltip til alderssøjler — aksen bruger korte labels (år / 25+). */
+export function AgeBarTooltip({ active, payload, label }: TooltipContentProps) {
+  const lbl = label != null && label !== "" ? String(label) : "";
+  const titleText =
+    lbl === "Ukendt"
+      ? "Alder · ikke angivet"
+      : lbl === "25+"
+        ? "Alder · 25 år eller derover"
+        : lbl
+          ? `Alder · ${lbl} år`
+          : "Alder";
+
+  return (
+    <AnalyticsTooltip
+      active={active}
+      payload={payload}
+      title={titleText}
+      valueSuffix="spillere"
+    />
+  );
+}

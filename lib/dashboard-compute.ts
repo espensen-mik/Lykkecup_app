@@ -42,6 +42,7 @@ export function computeKpis(players: DashboardPlayer[]): KpiStats {
 export type LevelCountRow = { name: string; count: number };
 export type ClubCountRow = { club: string; count: number };
 export type GenderSlice = { name: string; value: number };
+export type AgeCountRow = { label: string; count: number };
 
 export function playersPerLevel(players: DashboardPlayer[]): LevelCountRow[] {
   const map = new Map<string, number>();
@@ -80,16 +81,40 @@ export function genderDistribution(players: DashboardPlayer[]): GenderSlice[] {
   return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
 }
 
-export function recentPlayers(
-  players: DashboardPlayer[],
-  limit: number,
-): DashboardPlayer[] {
-  return [...players]
-    .sort((a, b) => {
-      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
-      if (tb !== ta) return tb - ta;
-      return b.id.localeCompare(a.id);
-    })
-    .slice(0, limit);
+/**
+ * Aldersfordeling til diagram: ét trin pr. heltalsalder under 25, alle 25+ i én søjle.
+ * Manglende eller ugyldig alder tælles som "Ukendt".
+ */
+export function playersByAgeBucket(players: DashboardPlayer[]): AgeCountRow[] {
+  type Acc = { count: number; sortKey: number };
+  const map = new Map<string, Acc>();
+
+  function add(label: string, sortKey: number) {
+    const cur = map.get(label);
+    if (cur) cur.count += 1;
+    else map.set(label, { count: 1, sortKey });
+  }
+
+  for (const p of players) {
+    const raw = p.age;
+    if (raw == null || Number.isNaN(Number(raw))) {
+      add("Ukendt", 10_000);
+      continue;
+    }
+    const age = Math.floor(Number(raw));
+    if (age < 0 || age > 120) {
+      add("Ukendt", 10_000);
+      continue;
+    }
+    if (age >= 25) {
+      add("25+", 25);
+    } else {
+      add(String(age), age);
+    }
+  }
+
+  return Array.from(map.entries())
+    .map(([label, { count, sortKey }]) => ({ label, count, sortKey }))
+    .sort((a, b) => a.sortKey - b.sortKey)
+    .map(({ label, count }) => ({ label, count }));
 }
