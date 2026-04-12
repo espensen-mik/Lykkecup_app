@@ -1,26 +1,61 @@
 @import "tailwindcss";
 
+/* `dark:` kræver klassen .dark på <html> — så lyse baggrunde som OptiSigns uanset systemindstilling */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* LykkeCup / OptiSigns: næsten hvid canvas, hvide paneler, meget lyse grå accenter */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fafafa;
+  --foreground: #1f2937;
+  --lc-canvas: #fafafa;
+  --lc-panel: #ffffff;
+  --lc-subtle: #f4f5f7;
+  --lc-primary: #14b8a6;
+  --lc-primary-hover: #0d9488;
+  --lc-primary-muted: #ccfbf1;
+  --lc-primary-faint: #f0fdfa;
+  --lc-teal: #0f766e;
+  --lc-teal-mid: #14b8a6;
+  --lc-teal-soft: #ecfdf5;
+  --lc-green: #0d9488;
+  --lc-green-mid: #2dd4bf;
+  --lc-green-soft: #ccfbf1;
+  --lc-border: #eceef2;
+  --lc-muted: #6b7280;
+  --lc-select: #f0f7ff;
+  --lc-card-shadow: 0 1px 2px rgb(15 23 42 / 0.03), 0 1px 3px rgb(15 23 42 / 0.04);
+  --lc-card-shadow-hover: 0 1px 3px rgb(15 23 42 / 0.04), 0 4px 12px rgb(15 23 42 / 0.05);
+  --tooltip-bg: #ffffff;
+  --tooltip-border: #e8eaef;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --color-lc-primary: var(--lc-primary);
+  --color-lc-teal: var(--lc-teal);
+  --color-lc-teal-mid: var(--lc-teal-mid);
+  --color-lc-teal-soft: var(--lc-teal-soft);
+  --color-lc-green: var(--lc-green);
+  --color-lc-green-mid: var(--lc-green-mid);
+  --color-lc-green-soft: var(--lc-green-soft);
+  --color-lc-border: var(--lc-border);
+  --color-lc-muted: var(--lc-muted);
+  --color-lc-select: var(--lc-select);
+  --color-lc-subtle: var(--lc-subtle);
+  --color-lc-panel: var(--lc-panel);
+  --shadow-lc-card: var(--lc-card-shadow);
+  --shadow-lc-card-hover: var(--lc-card-shadow-hover);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
+  background: var(--lc-canvas);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
