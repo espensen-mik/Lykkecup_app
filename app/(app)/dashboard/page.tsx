@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DashboardCharts } from "@/components/dashboard-charts";
+import { fetchClubFeedbackCounts } from "@/lib/club-feedback";
 import { fetchHolddannelseProgress } from "@/lib/holddannelse";
 import {
   computeKpis,
@@ -18,9 +19,10 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardPage() {
-  const [{ players, error }, { progress: holddannelseProgress }] = await Promise.all([
+  const [{ players, error }, { progress: holddannelseProgress }, commentKpis] = await Promise.all([
     fetchPlayersForDashboard(),
     fetchHolddannelseProgress(),
+    fetchClubFeedbackCounts(24),
   ]);
 
   if (error) {
@@ -42,6 +44,9 @@ export default async function DashboardPage() {
   const ageData = playersByAgeBucket(players);
   const genderData = genderDistribution(players);
 
+  const commentTotalStr = commentKpis.error ? "—" : String(commentKpis.total);
+  const commentRecentStr = commentKpis.error ? "—" : String(commentKpis.recent);
+
   const kpiItems = [
     { label: "Spillere i alt", value: String(kpis.totalPlayers) },
     { label: "Unikke klubber", value: String(kpis.uniqueClubs) },
@@ -50,6 +55,8 @@ export default async function DashboardPage() {
       label: "Gennemsnitsalder",
       value: kpis.averageAge != null ? String(kpis.averageAge) : "—",
     },
+    { label: "Antal kommentarer i alt", value: commentTotalStr },
+    { label: "Nye kommentarer", value: commentRecentStr },
   ] as const;
 
   return (
@@ -68,7 +75,7 @@ export default async function DashboardPage() {
 
       <section>
         <h2 className="sr-only">Nøgletal</h2>
-        <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
           {kpiItems.map((item) => (
             <KpiCard key={item.label} label={item.label} value={item.value} />
           ))}

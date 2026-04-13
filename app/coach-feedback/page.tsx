@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { StyledSelect } from "@/components/ui/styled-select";
 import { formatDaDateTime } from "@/lib/datetime";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
@@ -180,9 +181,10 @@ export default function CoachFeedbackPage() {
         <label htmlFor="club-select" className="block text-sm font-medium text-gray-800">
           Klub
         </label>
-        <select
+        <StyledSelect
           id="club-select"
-          className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[15px] text-gray-900 shadow-sm outline-none ring-teal-500/20 transition focus:border-teal-500 focus:ring-4 disabled:opacity-60"
+          wrapperClassName="mt-2"
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[15px] text-gray-900 shadow-sm outline-none ring-teal-500/20 transition focus:border-teal-500 focus:ring-4 disabled:opacity-60"
           value={selectedClub}
           onChange={(e) => setSelectedClub(e.target.value)}
           disabled={loadingBootstrap}
@@ -193,7 +195,7 @@ export default function CoachFeedbackPage() {
               {c}
             </option>
           ))}
-        </select>
+        </StyledSelect>
         {!loadingBootstrap && clubs.length === 0 ? (
           <p className="mt-3 text-sm text-gray-500">Der er ingen klubber registreret for dette arrangement.</p>
         ) : null}

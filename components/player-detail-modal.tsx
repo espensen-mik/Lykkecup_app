@@ -127,10 +127,10 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
           ref={closeBtnRef}
           type="button"
           onClick={onClose}
-          className="absolute right-3 top-3 z-10 rounded-xl border border-white/50 bg-white/45 p-2 text-gray-600 shadow-sm backdrop-blur-md transition-[background-color,border-color,color,box-shadow] hover:border-white/70 hover:bg-white/65 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50 dark:border-white/10 dark:bg-white/[0.08] dark:text-gray-300 dark:hover:border-white/18 dark:hover:bg-white/[0.14] dark:hover:text-white"
+          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-gray-200/90 bg-white/90 text-gray-500 shadow-sm backdrop-blur-sm transition hover:border-gray-300 hover:bg-white hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b8a6]/35 dark:border-white/12 dark:bg-gray-900/75 dark:text-gray-300 dark:hover:border-white/22 dark:hover:bg-gray-800 dark:hover:text-white"
           aria-label="Luk"
         >
-          <X className="h-5 w-5" strokeWidth={2} aria-hidden />
+          <X className="h-4 w-4" strokeWidth={1.75} aria-hidden />
         </button>
 
         <div className="relative max-h-[min(85vh,720px)] overflow-y-auto p-6 pt-14 sm:p-8 sm:pt-16">

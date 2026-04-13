@@ -10,6 +10,7 @@ import {
 } from "@/lib/player-preferences";
 import { supabase } from "@/lib/supabase";
 import type { HoldPlayerRow, TeamMemberRow, TeamRow } from "@/types/teams";
+import { StyledSelect } from "@/components/ui/styled-select";
 
 type Props = {
   levelKey: string;
@@ -301,8 +302,8 @@ export function TeamBuilder({
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <select
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            <StyledSelect
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               value={clubFilter}
               onChange={(e) => setClubFilter(e.target.value)}
             >
@@ -312,9 +313,9 @@ export function TeamBuilder({
                   {c}
                 </option>
               ))}
-            </select>
-            <select
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            </StyledSelect>
+            <StyledSelect
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               value={prefFilter}
               onChange={(e) => setPrefFilter(e.target.value)}
             >
@@ -323,7 +324,7 @@ export function TeamBuilder({
               <option value="Nye venner">Nye venner</option>
               <option value="Alt ok">Alt ok</option>
               <option value="uden">Uden badge</option>
-            </select>
+            </StyledSelect>
           </div>
 
           <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">

@@ -43,6 +43,38 @@ export async function hasClubFeedbackInLastHours(hours: number): Promise<boolean
   return (count ?? 0) > 0;
 }
 
+/** Antal trænerkommentarer i alt og inden for de seneste `hours` timer (til dashboard-KPI’er). */
+export async function fetchClubFeedbackCounts(hoursRecent = 24): Promise<{
+  total: number;
+  recent: number;
+  error: string | null;
+}> {
+  const sinceIso = new Date(Date.now() - hoursRecent * 60 * 60 * 1000).toISOString();
+
+  const [totalRes, recentRes] = await Promise.all([
+    supabase
+      .from("club_feedback")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", LYKKECUP_EVENT_ID),
+    supabase
+      .from("club_feedback")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", LYKKECUP_EVENT_ID)
+      .gte("created_at", sinceIso),
+  ]);
+
+  const err = totalRes.error?.message ?? recentRes.error?.message ?? null;
+  if (err) {
+    return { total: 0, recent: 0, error: err };
+  }
+
+  return {
+    total: totalRes.count ?? 0,
+    recent: recentRes.count ?? 0,
+    error: null,
+  };
+}
+
 /** Kommentarer grupperet efter klub (matcher klubkort), nyeste først pr. klub. */
 export function indexFeedbackByClub(comments: ClubFeedbackRow[]): Map<string, ClubFeedbackRow[]> {
   const map = new Map<string, ClubFeedbackRow[]>();

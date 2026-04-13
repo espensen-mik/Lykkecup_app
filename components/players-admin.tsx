@@ -3,6 +3,7 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { usePlayerModal } from "@/components/player-modal-context";
+import { StyledSelect } from "@/components/ui/styled-select";
 import { getLevelVisualClasses } from "@/lib/level-colors";
 import type { Player } from "@/types/player";
 
@@ -234,33 +235,25 @@ export function PlayersAdmin({ players, fetchError }: Props) {
         </label>
         <label className="flex min-w-[10rem] flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
           Niveau
-          <select
-            value={level}
-            onChange={(e) => setLevel(e.target.value)}
-            className={fieldClass}
-          >
+          <StyledSelect value={level} onChange={(e) => setLevel(e.target.value)} className={fieldClass}>
             <option value="">Alle niveauer</option>
             {levels.map((l) => (
               <option key={l} value={l}>
                 {l}
               </option>
             ))}
-          </select>
+          </StyledSelect>
         </label>
         <label className="flex min-w-[12rem] flex-1 flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
           Klub
-          <select
-            value={club}
-            onChange={(e) => setClub(e.target.value)}
-            className={fieldClass}
-          >
+          <StyledSelect value={club} onChange={(e) => setClub(e.target.value)} className={fieldClass}>
             <option value="">Alle klubber</option>
             {clubs.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
-          </select>
+          </StyledSelect>
         </label>
       </div>
 
