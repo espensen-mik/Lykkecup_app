@@ -95,6 +95,57 @@ export type LevelOverviewStats = {
   teamCount: number;
 };
 
+export type HolddannelseProgressStats = {
+  totalPlayers: number;
+  assignedPlayers: number;
+  percentAssigned: number;
+};
+
+/**
+ * Samlet fremdrift for holddannelse på tværs af alle niveauer.
+ * Tæller unikke spillere med i eventet og hvor mange af dem der er på et hold.
+ */
+export async function fetchHolddannelseProgress(): Promise<{
+  progress: HolddannelseProgressStats | null;
+  error: string | null;
+}> {
+  const eventId = HOLD_EVENT_ID;
+
+  const [playersRes, membersRes] = await Promise.all([
+    supabase.from("players").select("id").eq("event_id", eventId),
+    supabase.from("team_members").select("player_id").eq("event_id", eventId),
+  ]);
+
+  if (playersRes.error) {
+    return { progress: null, error: playersRes.error.message };
+  }
+  if (membersRes.error) {
+    return { progress: null, error: membersRes.error.message };
+  }
+
+  const players = (playersRes.data ?? []) as { id: string }[];
+  const members = (membersRes.data ?? []) as { player_id: string }[];
+  const playerIds = new Set(players.map((p) => p.id));
+  let assignedPlayers = 0;
+
+  for (const pid of new Set(members.map((m) => m.player_id))) {
+    if (playerIds.has(pid)) assignedPlayers += 1;
+  }
+
+  const totalPlayers = playerIds.size;
+  const percentAssigned =
+    totalPlayers > 0 ? Math.round((assignedPlayers / totalPlayers) * 1000) / 10 : 0;
+
+  return {
+    progress: {
+      totalPlayers,
+      assignedPlayers,
+      percentAssigned,
+    },
+    error: null,
+  };
+}
+
 export async function fetchHolddannelseOverview(): Promise<{
   levels: LevelOverviewStats[];
   error: string | null;

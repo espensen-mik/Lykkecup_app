@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DashboardCharts } from "@/components/dashboard-charts";
+import { fetchHolddannelseProgress } from "@/lib/holddannelse";
 import {
   computeKpis,
   genderDistribution,
@@ -17,7 +18,10 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardPage() {
-  const { players, error } = await fetchPlayersForDashboard();
+  const [{ players, error }, { progress: holddannelseProgress }] = await Promise.all([
+    fetchPlayersForDashboard(),
+    fetchHolddannelseProgress(),
+  ]);
 
   if (error) {
     return (
@@ -71,6 +75,22 @@ export default async function DashboardPage() {
         </div>
       </section>
 
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
+            Holddannelse fremdrift
+          </h2>
+          <p className="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+            Hvor mange spillere der allerede er placeret på et hold.
+          </p>
+        </div>
+        <HolddannelseProgressCard
+          assignedPlayers={holddannelseProgress?.assignedPlayers ?? 0}
+          totalPlayers={holddannelseProgress?.totalPlayers ?? 0}
+          percentAssigned={holddannelseProgress?.percentAssigned ?? 0}
+        />
+      </section>
+
       <section className="space-y-5">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
@@ -99,6 +119,43 @@ function KpiCard({ label, value }: { label: string; value: string }) {
       </p>
       <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-[#14b8a6] dark:text-teal-400">
         {value}
+      </p>
+    </div>
+  );
+}
+
+function HolddannelseProgressCard({
+  assignedPlayers,
+  totalPlayers,
+  percentAssigned,
+}: {
+  assignedPlayers: number;
+  totalPlayers: number;
+  percentAssigned: number;
+}) {
+  const safePct = Math.max(0, Math.min(100, percentAssigned));
+
+  return (
+    <div className="rounded-lg border border-lc-border bg-white p-5 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none sm:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+          Spillere tildelt hold
+        </p>
+        <p className="text-sm font-medium tabular-nums text-gray-500 dark:text-gray-400">
+          {assignedPlayers} / {totalPlayers}
+        </p>
+      </div>
+
+      <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#14b8a6] to-[#0d9488] transition-[width] duration-500 ease-out"
+          style={{ width: `${safePct}%` }}
+          aria-hidden
+        />
+      </div>
+
+      <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight text-[#14b8a6] dark:text-teal-400">
+        {safePct.toFixed(1)}%
       </p>
     </div>
   );
