@@ -20,6 +20,8 @@ import { supabase } from "@/lib/supabase";
 const RECENT_COMMENTS_HOURS = 24;
 
 const APP_SIDEBAR_TITLE = "LykkeCup KontrolCenter 2026";
+const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
+const HEADER_USER_NAME = "Mikael Espensen";
 
 const nav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard", label: "Overblik", icon: LayoutDashboard },
@@ -103,16 +105,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebar = (
     <>
-      {/* OptiSigns-style solid teal brand bar + hvid logo */}
-      <div className="flex h-11 shrink-0 items-center px-4 lg:h-12 lg:px-5 bg-[#14b8a6] dark:bg-teal-600">
-        <Link
-          href="/dashboard"
-          className="flex min-w-0 items-center"
-          onClick={() => setMobileOpen(false)}
-        >
-          <BrandLogo />
-        </Link>
-      </div>
       <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain border-b border-lc-border p-3 dark:border-gray-700 lg:p-4">
         <p className="mb-1.5 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-lc-muted dark:text-gray-500">
           Menu
@@ -217,11 +209,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="sticky top-0 z-50 flex h-14 items-center gap-3 border-b border-teal-500/40 bg-[#14b8a6] px-4 text-white shadow-[0_4px_18px_rgba(15,118,110,0.24)] dark:border-teal-400/30 dark:bg-teal-600">
+        <button
+          type="button"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
+          aria-expanded={mobileOpen}
+          aria-controls="app-sidebar"
+          onClick={() => setMobileOpen((o) => !o)}
+        >
+          <span className="sr-only">Menu</span>
+          <Menu className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+        </button>
+        <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-3">
+          <BrandLogo compact />
+          <span className="min-w-0 truncate text-sm font-semibold tracking-tight text-white sm:text-[0.9375rem]">
+            {HEADER_TITLE}
+          </span>
+        </Link>
+        <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/30 bg-white/12 px-2.5 py-1 backdrop-blur-sm">
+          <img
+            src="/mik_profil.jpg"
+            alt={HEADER_USER_NAME}
+            className="h-7 w-7 rounded-full object-cover ring-1 ring-white/50"
+          />
+          <span className="hidden text-sm font-medium text-white/95 sm:inline">
+            {HEADER_USER_NAME}
+          </span>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1">
       {mobileOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-gray-900/25 backdrop-blur-[1px] lg:hidden"
+          className="fixed inset-x-0 bottom-0 top-14 z-40 bg-gray-900/25 backdrop-blur-[1px] lg:hidden"
           aria-label="Luk menu"
           onClick={() => setMobileOpen(false)}
         />
@@ -229,7 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <aside
         id="app-sidebar"
-        className={`z-50 flex h-full min-h-0 w-[16.5rem] flex-col border-r border-lc-border bg-white dark:border-gray-700 dark:bg-gray-900 max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:transition-transform max-lg:duration-200 max-lg:ease-out lg:sticky lg:top-0 lg:h-svh lg:max-h-svh lg:shrink-0 lg:self-start ${
+        className={`z-50 flex min-h-0 w-[16.5rem] flex-col border-r border-lc-border bg-white dark:border-gray-700 dark:bg-gray-900 max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:top-14 max-lg:transition-transform max-lg:duration-200 max-lg:ease-out lg:sticky lg:top-14 lg:h-[calc(100svh-3.5rem)] lg:max-h-[calc(100svh-3.5rem)] lg:shrink-0 lg:self-start ${
           mobileOpen ? "max-lg:translate-x-0 max-lg:shadow-lc-card" : "max-lg:-translate-x-full"
         } `}
       >
@@ -237,28 +259,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-lc-border bg-white px-4 dark:border-gray-700 dark:bg-gray-900 lg:hidden">
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-            aria-expanded={mobileOpen}
-            aria-controls="app-sidebar"
-            onClick={() => setMobileOpen((o) => !o)}
-          >
-            <span className="sr-only">Menu</span>
-            <Menu className="h-5 w-5" strokeWidth={1.5} aria-hidden />
-          </button>
-          <Link
-            href="/dashboard"
-            className="flex min-h-[2.25rem] min-w-0 flex-1 items-center rounded-md bg-[#14b8a6] px-3 py-1.5 dark:bg-teal-600"
-          >
-            <BrandLogo compact />
-          </Link>
-        </header>
-
         <main className="flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-11 xl:px-12">
           {children}
         </main>
+      </div>
       </div>
     </div>
   );
