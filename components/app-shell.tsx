@@ -125,6 +125,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
 
   function isActive(href: string) {
     if (href === "/holddannelse") return pathname === "/holddannelse" || pathname.startsWith("/holddannelse/");
+    if (href === "/turnering/baner") return pathname === "/turnering/baner" || pathname.startsWith("/turnering/baner/");
     if (href === "/turnering") return pathname.startsWith("/turnering");
     if (href === "/turnering/puljer")
       return pathname === "/turnering/puljer" || pathname.startsWith("/turnering/puljer/");
@@ -383,6 +384,18 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                   </ul>
                 ) : null}
               </div>
+
+              <Link
+                href="/turnering/baner"
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center gap-2 rounded-md border-l-2 py-1.5 pl-2 pr-2 text-[0.86rem] font-medium transition-colors ${
+                  isActive("/turnering/baner")
+                    ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                    : "border-transparent text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800/60"
+                }`}
+              >
+                Baner & tider
+              </Link>
             </div>
           ) : null}
         </div>
