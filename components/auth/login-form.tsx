@@ -1,31 +1,48 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export function LoginForm({ nextPath }: { nextPath: string }) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
+  const [showManualContinue, setShowManualContinue] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setErrorMsg(null);
+    setInfoMsg(null);
+    setShowManualContinue(false);
 
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (error) {
+    try {
+      const loginPromise = supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("LOGIN_TIMEOUT")), 12000);
+      });
+      const { error } = await Promise.race([loginPromise, timeoutPromise]);
+      if (error) {
+        setErrorMsg("Kunne ikke logge ind. Tjek e-mail og adgangskode.");
+        return;
+      }
+
+      setInfoMsg("Login lykkedes. Viderestiller...");
+      setShowManualContinue(true);
+      // Hard redirect avoids race where middleware sees stale auth cookies.
+      window.location.assign(nextPath);
+    } catch (err) {
+      if (err instanceof Error && err.message === "LOGIN_TIMEOUT") {
+        setErrorMsg("Login tager længere tid end forventet. Prøv igen eller fortsæt manuelt.");
+      } else {
+        setErrorMsg("Der opstod en fejl under login. Prøv igen.");
+      }
+    } finally {
       setBusy(false);
-      setErrorMsg("Kunne ikke logge ind. Tjek e-mail og adgangskode.");
-      return;
     }
-
-    router.replace(nextPath);
-    router.refresh();
   }
 
   return (
@@ -65,6 +82,11 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
           {errorMsg ? (
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMsg}</p>
           ) : null}
+          {infoMsg ? (
+            <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              {infoMsg}
+            </p>
+          ) : null}
 
           <button
             type="submit"
@@ -76,9 +98,20 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
         </form>
 
         <div className="mt-4">
-          <Link href="/glemt-kode" className="text-sm font-medium text-[#0d9488] underline-offset-4 hover:underline">
-            Glemt kode?
-          </Link>
+          <div className="flex items-center justify-between gap-2">
+            <Link href="/glemt-kode" className="text-sm font-medium text-[#0d9488] underline-offset-4 hover:underline">
+              Glemt kode?
+            </Link>
+            {showManualContinue ? (
+              <button
+                type="button"
+                onClick={() => window.location.assign(nextPath)}
+                className="text-sm font-medium text-[#0d9488] underline-offset-4 hover:underline"
+              >
+                Fortsæt
+              </button>
+            ) : null}
+          </div>
         </div>
       </section>
     </main>

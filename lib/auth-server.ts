@@ -47,22 +47,41 @@ export async function getCurrentAuthAppUser(): Promise<AuthAppUser | null> {
   const supabase = await createServerSupabase();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   const email = authData.user?.email ?? null;
-  if (authError || !authData.user || !email) return null;
+  if (authError || !authData.user || !email) {
+    console.warn("[auth-server] no authenticated user in request", {
+      hasUser: Boolean(authData.user),
+      hasEmail: Boolean(email),
+      error: authError?.message ?? null,
+    });
+    return null;
+  }
 
   const user = authData.user;
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("full_name, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
+  if (profileError) {
+    console.warn("[auth-server] profile lookup failed, continuing with auth user", {
+      userId: user.id,
+      error: profileError.message,
+    });
+  }
 
   const fullName = profile?.full_name?.trim() || fallbackName(email);
+  const role = resolveRole(user);
+  console.info("[auth-server] resolved authenticated user", {
+    userId: user.id,
+    hasProfile: Boolean(profile),
+    role,
+  });
 
   return {
     id: user.id,
     email,
     fullName,
     avatarUrl: profile?.avatar_url?.trim() || null,
-    role: resolveRole(user),
+    role,
   };
 }

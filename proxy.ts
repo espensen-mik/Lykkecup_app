@@ -1,7 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/login", "/glemt-kode"]);
+const PUBLIC_PATHS = new Set(["/login", "/glemt-kode", "/nulstil-kode"]);
+const AUTH_ENTRY_PAGES = new Set(["/login", "/glemt-kode"]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
@@ -43,13 +44,15 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     if (pathname !== "/") url.searchParams.set("next", `${pathname}${search}`);
+    console.info("[auth-proxy] redirect unauthenticated -> /login", { pathname });
     return NextResponse.redirect(url);
   }
 
-  if (user && publicPath) {
+  if (user && AUTH_ENTRY_PAGES.has(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/";
     url.search = "";
+    console.info("[auth-proxy] redirect authenticated public path -> /", { pathname, userId: user.id });
     return NextResponse.redirect(url);
   }
 
