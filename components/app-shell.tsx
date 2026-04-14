@@ -417,46 +417,33 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             {HEADER_TITLE}
           </span>
         </Link>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-4">
           <KontrolcenterHelp />
-          <div className="flex max-w-[min(100%,18rem)] shrink-0 items-stretch overflow-hidden rounded-2xl border border-white/25 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_12px_rgba(0,0,0,0.1)] backdrop-blur-md">
-            <div className="flex min-w-0 items-center gap-2.5 pl-2 pr-1 py-1.5 sm:pl-2.5 sm:pr-2">
-              {currentUser?.avatarUrl ? (
-                <img
-                  src={currentUser.avatarUrl}
-                  alt={currentUser.fullName}
-                  className="h-8 w-8 shrink-0 rounded-full object-cover shadow-md ring-2 ring-white/45"
-                />
-              ) : (
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-white/95 to-white/75 text-[0.7rem] font-bold tracking-tight text-[#0f766e] shadow-md ring-2 ring-white/40">
-                  {initialsFromName(currentUser?.fullName ?? "Ukendt bruger")}
-                </span>
-              )}
-              <div className="hidden min-w-0 sm:block">
-                <p className="truncate text-[0.8125rem] font-semibold leading-tight tracking-tight text-white drop-shadow-sm">
-                  {currentUser?.fullName ?? "Bruger"}
-                </p>
-                <p className="mt-0.5">
-                  <span className="inline-flex max-w-full rounded-md border border-white/20 bg-black/10 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-white/90">
-                    {currentUser?.role ?? "user"}
-                  </span>
-                </p>
-              </div>
-            </div>
-            <div className="w-px shrink-0 bg-gradient-to-b from-transparent via-white/35 to-transparent" aria-hidden />
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              className="group inline-flex w-10 shrink-0 items-center justify-center text-white/88 transition hover:bg-white/12 hover:text-white active:bg-white/8"
-              aria-label="Log ud"
-              title="Log ud"
-            >
-              <LogOut
-                className="h-[1.05rem] w-[1.05rem] transition group-hover:translate-x-px"
-                strokeWidth={2.25}
-                aria-hidden
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            className="shrink-0 rounded-md p-2 text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/40"
+            aria-label="Log ud"
+            title="Log ud af KontrolCenter"
+          >
+            <LogOut className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+          </button>
+          <div className="flex min-w-0 items-center gap-3 pl-1 sm:pl-2">
+            {currentUser?.avatarUrl ? (
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.fullName}
+                className="h-8 w-8 shrink-0 rounded-full object-cover"
               />
-            </button>
+            ) : (
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-[0.7rem] font-semibold text-[#0f766e]">
+                {initialsFromName(currentUser?.fullName ?? "Ukendt bruger")}
+              </span>
+            )}
+            <div className="hidden min-w-0 sm:block">
+              <p className="truncate text-sm font-semibold text-white">{currentUser?.fullName ?? "Bruger"}</p>
+              <p className="truncate text-xs text-white/65">{currentUser?.role ?? "user"}</p>
+            </div>
           </div>
         </div>
       </header>

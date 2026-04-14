@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleHelp, X } from "lucide-react";
+import { HelpCircle, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 export function KontrolcenterHelp() {
@@ -21,15 +21,11 @@ export function KontrolcenterHelp() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_8px_rgba(0,0,0,0.08)] backdrop-blur-sm transition hover:border-white/35 hover:bg-white/18 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_4px_14px_rgba(0,0,0,0.12)] active:scale-[0.97]"
+        className="shrink-0 rounded-md p-2 text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/40"
         aria-label="Hjælp og vejledning"
-        title="Hjælp"
+        title="Åbn hjælp — vejledning til KontrolCenter"
       >
-        <CircleHelp
-          className="h-[1.125rem] w-[1.125rem] text-white/95 transition group-hover:text-white"
-          strokeWidth={2}
-          aria-hidden
-        />
+        <HelpCircle className="h-5 w-5" strokeWidth={1.75} aria-hidden />
       </button>
 
       {open ? (
