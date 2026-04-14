@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { getAuthBrowserClient } from "@/lib/auth-browser";
 
 function parseHashParams(hash: string): URLSearchParams {
   const raw = hash.startsWith("#") ? hash.slice(1) : hash;
@@ -10,6 +10,7 @@ function parseHashParams(hash: string): URLSearchParams {
 }
 
 export default function ResetPasswordPage() {
+  const supabase = getAuthBrowserClient();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);

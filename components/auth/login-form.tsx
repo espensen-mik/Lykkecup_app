@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { getAuthBrowserClient } from "@/lib/auth-browser";
 
 export function LoginForm({ nextPath }: { nextPath: string }) {
+  const supabase = getAuthBrowserClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);

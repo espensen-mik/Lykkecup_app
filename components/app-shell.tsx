@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { AuthAppUser } from "@/lib/auth-server";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { hasClubFeedbackInLastHours } from "@/lib/club-feedback";
 import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
@@ -48,6 +49,7 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
 }
 
 export function AppShell({ children, currentUser }: { children: React.ReactNode; currentUser: AuthAppUser | null }) {
+  const authClient = getAuthBrowserClient();
   function initialsFromName(name: string) {
     const parts = name
       .trim()
@@ -61,7 +63,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await authClient.auth.signOut();
     window.location.href = "/login";
   }
 
