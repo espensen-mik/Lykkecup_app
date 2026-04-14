@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Kommentarer fra trænere",
   description:
-    "Vælg klub, se tilmeldte spillere og send kommentarer om niveauer eller holdinddeling.",
+    "Skriv kommentarer til dit hold og dine spillere før turneringsplanen for LykkeCup 2026.",
 };
 
 export default function CoachFeedbackLayout({

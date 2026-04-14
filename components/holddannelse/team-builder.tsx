@@ -287,44 +287,74 @@ export function TeamBuilder({
             ).
           </p>
 
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <div className="relative min-w-0 flex-1">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                strokeWidth={2}
-                aria-hidden
-              />
-              <input
-                type="search"
-                placeholder="Søg efter navn…"
-                className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-2 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+          <div className="mt-4 space-y-3">
+            <div>
+              <label
+                htmlFor="holddannelse-search"
+                className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+              >
+                Søg
+              </label>
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                  strokeWidth={2}
+                  aria-hidden
+                />
+                <input
+                  id="holddannelse-search"
+                  type="search"
+                  placeholder="Navn på spiller…"
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             </div>
-            <StyledSelect
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-              value={clubFilter}
-              onChange={(e) => setClubFilter(e.target.value)}
-            >
-              <option value="">Alle klubber</option>
-              {clubOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </StyledSelect>
-            <StyledSelect
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-              value={prefFilter}
-              onChange={(e) => setPrefFilter(e.target.value)}
-            >
-              <option value="alle">Alle præferencer</option>
-              <option value="Egen klub">Egen klub</option>
-              <option value="Nye venner">Nye venner</option>
-              <option value="Alt ok">Alt ok</option>
-              <option value="uden">Uden badge</option>
-            </StyledSelect>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="min-w-0">
+                <label
+                  htmlFor="holddannelse-club"
+                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                >
+                  Klub
+                </label>
+                <StyledSelect
+                  id="holddannelse-club"
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  value={clubFilter}
+                  onChange={(e) => setClubFilter(e.target.value)}
+                >
+                  <option value="">Alle klubber</option>
+                  {clubOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </StyledSelect>
+              </div>
+              <div className="min-w-0">
+                <label
+                  htmlFor="holddannelse-pref"
+                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                >
+                  Præference
+                </label>
+                <StyledSelect
+                  id="holddannelse-pref"
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  value={prefFilter}
+                  onChange={(e) => setPrefFilter(e.target.value)}
+                >
+                  <option value="alle">Alle præferencer</option>
+                  <option value="Egen klub">Egen klub</option>
+                  <option value="Nye venner">Nye venner</option>
+                  <option value="Alt ok">Alt ok</option>
+                  <option value="uden">Uden badge</option>
+                </StyledSelect>
+              </div>
+            </div>
           </div>
 
           <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">

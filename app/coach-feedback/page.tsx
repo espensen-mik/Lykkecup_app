@@ -158,14 +158,25 @@ export default function CoachFeedbackPage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-10 pb-16 sm:px-6 sm:py-14">
-      <header className="mb-10 text-center sm:mb-12 sm:text-left">
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-[1.65rem]">
-          Kommentarer fra trænere
-        </h1>
-        <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-gray-600 sm:mx-0">
-          Vælg jeres klub for at se tilmeldte spillere og skrive en samlet kommentar om niveauer eller
-          holdinddeling.
-        </p>
+      <header className="mb-10 sm:mb-12">
+        <div className="flex flex-col items-center gap-6 border-b border-gray-200/80 pb-8 sm:flex-row sm:items-start sm:gap-8 sm:border-0 sm:pb-0">
+          <div className="flex shrink-0 justify-center sm:pt-1">
+            <img
+              src="/lykkeliga-logo.svg"
+              alt="Lykkeliga"
+              className="h-12 w-auto max-w-[200px] object-contain object-center sm:h-14 sm:object-left"
+            />
+          </div>
+          <div className="min-w-0 flex-1 text-center sm:text-left">
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-[1.65rem]">
+              Kommentarer fra trænere
+            </h1>
+            <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-gray-600 sm:mx-0">
+              Nu nærmer tiden sig for LykkeCup 2026. For at sikre den bedste oplevelse for alle har du nu
+              mulighed for at skrive kommentarer til dit hold og dine spillere før vi laver turneringsplanen.
+            </p>
+          </div>
+        </div>
       </header>
 
       {loadError ? (
@@ -208,18 +219,24 @@ export default function CoachFeedbackPage() {
             {filteredPlayers.length === 0 ? (
               <p className="mt-4 text-sm text-gray-500">Ingen spillere fundet for denne klub.</p>
             ) : (
-              <div className="mt-4 overflow-x-auto rounded-xl border border-gray-100">
+              <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200/90 shadow-sm">
                 <table className="w-full min-w-[280px] text-left text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/80">
-                      <th className="px-3 py-2.5 font-medium text-gray-600">Navn</th>
-                      <th className="px-3 py-2.5 font-medium text-gray-600">Alder</th>
-                      <th className="px-3 py-2.5 font-medium text-gray-600">Niveau</th>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="px-3 py-2.5 font-medium text-gray-700">Navn</th>
+                      <th className="px-3 py-2.5 font-medium text-gray-700">Alder</th>
+                      <th className="px-3 py-2.5 font-medium text-gray-700">Niveau</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredPlayers.map((p) => (
-                      <tr key={p.id} className="bg-white">
+                  <tbody>
+                    {filteredPlayers.map((p, index) => (
+                      <tr
+                        key={p.id}
+                        className={
+                          (index % 2 === 0 ? "bg-white" : "bg-emerald-50/70") +
+                          (index < filteredPlayers.length - 1 ? " border-b border-gray-100/90" : "")
+                        }
+                      >
                         <td className="px-3 py-2.5 font-medium text-gray-900">{p.name}</td>
                         <td className="px-3 py-2.5 text-gray-600">
                           {p.age != null && !Number.isNaN(p.age) ? p.age : "—"}
