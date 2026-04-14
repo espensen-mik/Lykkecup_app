@@ -505,57 +505,32 @@ export function TeamBuilder({
                 if (completed && !closedDetailOpen) {
                   return (
                     <li key={t.id}>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-2">
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => openClosedTeamDetail()}
-                          className="flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/95 px-4 py-3 text-left shadow-sm transition hover:bg-emerald-100/90 dark:border-emerald-900/50 dark:bg-emerald-950/35 dark:hover:bg-emerald-950/50 sm:flex-1"
-                        >
-                          <span className="flex min-w-0 flex-wrap items-center gap-2">
-                            <CheckCircle2
-                              className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                              aria-hidden
-                            />
-                            <span className="font-semibold text-emerald-900 dark:text-emerald-100">Luk hold</span>
-                            <span className="truncate text-sm text-emerald-900/85 dark:text-emerald-200/85">
-                              · {t.name}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => openClosedTeamDetail()}
+                        className="flex w-full items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/95 px-4 py-3 text-left shadow-sm transition hover:bg-emerald-100/90 dark:border-emerald-900/50 dark:bg-emerald-950/35 dark:hover:bg-emerald-950/50"
+                      >
+                        <span className="flex min-w-0 flex-1 items-start gap-2.5">
+                          <CheckCircle2
+                            className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                            aria-hidden
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-base font-semibold text-emerald-950 dark:text-emerald-50">
+                              {t.name}
                             </span>
-                            <span className="text-xs tabular-nums text-emerald-800/90 dark:text-emerald-200/90">
+                            <span className="mt-0.5 block text-xs tabular-nums text-emerald-800/90 dark:text-emerald-200/90">
                               {tMembers.length} {tMembers.length === 1 ? "spiller" : "spillere"}
                               {avgAge != null ? ` · snit alder ${avgAge}` : ""}
                             </span>
                           </span>
-                          <ChevronDown
-                            className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300"
-                            aria-hidden
-                          />
-                        </button>
-                        <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0 sm:border-l sm:border-emerald-200/80 sm:pl-3 dark:sm:border-emerald-800/50">
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void toggleTeamCompleted(t)}
-                            className="rounded-lg border border-emerald-200/90 bg-white/90 px-3 py-1.5 text-xs font-medium text-emerald-900 shadow-sm transition hover:bg-white dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100 dark:hover:bg-emerald-900/60"
-                          >
-                            Åbn igen
-                          </button>
-                          {active ? (
-                            <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-center text-xs font-semibold text-teal-900 dark:bg-teal-950/60 dark:text-teal-200">
-                              Aktivt
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => setActiveTeamId(t.id)}
-                              className="rounded-full border border-emerald-300/80 bg-white px-2.5 py-0.5 text-center text-xs font-medium text-emerald-900 shadow-sm transition hover:bg-emerald-100/80 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-900/50"
-                            >
-                              Vælg
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                        </span>
+                        <ChevronDown
+                          className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300"
+                          aria-hidden
+                        />
+                      </button>
                     </li>
                   );
                 }
@@ -580,7 +555,7 @@ export function TeamBuilder({
                       >
                         <span className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                          Luk hold · klik for at folde sammen
+                          Hold lukket · klik for at folde sammen
                         </span>
                         <ChevronDown className="h-4 w-4 rotate-180 text-emerald-700 dark:text-emerald-300" aria-hidden />
                       </button>
