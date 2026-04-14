@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { KommentarerFilteredList } from "@/components/kommentarer-filtered-list";
 import { fetchClubFeedbackForEvent } from "@/lib/club-feedback";
+import { getCurrentAuthAppUser } from "@/lib/auth-server";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,8 @@ export const metadata: Metadata = {
 };
 
 export default async function KommentarerPage() {
-  const { comments, error } = await fetchClubFeedbackForEvent();
+  const [feedbackRes, currentUser] = await Promise.all([fetchClubFeedbackForEvent(), getCurrentAuthAppUser()]);
+  const { comments, error } = feedbackRes;
 
   if (error) {
     return (
@@ -40,7 +42,15 @@ export default async function KommentarerPage() {
         </p>
       </header>
 
-      <KommentarerFilteredList comments={comments} totalCount={comments.length} />
+      <KommentarerFilteredList
+        comments={comments}
+        totalCount={comments.length}
+        currentUser={
+          currentUser
+            ? { id: currentUser.id, fullName: currentUser.fullName, avatarUrl: currentUser.avatarUrl }
+            : null
+        }
+      />
     </div>
   );
 }

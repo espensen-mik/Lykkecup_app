@@ -15,7 +15,9 @@ export async function fetchClubFeedbackForEvent(): Promise<{
 }> {
   const { data, error } = await supabase
     .from("club_feedback")
-    .select("id, event_id, home_club, author_name, comment_text, created_at")
+    .select(
+      "id, event_id, home_club, author_name, comment_text, created_at, ll_status_text, ll_status_created_at, ll_status_author_id, ll_status_author_name, ll_status_author_avatar_url, handled_at, handled_by",
+    )
     .eq("event_id", LYKKECUP_EVENT_ID)
     .order("created_at", { ascending: false });
 
@@ -23,8 +25,18 @@ export async function fetchClubFeedbackForEvent(): Promise<{
     return { comments: [], error: error.message };
   }
 
+  const rows = (data ?? []) as ClubFeedbackRow[];
   return {
-    comments: (data ?? []) as ClubFeedbackRow[],
+    comments: rows.map((r) => ({
+      ...r,
+      ll_status_text: r.ll_status_text ?? null,
+      ll_status_created_at: r.ll_status_created_at ?? null,
+      ll_status_author_id: r.ll_status_author_id ?? null,
+      ll_status_author_name: r.ll_status_author_name ?? null,
+      ll_status_author_avatar_url: r.ll_status_author_avatar_url ?? null,
+      handled_at: r.handled_at ?? null,
+      handled_by: r.handled_by ?? null,
+    })),
     error: null,
   };
 }
