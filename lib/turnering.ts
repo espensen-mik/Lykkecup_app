@@ -1,8 +1,21 @@
-import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
+import { levelSlugForPalette, normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { supabase } from "@/lib/supabase";
 import type { TeamMemberRow, TeamRow } from "@/types/teams";
 
 export const TURNERING_EVENT_ID = "ae74ce1e-9793-48cd-bb1d-c4a248eaf4bf";
+
+function cleanLevelLabel(level: string | null | undefined): string {
+  const normalized = normalizeLevelKey(level);
+  if (normalized === "Ukendt niveau") return normalized;
+  return normalized.replace(/\*+/g, "").replace(/\s+/g, " ").trim();
+}
+
+function canonicalLevelBucket(level: string | null | undefined): { bucketKey: string; label: string } {
+  const cleaned = cleanLevelLabel(level);
+  if (cleaned === "Ukendt niveau") return { bucketKey: cleaned, label: cleaned };
+  const slug = levelSlugForPalette(cleaned);
+  return { bucketKey: `slug:${slug}`, label: cleaned };
+}
 
 export type PuljerOverviewLevel = {
   levelKey: string;
@@ -220,5 +233,205 @@ export function generateRoundRobinMatches<T extends { id: string }>(
     }
   }
   return matches;
+}
+
+export type TurneringDashboardLevelStats = {
+  levelKey: string;
+  playerCount: number;
+  teamCount: number;
+  poolCount: number;
+  pooledTeams: number;
+  unpooledTeams: number;
+  teamPooledPct: number;
+  matchesGenerated: number;
+  expectedMatches: number;
+  matchCoveragePct: number;
+};
+
+export type TurneringDashboardOverview = {
+  levels: TurneringDashboardLevelStats[];
+  totals: {
+    playerCount: number;
+    teamCount: number;
+    poolCount: number;
+    pooledTeams: number;
+    matchesGenerated: number;
+    expectedMatches: number;
+    poolsReadyForMatches: number;
+  };
+  error: string | null;
+};
+
+export async function fetchTurneringDashboardOverview(): Promise<TurneringDashboardOverview> {
+  const eventId = TURNERING_EVENT_ID;
+  const [playersRes, teamsRes, poolsRes, matchesRes] = await Promise.all([
+    supabase.from("players").select("id, level").eq("event_id", eventId),
+    supabase.from("teams").select("id, level, pool_id").eq("event_id", eventId),
+    supabase.from("pools").select("id, level").eq("event_id", eventId),
+    supabase.from("matches").select("id, pool_id").eq("event_id", eventId),
+  ]);
+
+  if (playersRes.error) {
+    return {
+      levels: [],
+      totals: {
+        playerCount: 0,
+        teamCount: 0,
+        poolCount: 0,
+        pooledTeams: 0,
+        matchesGenerated: 0,
+        expectedMatches: 0,
+        poolsReadyForMatches: 0,
+      },
+      error: playersRes.error.message,
+    };
+  }
+  if (teamsRes.error) {
+    return {
+      levels: [],
+      totals: {
+        playerCount: 0,
+        teamCount: 0,
+        poolCount: 0,
+        pooledTeams: 0,
+        matchesGenerated: 0,
+        expectedMatches: 0,
+        poolsReadyForMatches: 0,
+      },
+      error: teamsRes.error.message,
+    };
+  }
+  if (poolsRes.error) {
+    return {
+      levels: [],
+      totals: {
+        playerCount: 0,
+        teamCount: 0,
+        poolCount: 0,
+        pooledTeams: 0,
+        matchesGenerated: 0,
+        expectedMatches: 0,
+        poolsReadyForMatches: 0,
+      },
+      error: poolsRes.error.message,
+    };
+  }
+  if (matchesRes.error) {
+    return {
+      levels: [],
+      totals: {
+        playerCount: 0,
+        teamCount: 0,
+        poolCount: 0,
+        pooledTeams: 0,
+        matchesGenerated: 0,
+        expectedMatches: 0,
+        poolsReadyForMatches: 0,
+      },
+      error: matchesRes.error.message,
+    };
+  }
+
+  const players = (playersRes.data ?? []) as { id: string; level: string | null }[];
+  const teams = (teamsRes.data ?? []) as { id: string; level: string | null; pool_id: string | null }[];
+  const pools = (poolsRes.data ?? []) as { id: string; level: string | null }[];
+  const matches = (matchesRes.data ?? []) as { id: string; pool_id: string | null }[];
+
+  const levelMap = new Map<string, TurneringDashboardLevelStats>();
+  const ensureLevel = (bucketKey: string, label: string): TurneringDashboardLevelStats => {
+    const current = levelMap.get(bucketKey);
+    if (current) return current;
+    const row: TurneringDashboardLevelStats = {
+      levelKey: label,
+      playerCount: 0,
+      teamCount: 0,
+      poolCount: 0,
+      pooledTeams: 0,
+      unpooledTeams: 0,
+      teamPooledPct: 0,
+      matchesGenerated: 0,
+      expectedMatches: 0,
+      matchCoveragePct: 0,
+    };
+    levelMap.set(bucketKey, row);
+    return row;
+  };
+
+  for (const p of players) {
+    const level = canonicalLevelBucket(p.level);
+    ensureLevel(level.bucketKey, level.label).playerCount += 1;
+  }
+
+  const poolLevelById = new Map<string, string>();
+  for (const pool of pools) {
+    const level = canonicalLevelBucket(pool.level);
+    poolLevelById.set(pool.id, level.bucketKey);
+    ensureLevel(level.bucketKey, level.label).poolCount += 1;
+  }
+
+  const teamCountByPool = new Map<string, number>();
+  for (const team of teams) {
+    const level = canonicalLevelBucket(team.level);
+    const row = ensureLevel(level.bucketKey, level.label);
+    row.teamCount += 1;
+    if (team.pool_id) {
+      row.pooledTeams += 1;
+      teamCountByPool.set(team.pool_id, (teamCountByPool.get(team.pool_id) ?? 0) + 1);
+    } else {
+      row.unpooledTeams += 1;
+    }
+  }
+
+  for (const match of matches) {
+    if (!match.pool_id) continue;
+    const bucketKey = poolLevelById.get(match.pool_id);
+    if (!bucketKey) continue;
+    const row = levelMap.get(bucketKey);
+    if (!row) continue;
+    row.matchesGenerated += 1;
+  }
+
+  for (const [poolId, teamCount] of teamCountByPool.entries()) {
+    const bucketKey = poolLevelById.get(poolId);
+    if (!bucketKey) continue;
+    const expected = teamCount >= 2 ? (teamCount * (teamCount - 1)) / 2 : 0;
+    const row = levelMap.get(bucketKey);
+    if (!row) continue;
+    row.expectedMatches += expected;
+  }
+
+  for (const row of levelMap.values()) {
+    row.teamPooledPct = row.teamCount > 0 ? Math.round((row.pooledTeams / row.teamCount) * 1000) / 10 : 0;
+    row.matchCoveragePct =
+      row.expectedMatches > 0 ? Math.round((row.matchesGenerated / row.expectedMatches) * 1000) / 10 : 0;
+  }
+
+  const levels = sortLevelKeysForNav([...levelMap.values()].map((v) => v.levelKey)).map(
+    (label) => [...levelMap.values()].find((row) => row.levelKey === label)!,
+  );
+
+  const totals = levels.reduce(
+    (acc, row) => {
+      acc.playerCount += row.playerCount;
+      acc.teamCount += row.teamCount;
+      acc.poolCount += row.poolCount;
+      acc.pooledTeams += row.pooledTeams;
+      acc.matchesGenerated += row.matchesGenerated;
+      acc.expectedMatches += row.expectedMatches;
+      return acc;
+    },
+    {
+      playerCount: 0,
+      teamCount: 0,
+      poolCount: 0,
+      pooledTeams: 0,
+      matchesGenerated: 0,
+      expectedMatches: 0,
+      poolsReadyForMatches: 0,
+    },
+  );
+
+  totals.poolsReadyForMatches = [...teamCountByPool.values()].filter((count) => count >= 2).length;
+  return { levels, totals, error: null };
 }
 

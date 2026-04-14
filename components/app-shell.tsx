@@ -233,9 +233,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 : "border-transparent text-gray-700 dark:text-gray-300"
             }`}
           >
-            <button
-              type="button"
-              onClick={() => setTurneringOpen((v) => !v)}
+            <Link
+              href="/turnering"
+              onClick={() => setMobileOpen(false)}
               className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 pr-1 text-left text-[0.9375rem] font-medium"
             >
               <CalendarDays
@@ -246,7 +246,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-hidden
               />
               <span className="truncate">Turnering</span>
-            </button>
+            </Link>
             <button
               type="button"
               onClick={() => setTurneringOpen((v) => !v)}
