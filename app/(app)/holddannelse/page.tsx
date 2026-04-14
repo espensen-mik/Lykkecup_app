@@ -15,7 +15,7 @@ export default async function HolddannelsePage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto w-full max-w-3xl">
         <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
           Holddannelse
         </h1>
@@ -27,7 +27,7 @@ export default async function HolddannelsePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-10 lg:space-y-11">
+    <div className="mx-auto w-full max-w-7xl space-y-10 lg:space-y-11">
       <header className="max-w-2xl">
         <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">
           Arrangement

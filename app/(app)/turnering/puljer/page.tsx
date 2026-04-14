@@ -16,7 +16,7 @@ export default async function TurneringPuljerPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto w-full max-w-3xl">
         <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Puljer</h1>
         <div className="mt-8 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
           Kunne ikke indlæse data: {error}
@@ -26,7 +26,7 @@ export default async function TurneringPuljerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-10 lg:space-y-11">
+    <div className="mx-auto w-full max-w-7xl space-y-10 lg:space-y-11">
       <header className="max-w-2xl">
         <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">
           Turnering

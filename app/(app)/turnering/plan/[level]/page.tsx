@@ -36,7 +36,7 @@ export default async function TurneringPlanLevelPage({ params }: PageProps) {
 
   if (bundle.error) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto w-full max-w-3xl">
         <BackLink />
         <h1 className="mt-6 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Turneringsplan</h1>
         <div className="mt-8 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
@@ -49,7 +49,7 @@ export default async function TurneringPlanLevelPage({ params }: PageProps) {
   if (bundle.teams.length === 0 && bundle.pools.length === 0) notFound();
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto w-full max-w-7xl space-y-8">
       <div>
         <BackLink />
         <header className="mt-4 max-w-3xl">

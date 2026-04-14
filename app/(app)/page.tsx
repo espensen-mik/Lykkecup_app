@@ -7,7 +7,7 @@ export default async function Home() {
   const { players, error } = await fetchPlayersForEvent();
 
   return (
-    <div className="mx-auto max-w-6xl space-y-10 lg:space-y-11">
+    <div className="mx-auto w-full max-w-7xl space-y-10 lg:space-y-11">
       <header className="max-w-2xl">
         <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">
           Deltagere

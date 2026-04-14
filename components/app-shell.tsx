@@ -480,8 +480,8 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
         {sidebar}
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main className="flex min-h-0 flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-11 xl:px-12">
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-11 xl:px-12">
           {children}
         </main>
       </div>

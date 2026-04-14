@@ -472,7 +472,7 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <header>
         <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">Turnering</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">Baner & tider</h1>

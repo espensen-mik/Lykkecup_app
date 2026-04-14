@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function PlayerNotFound() {
   return (
-    <div className="mx-auto max-w-lg px-2 py-12 text-center">
+    <div className="mx-auto w-full max-w-lg px-2 py-12 text-center">
       <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
         Spilleren findes ikke
       </h1>

@@ -31,7 +31,7 @@ export default async function PlayerDetailPage({ params }: PageProps) {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-lg">
+      <div className="mx-auto w-full max-w-lg">
         <Link
           href="/"
           className="mb-8 inline-flex text-sm font-medium text-[#0d9488] underline-offset-4 hover:underline dark:text-teal-400"
@@ -50,7 +50,7 @@ export default async function PlayerDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-lg">
+    <div className="mx-auto w-full max-w-lg">
       <Link
         href="/"
         className="mb-8 inline-flex text-sm font-medium text-[#0d9488] underline-offset-4 hover:underline dark:text-teal-400"

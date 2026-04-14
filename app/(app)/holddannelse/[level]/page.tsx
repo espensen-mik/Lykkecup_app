@@ -36,7 +36,7 @@ export default async function HoldLevelPage({ params }: PageProps) {
 
   if (bundle.error) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto w-full max-w-3xl">
         <BackLink />
         <h1 className="mt-6 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
           Holddannelse
@@ -53,7 +53,7 @@ export default async function HoldLevelPage({ params }: PageProps) {
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-8">
+    <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-8">
       <div className="shrink-0">
         <BackLink />
         <header className="mt-4 max-w-2xl">

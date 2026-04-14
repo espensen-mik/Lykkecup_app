@@ -74,6 +74,8 @@ export function TeamBuilder({
   const [actionError, setActionError] = useState<string | null>(null);
   /** Sammenfoldede hold (kun UI — gemmes ikke). */
   const [collapsedTeamIds, setCollapsedTeamIds] = useState<Set<string>>(() => new Set());
+  /** Lukkede hold: false/undefined = kompakt grøn bjælke (som håndterede kommentarer); true = udvidet kort. */
+  const [closedTeamDetailOpen, setClosedTeamDetailOpen] = useState<Record<string, boolean>>({});
 
   const playerById = useMemo(() => {
     const m = new Map<string, HoldPlayerRow>();
@@ -236,6 +238,11 @@ export function TeamBuilder({
       if (next) s.add(team.id);
       else s.delete(team.id);
       return s;
+    });
+    setClosedTeamDetailOpen((prev) => {
+      const copy = { ...prev };
+      delete copy[team.id];
+      return copy;
     });
   }, []);
 
@@ -475,6 +482,8 @@ export function TeamBuilder({
                 const active = t.id === activeTeamId;
                 const collapsed = collapsedTeamIds.has(t.id);
                 const completed = teamIsCompleted(t);
+                const closedDetailOpen = closedTeamDetailOpen[t.id] === true;
+
                 const cardClass = completed
                   ? active
                     ? "border-emerald-200 bg-emerald-50/95 ring-2 ring-teal-500/30 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:ring-teal-500/25"
@@ -482,146 +491,237 @@ export function TeamBuilder({
                   : active
                     ? "border-teal-500 ring-2 ring-teal-500/25 dark:border-teal-500"
                     : "border-lc-border dark:border-gray-700";
-                return (
-                  <li
-                    key={t.id}
-                    className={`rounded-xl border bg-white p-3 shadow-sm transition-colors dark:bg-gray-900/35 sm:p-4 ${cardClass}`}
-                  >
-                    <div className="flex gap-1 sm:gap-2">
-                      <button
-                        type="button"
-                        aria-expanded={!collapsed}
-                        aria-label={collapsed ? "Udvid hold" : "Sammenfold hold"}
-                        onClick={() => toggleTeamCollapsed(t.id)}
-                        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                          completed
-                            ? "text-emerald-700 hover:bg-emerald-100/90 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
-                            : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        }`}
-                      >
-                        <ChevronDown
-                          className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : ""} ${completed ? "text-emerald-700 dark:text-emerald-300" : ""}`}
-                          strokeWidth={2}
-                          aria-hidden
-                        />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setActiveTeamId(t.id)}
-                            className="min-w-0 flex-1 text-left"
-                          >
-                            <div className="flex items-center gap-2">
-                              {completed ? (
-                                <span className="inline-flex shrink-0" title="Hold lukket">
-                                  <CheckCircle2
-                                    className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
-                                    strokeWidth={2}
-                                    aria-hidden
-                                  />
-                                </span>
-                              ) : null}
-                              <h3
-                                className={`text-base font-semibold ${
-                                  completed ? "text-emerald-950 dark:text-emerald-50" : "text-gray-900 dark:text-white"
-                                }`}
-                              >
-                                {t.name}
-                              </h3>
-                            </div>
-                            <p
-                              className={`mt-1 text-xs ${
-                                completed ? "text-emerald-800/90 dark:text-emerald-200/85" : "text-gray-500 dark:text-gray-400"
-                              }`}
-                            >
+
+                function openClosedTeamDetail() {
+                  setActiveTeamId(t.id);
+                  setClosedTeamDetailOpen((p) => ({ ...p, [t.id]: true }));
+                  setCollapsedTeamIds((prev) => {
+                    const s = new Set(prev);
+                    s.delete(t.id);
+                    return s;
+                  });
+                }
+
+                if (completed && !closedDetailOpen) {
+                  return (
+                    <li key={t.id}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-2">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => openClosedTeamDetail()}
+                          className="flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/95 px-4 py-3 text-left shadow-sm transition hover:bg-emerald-100/90 dark:border-emerald-900/50 dark:bg-emerald-950/35 dark:hover:bg-emerald-950/50 sm:flex-1"
+                        >
+                          <span className="flex min-w-0 flex-wrap items-center gap-2">
+                            <CheckCircle2
+                              className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                              aria-hidden
+                            />
+                            <span className="font-semibold text-emerald-900 dark:text-emerald-100">Luk hold</span>
+                            <span className="truncate text-sm text-emerald-900/85 dark:text-emerald-200/85">
+                              · {t.name}
+                            </span>
+                            <span className="text-xs tabular-nums text-emerald-800/90 dark:text-emerald-200/90">
                               {tMembers.length} {tMembers.length === 1 ? "spiller" : "spillere"}
                               {avgAge != null ? ` · snit alder ${avgAge}` : ""}
-                              {clubCount > 0
-                                ? ` · ${clubCount} ${clubCount === 1 ? "klub" : "klubber"}`
-                                : ""}
-                            </p>
+                            </span>
+                          </span>
+                          <ChevronDown
+                            className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300"
+                            aria-hidden
+                          />
+                        </button>
+                        <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0 sm:border-l sm:border-emerald-200/80 sm:pl-3 dark:sm:border-emerald-800/50">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void toggleTeamCompleted(t)}
+                            className="rounded-lg border border-emerald-200/90 bg-white/90 px-3 py-1.5 text-xs font-medium text-emerald-900 shadow-sm transition hover:bg-white dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100 dark:hover:bg-emerald-900/60"
+                          >
+                            Åbn igen
                           </button>
-                          <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+                          {active ? (
+                            <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-center text-xs font-semibold text-teal-900 dark:bg-teal-950/60 dark:text-teal-200">
+                              Aktivt
+                            </span>
+                          ) : (
                             <button
                               type="button"
                               disabled={busy}
-                              onClick={() => void toggleTeamCompleted(t)}
-                              className={
-                                completed
-                                  ? "rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-                                  : "rounded-lg border border-emerald-600/90 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-950/70"
-                              }
+                              onClick={() => setActiveTeamId(t.id)}
+                              className="rounded-full border border-emerald-300/80 bg-white px-2.5 py-0.5 text-center text-xs font-medium text-emerald-900 shadow-sm transition hover:bg-emerald-100/80 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-900/50"
                             >
-                              {completed ? "Åbn igen" : "Luk hold"}
+                              Vælg
                             </button>
-                            {active ? (
-                              <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-center text-xs font-semibold text-teal-900 dark:bg-teal-950/60 dark:text-teal-200">
-                                Aktivt
-                              </span>
-                            ) : (
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                }
+
+                const outerLiClass = completed
+                  ? `overflow-hidden rounded-xl border shadow-sm transition-colors dark:shadow-none ${
+                      active
+                        ? "border-emerald-200 bg-white ring-2 ring-teal-500/30 dark:border-emerald-900/40 dark:bg-gray-900/35"
+                        : "border-emerald-200 bg-white dark:border-emerald-900/40 dark:bg-gray-900/35"
+                    }`
+                  : `rounded-xl border bg-white p-3 shadow-sm transition-colors dark:bg-gray-900/35 sm:p-4 ${cardClass}`;
+
+                return (
+                  <li key={t.id} className={outerLiClass}>
+                    {completed ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setClosedTeamDetailOpen((p) => ({ ...p, [t.id]: false }));
+                        }}
+                        className="flex w-full items-center justify-between gap-2 border-b border-emerald-100 bg-emerald-50/90 px-4 py-2.5 text-left text-sm font-medium text-emerald-900 transition hover:bg-emerald-100/90 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-950/55"
+                      >
+                        <span className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                          Luk hold · klik for at folde sammen
+                        </span>
+                        <ChevronDown className="h-4 w-4 rotate-180 text-emerald-700 dark:text-emerald-300" aria-hidden />
+                      </button>
+                    ) : null}
+                    <div className={completed ? "p-3 sm:p-4" : ""}>
+                      <div className="flex gap-1 sm:gap-2">
+                        <button
+                          type="button"
+                          aria-expanded={!collapsed}
+                          aria-label={collapsed ? "Udvid hold" : "Sammenfold hold"}
+                          onClick={() => toggleTeamCollapsed(t.id)}
+                          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                            completed
+                              ? "text-emerald-700 hover:bg-emerald-100/90 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+                              : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          }`}
+                        >
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : ""} ${completed ? "text-emerald-700 dark:text-emerald-300" : ""}`}
+                            strokeWidth={2}
+                            aria-hidden
+                          />
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setActiveTeamId(t.id)}
+                              className="min-w-0 flex-1 text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                {completed ? (
+                                  <span className="inline-flex shrink-0" title="Hold lukket">
+                                    <CheckCircle2
+                                      className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
+                                      strokeWidth={2}
+                                      aria-hidden
+                                    />
+                                  </span>
+                                ) : null}
+                                <h3
+                                  className={`text-base font-semibold ${
+                                    completed ? "text-emerald-950 dark:text-emerald-50" : "text-gray-900 dark:text-white"
+                                  }`}
+                                >
+                                  {t.name}
+                                </h3>
+                              </div>
+                              <p
+                                className={`mt-1 text-xs ${
+                                  completed ? "text-emerald-800/90 dark:text-emerald-200/85" : "text-gray-500 dark:text-gray-400"
+                                }`}
+                              >
+                                {tMembers.length} {tMembers.length === 1 ? "spiller" : "spillere"}
+                                {avgAge != null ? ` · snit alder ${avgAge}` : ""}
+                                {clubCount > 0
+                                  ? ` · ${clubCount} ${clubCount === 1 ? "klub" : "klubber"}`
+                                  : ""}
+                              </p>
+                            </button>
+                            <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                               <button
                                 type="button"
                                 disabled={busy}
-                                onClick={() => setActiveTeamId(t.id)}
-                                className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-center text-xs font-medium text-gray-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50 hover:text-[#0f766e] disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900/60 dark:text-gray-200 dark:hover:border-teal-600 dark:hover:bg-teal-950/40 dark:hover:text-teal-200"
+                                onClick={() => void toggleTeamCompleted(t)}
+                                className={
+                                  completed
+                                    ? "rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                                    : "rounded-lg border border-emerald-600/90 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-950/70"
+                                }
                               >
-                                Vælg
+                                {completed ? "Åbn igen" : "Luk hold"}
                               </button>
-                            )}
+                              {active ? (
+                                <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-center text-xs font-semibold text-teal-900 dark:bg-teal-950/60 dark:text-teal-200">
+                                  Aktivt
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => setActiveTeamId(t.id)}
+                                  className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-center text-xs font-medium text-gray-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50 hover:text-[#0f766e] disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900/60 dark:text-gray-200 dark:hover:border-teal-600 dark:hover:bg-teal-950/40 dark:hover:text-teal-200"
+                                >
+                                  Vælg
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
 
-                        {!collapsed ? (
-                          tMembers.length === 0 ? (
-                            <p className="mt-3 text-xs text-gray-500">
-                              Ingen spillere på holdet endnu.
-                            </p>
-                          ) : (
-                            <ul
-                              className={`mt-3 divide-y ${
-                                completed
-                                  ? "divide-emerald-100 dark:divide-emerald-900/45"
-                                  : "divide-gray-100 dark:divide-gray-700"
-                              }`}
-                            >
-                              {tMembers.map((m) => {
-                                const pl = playerById.get(m.player_id);
-                                return (
-                                  <li
-                                    key={m.id}
-                                    className="flex items-start justify-between gap-3 py-2.5 first:pt-0"
-                                  >
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {pl?.name ?? m.player_id}
-                                      </p>
-                                      {pl ? (
-                                        <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-gray-500 dark:text-gray-400">
-                                          <span>{pl.home_club?.trim() || "—"}</span>
-                                          <span className="tabular-nums">
-                                            {pl.age != null && !Number.isNaN(pl.age)
-                                              ? `${pl.age} år`
-                                              : "Alder —"}
-                                          </span>
-                                          <span>{pl.gender?.trim() || "Køn —"}</span>
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      disabled={busy}
-                                      onClick={() => void removeMember(m)}
-                                      className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-800 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-200"
+                          {!collapsed ? (
+                            tMembers.length === 0 ? (
+                              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                                Ingen spillere på holdet endnu.
+                              </p>
+                            ) : (
+                              <ul
+                                className={`mt-3 divide-y ${
+                                  completed
+                                    ? "divide-emerald-100 dark:divide-emerald-900/45"
+                                    : "divide-gray-100 dark:divide-gray-700"
+                                }`}
+                              >
+                                {tMembers.map((m) => {
+                                  const pl = playerById.get(m.player_id);
+                                  return (
+                                    <li
+                                      key={m.id}
+                                      className="flex items-start justify-between gap-3 py-2.5 first:pt-0"
                                     >
-                                      Fjern
-                                    </button>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )
-                        ) : null}
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                          {pl?.name ?? m.player_id}
+                                        </p>
+                                        {pl ? (
+                                          <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-gray-500 dark:text-gray-400">
+                                            <span>{pl.home_club?.trim() || "—"}</span>
+                                            <span className="tabular-nums">
+                                              {pl.age != null && !Number.isNaN(pl.age)
+                                                ? `${pl.age} år`
+                                                : "Alder —"}
+                                            </span>
+                                            <span>{pl.gender?.trim() || "Køn —"}</span>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        disabled={busy}
+                                        onClick={() => void removeMember(m)}
+                                        className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-800 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-200"
+                                      >
+                                        Fjern
+                                      </button>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </li>
