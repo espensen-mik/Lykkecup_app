@@ -1,7 +1,8 @@
 "use client";
 
-import { Building2, CalendarDays, ChevronDown, LayoutDashboard, Menu, MessageSquareText, Users, UsersRound, type LucideIcon } from "lucide-react";
+import { Building2, CalendarDays, ChevronDown, LayoutDashboard, LogOut, Menu, MessageSquareText, Users, UsersRound, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+import type { AuthAppUser } from "@/lib/auth-server";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { hasClubFeedbackInLastHours } from "@/lib/club-feedback";
@@ -13,7 +14,6 @@ const RECENT_COMMENTS_HOURS = 24;
 
 const APP_SIDEBAR_TITLE = "LykkeCup KontrolCenter 2026";
 const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
-const HEADER_USER_NAME = "Mikael Espensen";
 
 const nav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard", label: "Overblik", icon: LayoutDashboard },
@@ -47,7 +47,24 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, currentUser }: { children: React.ReactNode; currentUser: AuthAppUser | null }) {
+  function initialsFromName(name: string) {
+    const parts = name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (parts.length === 0) return "U";
+    return parts
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("");
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }
+
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [holdLevels, setHoldLevels] = useState<string[]>([]);
@@ -397,15 +414,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {HEADER_TITLE}
           </span>
         </Link>
-        <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/30 bg-white/12 px-2.5 py-1 backdrop-blur-sm">
-          <img
-            src="/mik_profil.jpg"
-            alt={HEADER_USER_NAME}
-            className="h-7 w-7 rounded-full object-cover ring-1 ring-white/50"
-          />
-          <span className="hidden text-sm font-medium text-white/95 sm:inline">
-            {HEADER_USER_NAME}
-          </span>
+        <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/30 bg-white/12 px-2 py-1 backdrop-blur-sm">
+          {currentUser?.avatarUrl ? (
+            <img
+              src={currentUser.avatarUrl}
+              alt={currentUser.fullName}
+              className="h-7 w-7 rounded-full object-cover ring-1 ring-white/50"
+            />
+          ) : (
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/85 text-[0.68rem] font-semibold text-[#0f766e] ring-1 ring-white/50">
+              {initialsFromName(currentUser?.fullName ?? "Ukendt bruger")}
+            </span>
+          )}
+          <div className="hidden min-w-0 sm:block">
+            <p className="truncate text-sm font-medium text-white/95">{currentUser?.fullName ?? "Bruger"}</p>
+            <p className="truncate text-[0.65rem] uppercase tracking-wide text-white/75">{currentUser?.role ?? "user"}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Log ud"
+            title="Log ud"
+          >
+            <LogOut className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </button>
         </div>
       </header>
 
