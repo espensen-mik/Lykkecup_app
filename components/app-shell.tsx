@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Building2,
-  LayoutDashboard,
-  Menu,
-  MessageSquareText,
-  Users,
-  UsersRound,
-  type LucideIcon,
-} from "lucide-react";
+import { Building2, CalendarDays, ChevronDown, LayoutDashboard, Menu, MessageSquareText, Users, UsersRound, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -28,12 +20,11 @@ const nav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Spillere", icon: Users },
   { href: "/klubber", label: "Klubber", icon: Building2 },
   { href: "/kommentarer", label: "Kommentarer", icon: MessageSquareText },
-  { href: "/holddannelse", label: "Holddannelse", icon: UsersRound },
 ];
 
-function pathLevelKeyFromPathname(pathname: string): string | null {
-  if (!pathname.startsWith("/holddannelse/")) return null;
-  const rest = pathname.slice("/holddannelse/".length);
+function pathLevelKeyFromPathname(pathname: string, basePath: string): string | null {
+  if (!pathname.startsWith(`${basePath}/`)) return null;
+  const rest = pathname.slice(`${basePath}/`.length);
   if (!rest) return null;
   try {
     return decodeURIComponent(rest);
@@ -60,21 +51,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [holdLevels, setHoldLevels] = useState<string[]>([]);
+  const [turneringLevels, setTurneringLevels] = useState<string[]>([]);
   const [kommentarerNye, setKommentarerNye] = useState(false);
+  const [holdOpen, setHoldOpen] = useState(() => pathname.startsWith("/holddannelse"));
+  const [turneringOpen, setTurneringOpen] = useState(() => pathname.startsWith("/turnering"));
+  const [puljerOpen, setPuljerOpen] = useState(() => pathname.startsWith("/turnering/puljer"));
+  const [planOpen, setPlanOpen] = useState(() => pathname.startsWith("/turnering/plan"));
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from("players")
-        .select("level")
-        .eq("event_id", LYKKECUP_EVENT_ID);
-      if (cancelled || error || !data) return;
-      const keys = new Set<string>();
-      for (const row of data as { level: string | null }[]) {
-        keys.add(normalizeLevelKey(row.level));
+      const [playersRes, teamsRes] = await Promise.all([
+        supabase.from("players").select("level").eq("event_id", LYKKECUP_EVENT_ID),
+        supabase.from("teams").select("level").eq("event_id", LYKKECUP_EVENT_ID),
+      ]);
+      if (cancelled) return;
+      if (playersRes.error || teamsRes.error) return;
+
+      const holdKeys = new Set<string>();
+      for (const row of (playersRes.data ?? []) as { level: string | null }[]) {
+        holdKeys.add(normalizeLevelKey(row.level));
       }
-      setHoldLevels(sortLevelKeysForNav([...keys]));
+      setHoldLevels(sortLevelKeysForNav([...holdKeys]));
+
+      const turneringKeys = new Set<string>();
+      for (const row of (teamsRes.data ?? []) as { level: string | null }[]) {
+        turneringKeys.add(normalizeLevelKey(row.level));
+      }
+      setTurneringLevels(sortLevelKeysForNav([...turneringKeys]));
     })();
     return () => {
       cancelled = true;
@@ -92,16 +96,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (pathname.startsWith("/holddannelse")) setHoldOpen(true);
+    if (pathname.startsWith("/turnering")) setTurneringOpen(true);
+    if (pathname.startsWith("/turnering/puljer")) setPuljerOpen(true);
+    if (pathname.startsWith("/turnering/plan")) setPlanOpen(true);
+  }, [pathname]);
+
   function isActive(href: string) {
-    if (href === "/holddannelse") {
-      return pathname === "/holddannelse" || pathname.startsWith("/holddannelse/");
-    }
+    if (href === "/holddannelse") return pathname === "/holddannelse" || pathname.startsWith("/holddannelse/");
+    if (href === "/turnering") return pathname.startsWith("/turnering");
+    if (href === "/turnering/puljer")
+      return pathname === "/turnering/puljer" || pathname.startsWith("/turnering/puljer/");
+    if (href === "/turnering/plan")
+      return pathname === "/turnering/plan" || pathname.startsWith("/turnering/plan/");
     return pathname === href;
   }
 
-  const currentHoldLevelKey = pathLevelKeyFromPathname(pathname);
+  const currentHoldLevelKey = pathLevelKeyFromPathname(pathname, "/holddannelse");
+  const currentPuljerLevelKey = pathLevelKeyFromPathname(pathname, "/turnering/puljer");
+  const currentPlanLevelKey = pathLevelKeyFromPathname(pathname, "/turnering/plan");
 
   const sortedHoldLevels = useMemo(() => sortLevelKeysForNav([...holdLevels]), [holdLevels]);
+  const sortedTurneringLevels = useMemo(() => sortLevelKeysForNav([...turneringLevels]), [turneringLevels]);
 
   const sidebar = (
     <>
@@ -112,56 +129,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {nav.map((item) => {
           const active = isActive(item.href);
           const NavIcon = item.icon;
-
-          if (item.href === "/holddannelse") {
-            return (
-              <div key={item.href} className="space-y-0.5">
-                <Link
-                  href="/holddannelse"
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 rounded-md py-2.5 pr-3 text-[0.9375rem] font-medium transition-colors border-l-2 ${
-                    active
-                      ? "border-[#14b8a6] bg-teal-50/90 pl-[10px] text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
-                      : "border-transparent pl-3 text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-white"
-                  } `}
-                >
-                  <NavIcon
-                    className={`h-4 w-4 shrink-0 ${active ? "text-[#0f766e] dark:text-teal-300" : "text-gray-400 dark:text-gray-500"}`}
-                    strokeWidth={2}
-                    aria-hidden
-                  />
-                  {item.label}
-                </Link>
-                {sortedHoldLevels.length > 0 ? (
-                  <ul
-                    className="ml-4 space-y-0.5 border-l border-gray-200 py-0.5 pl-3 dark:border-gray-700"
-                    aria-label="Niveauer"
-                  >
-                    {sortedHoldLevels.map((levelKey) => {
-                      const href = `/holddannelse/${encodeURIComponent(levelKey)}`;
-                      const subActive = currentHoldLevelKey === levelKey;
-                      return (
-                        <li key={levelKey}>
-                          <Link
-                            href={href}
-                            title={levelKey}
-                            onClick={() => setMobileOpen(false)}
-                            className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
-                              subActive
-                                ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
-                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
-                            }`}
-                          >
-                            {levelKey}
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </div>
-            );
-          }
 
           const showKommentarerNyeTag =
             item.href === "/kommentarer" && kommentarerNye;
@@ -189,13 +156,216 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
               {showKommentarerNyeTag ? (
-                <span className="shrink-0 rounded-full bg-teal-100 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-[#0f766e] dark:bg-teal-900/50 dark:text-teal-200">
+                <span
+                  title="Nye kommentarer registreret inden for de sidste 24 timer."
+                  className="shrink-0 rounded-full bg-teal-100 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-[#0f766e] dark:bg-teal-900/50 dark:text-teal-200"
+                >
                   Nye
                 </span>
               ) : null}
             </Link>
           );
         })}
+
+        <div className="mt-1 space-y-0.5">
+          <div
+            className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
+              isActive("/holddannelse")
+                ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                : "border-transparent text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            <Link
+              href="/holddannelse"
+              onClick={() => setMobileOpen(false)}
+              className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 pr-1 text-[0.9375rem] font-medium"
+            >
+              <UsersRound
+                className={`h-4 w-4 shrink-0 ${
+                  isActive("/holddannelse") ? "text-[#0f766e] dark:text-teal-300" : "text-gray-400 dark:text-gray-500"
+                }`}
+                strokeWidth={2}
+                aria-hidden
+              />
+              <span className="truncate">Holddannelse</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setHoldOpen((v) => !v)}
+              className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              aria-label={holdOpen ? "Skjul niveauer" : "Vis niveauer"}
+              aria-expanded={holdOpen}
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${holdOpen ? "" : "-rotate-90"}`} aria-hidden />
+            </button>
+          </div>
+          {holdOpen && sortedHoldLevels.length > 0 ? (
+            <ul className="ml-6 space-y-0.5 border-l border-gray-200 py-0.5 pl-3 dark:border-gray-700" aria-label="Holddannelse niveauer">
+              {sortedHoldLevels.map((levelKey) => {
+                const href = `/holddannelse/${encodeURIComponent(levelKey)}`;
+                const subActive = currentHoldLevelKey === levelKey;
+                return (
+                  <li key={`hold-${levelKey}`}>
+                    <Link
+                      href={href}
+                      title={levelKey}
+                      onClick={() => setMobileOpen(false)}
+                      className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
+                        subActive
+                          ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+                      }`}
+                    >
+                      {levelKey}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </div>
+
+        <div className="mt-1 space-y-0.5">
+          <div
+            className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
+              isActive("/turnering")
+                ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                : "border-transparent text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => setTurneringOpen((v) => !v)}
+              className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 pr-1 text-left text-[0.9375rem] font-medium"
+            >
+              <CalendarDays
+                className={`h-4 w-4 shrink-0 ${
+                  isActive("/turnering") ? "text-[#0f766e] dark:text-teal-300" : "text-gray-400 dark:text-gray-500"
+                }`}
+                strokeWidth={2}
+                aria-hidden
+              />
+              <span className="truncate">Turnering</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTurneringOpen((v) => !v)}
+              className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              aria-label={turneringOpen ? "Skjul sektion" : "Vis sektion"}
+              aria-expanded={turneringOpen}
+            >
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${turneringOpen ? "" : "-rotate-90"}`}
+                aria-hidden
+              />
+            </button>
+          </div>
+          {turneringOpen ? (
+            <div className="ml-4 space-y-0.5 border-l border-gray-200 py-0.5 pl-3 dark:border-gray-700">
+              <div className="space-y-0.5">
+                <div
+                  className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
+                    isActive("/turnering/puljer")
+                      ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                      : "border-transparent text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  <Link
+                    href="/turnering/puljer"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex min-w-0 flex-1 items-center gap-2 py-1 pl-2 pr-1 text-[0.86rem] font-medium"
+                  >
+                    <span className="truncate">Puljer</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setPuljerOpen((v) => !v)}
+                    className="mr-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                    aria-label={puljerOpen ? "Skjul niveauer" : "Vis niveauer"}
+                    aria-expanded={puljerOpen}
+                  >
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${puljerOpen ? "" : "-rotate-90"}`} aria-hidden />
+                  </button>
+                </div>
+                {puljerOpen && sortedTurneringLevels.length > 0 ? (
+                  <ul className="ml-4 space-y-0.5 border-l border-gray-200 py-0.5 pl-3 dark:border-gray-700" aria-label="Puljer niveauer">
+                    {sortedTurneringLevels.map((levelKey) => {
+                      const href = `/turnering/puljer/${encodeURIComponent(levelKey)}`;
+                      const subActive = currentPuljerLevelKey === levelKey;
+                      return (
+                        <li key={`puljer-${levelKey}`}>
+                          <Link
+                            href={href}
+                            title={levelKey}
+                            onClick={() => setMobileOpen(false)}
+                            className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
+                              subActive
+                                ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+                            }`}
+                          >
+                            {levelKey}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+
+              <div className="space-y-0.5">
+                <div
+                  className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
+                    isActive("/turnering/plan")
+                      ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                      : "border-transparent text-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  <Link
+                    href="/turnering/plan"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex min-w-0 flex-1 items-center gap-2 py-1 pl-2 pr-1 text-[0.86rem] font-medium"
+                  >
+                    <span className="truncate">Turneringsplan</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setPlanOpen((v) => !v)}
+                    className="mr-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                    aria-label={planOpen ? "Skjul niveauer" : "Vis niveauer"}
+                    aria-expanded={planOpen}
+                  >
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${planOpen ? "" : "-rotate-90"}`} aria-hidden />
+                  </button>
+                </div>
+                {planOpen && sortedTurneringLevels.length > 0 ? (
+                  <ul className="ml-4 space-y-0.5 border-l border-gray-200 py-0.5 pl-3 dark:border-gray-700" aria-label="Turneringsplan niveauer">
+                    {sortedTurneringLevels.map((levelKey) => {
+                      const href = `/turnering/plan/${encodeURIComponent(levelKey)}`;
+                      const subActive = currentPlanLevelKey === levelKey;
+                      return (
+                        <li key={`plan-${levelKey}`}>
+                          <Link
+                            href={href}
+                            title={levelKey}
+                            onClick={() => setMobileOpen(false)}
+                            className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
+                              subActive
+                                ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+                            }`}
+                          >
+                            {levelKey}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </nav>
       <div className="shrink-0 border-t border-lc-border bg-white p-4 dark:border-gray-700 dark:bg-gray-900 lg:p-5">
         <p className="px-1 text-[0.8125rem] font-semibold leading-snug text-gray-900 dark:text-gray-100">

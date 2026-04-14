@@ -95,7 +95,10 @@ export default async function KlubberPage() {
                   <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                     {group.name}
                   </h2>
-                  <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-medium tabular-nums text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-300">
+                  <span
+                    title={`Antal spillere i ${group.name}: ${group.players.length}`}
+                    className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-medium tabular-nums text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-300"
+                  >
                     {group.players.length}{" "}
                     {group.players.length === 1 ? "spiller" : "spillere"}
                   </span>

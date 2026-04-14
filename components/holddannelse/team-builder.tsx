@@ -371,18 +371,25 @@ export function TeamBuilder({
                         <div className="flex flex-wrap items-center gap-1.5">
                           {badge ? (
                             <span
+                              title={`Status: ${badge}`}
                               className={`rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold ${BADGE_CLASS[badge]}`}
                             >
                               {badge}
                             </span>
                           ) : null}
                           {assignedHere ? (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                            <span
+                              title={`Spilleren er allerede på ${teamById.get(teamIdHere!)?.name ?? "dette hold"}.`}
+                              className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
+                            >
                               På {teamById.get(teamIdHere!)?.name ?? "hold"}
                             </span>
                           ) : null}
                           {assignedOther ? (
-                            <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[0.6875rem] font-medium text-gray-800 dark:bg-gray-600 dark:text-gray-100">
+                            <span
+                              title="Spilleren er tildelt et andet hold."
+                              className="rounded-full bg-gray-200 px-2 py-0.5 text-[0.6875rem] font-medium text-gray-800 dark:bg-gray-600 dark:text-gray-100"
+                            >
                               Tildelt andet hold
                             </span>
                           ) : null}
