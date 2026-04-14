@@ -5,7 +5,7 @@ export type TeamRow = {
   name: string;
   level: string | null;
   sort_order: number;
-  /** Når true: holdet er markeret som færdigt (grøn prik + “Udført”). Kræver kolonnen `is_completed` i `teams`. */
+  /** Når true: holdet er lukket (grønt kort + “Luk hold”). Kræver kolonnen `is_completed` i `teams`. */
   is_completed?: boolean | null;
 };
 

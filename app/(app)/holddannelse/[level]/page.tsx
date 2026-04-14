@@ -53,8 +53,8 @@ export default async function HoldLevelPage({ params }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <div>
+    <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-8">
+      <div className="shrink-0">
         <BackLink />
         <header className="mt-4 max-w-2xl">
           <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">

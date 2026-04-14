@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { ChevronDown, Plus, Search } from "lucide-react";
+import { CheckCircle2, ChevronDown, Plus, Search } from "lucide-react";
 import { HOLD_EVENT_ID, nextDefaultTeamName, normalizeLevelKey } from "@/lib/holddannelse";
 import {
   derivePreferenceBadge,
@@ -231,6 +231,12 @@ export function TeamBuilder({
     setTeams((prev) =>
       prev.map((x) => (x.id === team.id ? { ...x, is_completed: next } : x)),
     );
+    setCollapsedTeamIds((prev) => {
+      const s = new Set(prev);
+      if (next) s.add(team.id);
+      else s.delete(team.id);
+      return s;
+    });
   }, []);
 
   const createTeam = useCallback(async () => {
@@ -260,8 +266,8 @@ export function TeamBuilder({
   }, [teams, canonical]);
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-8">
+      <div className="grid shrink-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Spillere i niveau" value={kpis.total} accent="teal" />
         <Kpi label="Fordelt på hold" value={kpis.assigned} accent="blue" />
         <Kpi label="Ikke fordelt" value={kpis.unassigned} accent="slate" />
@@ -269,17 +275,17 @@ export function TeamBuilder({
       </div>
 
       {actionError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+        <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
           {actionError}
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
-        <section className="rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none sm:p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-8">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none sm:p-5 lg:min-h-0 lg:flex-1">
+          <h2 className="shrink-0 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             Tilgængelige spillere
           </h2>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-1 shrink-0 text-xs text-gray-500 dark:text-gray-400">
             Klik på en spiller for at tilføje til det aktive hold (
             <span className="font-medium text-gray-700 dark:text-gray-300">
               {activeTeamId ? teamById.get(activeTeamId)?.name ?? "—" : "vælg hold"}
@@ -287,7 +293,7 @@ export function TeamBuilder({
             ).
           </p>
 
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 shrink-0 space-y-3">
             <div>
               <label
                 htmlFor="holddannelse-search"
@@ -357,7 +363,7 @@ export function TeamBuilder({
             </div>
           </div>
 
-          <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <label className="mt-3 flex shrink-0 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
               type="checkbox"
               className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
@@ -367,7 +373,7 @@ export function TeamBuilder({
             Vis kun spillere uden hold
           </label>
 
-          <ul className="mt-4 max-h-[min(520px,55vh)] space-y-2 overflow-y-auto pr-1">
+          <ul className="mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 max-lg:max-h-[min(520px,65vh)] lg:flex-1">
             {filteredPlayers.length === 0 ? (
               <li className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
                 Ingen spillere matcher filtrene.
@@ -440,8 +446,8 @@ export function TeamBuilder({
           </ul>
         </section>
 
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <section className="flex min-h-0 min-w-0 flex-col space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
               Hold
             </h2>
@@ -469,14 +475,17 @@ export function TeamBuilder({
                 const active = t.id === activeTeamId;
                 const collapsed = collapsedTeamIds.has(t.id);
                 const completed = teamIsCompleted(t);
+                const cardClass = completed
+                  ? active
+                    ? "border-emerald-200 bg-emerald-50/95 ring-2 ring-teal-500/30 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:ring-teal-500/25"
+                    : "border-emerald-200 bg-emerald-50/95 dark:border-emerald-800/60 dark:bg-emerald-950/35"
+                  : active
+                    ? "border-teal-500 ring-2 ring-teal-500/25 dark:border-teal-500"
+                    : "border-lc-border dark:border-gray-700";
                 return (
                   <li
                     key={t.id}
-                    className={`rounded-xl border bg-white p-3 shadow-sm transition-colors dark:bg-gray-900/35 sm:p-4 ${
-                      active
-                        ? "border-teal-500 ring-2 ring-teal-500/25 dark:border-teal-500"
-                        : "border-lc-border dark:border-gray-700"
-                    }`}
+                    className={`rounded-xl border bg-white p-3 shadow-sm transition-colors dark:bg-gray-900/35 sm:p-4 ${cardClass}`}
                   >
                     <div className="flex gap-1 sm:gap-2">
                       <button
@@ -484,10 +493,14 @@ export function TeamBuilder({
                         aria-expanded={!collapsed}
                         aria-label={collapsed ? "Udvid hold" : "Sammenfold hold"}
                         onClick={() => toggleTeamCollapsed(t.id)}
-                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                          completed
+                            ? "text-emerald-700 hover:bg-emerald-100/90 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+                            : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
                       >
                         <ChevronDown
-                          className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+                          className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : ""} ${completed ? "text-emerald-700 dark:text-emerald-300" : ""}`}
                           strokeWidth={2}
                           aria-hidden
                         />
@@ -501,16 +514,27 @@ export function TeamBuilder({
                           >
                             <div className="flex items-center gap-2">
                               {completed ? (
-                                <span
-                                  className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-gray-900"
-                                  title="Hold markeret som udført"
-                                />
+                                <span className="inline-flex shrink-0" title="Hold lukket">
+                                  <CheckCircle2
+                                    className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
+                                    strokeWidth={2}
+                                    aria-hidden
+                                  />
+                                </span>
                               ) : null}
-                              <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                              <h3
+                                className={`text-base font-semibold ${
+                                  completed ? "text-emerald-950 dark:text-emerald-50" : "text-gray-900 dark:text-white"
+                                }`}
+                              >
                                 {t.name}
                               </h3>
                             </div>
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            <p
+                              className={`mt-1 text-xs ${
+                                completed ? "text-emerald-800/90 dark:text-emerald-200/85" : "text-gray-500 dark:text-gray-400"
+                              }`}
+                            >
                               {tMembers.length} {tMembers.length === 1 ? "spiller" : "spillere"}
                               {avgAge != null ? ` · snit alder ${avgAge}` : ""}
                               {clubCount > 0
@@ -529,16 +553,21 @@ export function TeamBuilder({
                                   : "rounded-lg border border-emerald-600/90 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-950/70"
                               }
                             >
-                              {completed ? "Åbn igen" : "Udført"}
+                              {completed ? "Åbn igen" : "Luk hold"}
                             </button>
                             {active ? (
                               <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-center text-xs font-semibold text-teal-900 dark:bg-teal-950/60 dark:text-teal-200">
                                 Aktivt
                               </span>
                             ) : (
-                              <span className="px-2.5 py-0.5 text-center text-xs font-medium text-gray-400">
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => setActiveTeamId(t.id)}
+                                className="rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-center text-xs font-medium text-gray-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50 hover:text-[#0f766e] disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900/60 dark:text-gray-200 dark:hover:border-teal-600 dark:hover:bg-teal-950/40 dark:hover:text-teal-200"
+                              >
                                 Vælg
-                              </span>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -549,7 +578,13 @@ export function TeamBuilder({
                               Ingen spillere på holdet endnu.
                             </p>
                           ) : (
-                            <ul className="mt-3 divide-y divide-gray-100 dark:divide-gray-700">
+                            <ul
+                              className={`mt-3 divide-y ${
+                                completed
+                                  ? "divide-emerald-100 dark:divide-emerald-900/45"
+                                  : "divide-gray-100 dark:divide-gray-700"
+                              }`}
+                            >
                               {tMembers.map((m) => {
                                 const pl = playerById.get(m.player_id);
                                 return (
