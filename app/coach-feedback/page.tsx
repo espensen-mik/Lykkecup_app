@@ -175,7 +175,7 @@ export default function CoachFeedbackPage() {
           <img
             src="/LykkeCUP26_blue.svg"
             alt="LykkeCup 2026"
-            className="h-auto w-full max-w-[min(100%,17rem)] object-contain object-center sm:max-w-[19rem] lg:max-w-[22rem] xl:max-w-[26rem]"
+            className="h-auto w-[200px] max-w-full object-contain object-center"
           />
         </div>
 
