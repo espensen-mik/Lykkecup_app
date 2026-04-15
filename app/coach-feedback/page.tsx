@@ -157,9 +157,9 @@ export default function CoachFeedbackPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-10 pb-16 sm:px-6 sm:py-14">
+    <main className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4 py-10 pb-8 sm:px-6 sm:py-14">
       <header className="mb-10 sm:mb-12">
-        {/* Mobil: fuld bredde header-billede (1920×800), logo i bunden */}
+        {/* Mobil: fuld bredde header-billede (1920×800) */}
         <div className="relative left-1/2 mb-8 w-screen max-w-[100vw] -translate-x-1/2 lg:hidden">
           <div className="relative aspect-[1920/800] w-full overflow-hidden bg-gray-200">
             <img
@@ -167,32 +167,16 @@ export default function CoachFeedbackPage() {
               alt=""
               className="absolute inset-0 h-full w-full object-cover object-center"
             />
-            <div className="absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/45 via-black/15 to-transparent px-4 pb-2.5 pt-16">
-              <img
-                src="/lykkeliga-logo.svg"
-                alt="Lykkeliga"
-                className="h-6 w-auto max-w-[7.5rem] object-contain object-bottom brightness-0 invert sm:h-7 sm:max-w-[8.5rem]"
-              />
-            </div>
           </div>
         </div>
 
-        {/* Desktop: LykkeCup øverst (centreret), Lykkeliga-logo i bunden — samme hierarki som mobil-hero */}
-        <div className="mb-10 hidden lg:block">
-          <div className="overflow-hidden rounded-2xl border border-gray-200/90 bg-gradient-to-b from-slate-50/90 to-gray-100/80 px-8 py-10 shadow-sm dark:border-gray-700 dark:from-gray-900/50 dark:to-gray-900/80">
-            <div className="mx-auto flex min-h-[14rem] max-w-xl flex-col items-center justify-between gap-10">
-              <img
-                src="/LykkeCUP26_blue.svg"
-                alt="LykkeCup 2026"
-                className="h-auto w-full max-w-md object-contain object-center"
-              />
-              <img
-                src="/lykkeliga-logo.svg"
-                alt="Lykkeliga"
-                className="h-7 w-auto max-w-[8.5rem] object-contain object-bottom opacity-95 sm:h-8"
-              />
-            </div>
-          </div>
+        {/* Desktop: LykkeCup-logo centreret øverst — lille, uden ramme/kasse */}
+        <div className="mb-8 hidden justify-center lg:flex">
+          <img
+            src="/LykkeCUP26_blue.svg"
+            alt="LykkeCup 2026"
+            className="h-8 w-auto max-w-[9rem] object-contain object-center sm:h-9 sm:max-w-[10rem]"
+          />
         </div>
 
         <div className="border-b border-gray-200/80 pb-8 text-center lg:border-0 lg:pb-0 lg:text-left">
@@ -361,6 +345,16 @@ export default function CoachFeedbackPage() {
           </section>
         </>
       ) : null}
+
+      <footer className="mt-auto border-t border-gray-200/90 pt-10 pb-6 dark:border-gray-700">
+        <div className="flex justify-center">
+          <img
+            src="/lykkeliga-logo.svg"
+            alt="Lykkeliga"
+            className="h-5 w-auto max-w-[6.5rem] object-contain opacity-90 sm:h-6 sm:max-w-[7rem]"
+          />
+        </div>
+      </footer>
     </main>
   );
 }
