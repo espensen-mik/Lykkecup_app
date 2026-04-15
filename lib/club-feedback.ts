@@ -41,18 +41,16 @@ export async function fetchClubFeedbackForEvent(): Promise<{
   };
 }
 
-/** Sandt hvis mindst én kommentar for arrangementet er oprettet inden for de seneste `hours` timer. */
-export async function hasClubFeedbackInLastHours(hours: number): Promise<boolean> {
-  const sinceMs = Date.now() - hours * 60 * 60 * 1000;
-  const sinceIso = new Date(sinceMs).toISOString();
+/** Antal kommentarer for arrangementet, som endnu ikke er markeret som håndteret. */
+export async function fetchUnhandledClubFeedbackCount(): Promise<number> {
   const { count, error } = await supabase
     .from("club_feedback")
     .select("id", { count: "exact", head: true })
     .eq("event_id", LYKKECUP_EVENT_ID)
-    .gte("created_at", sinceIso);
+    .is("handled_at", null);
 
-  if (error) return false;
-  return (count ?? 0) > 0;
+  if (error) return 0;
+  return count ?? 0;
 }
 
 /** Antal trænerkommentarer i alt og inden for de seneste `hours` timer (til dashboard-KPI’er). */

@@ -7,12 +7,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { KontrolcenterHelp } from "@/components/kontrolcenter-help";
-import { hasClubFeedbackInLastHours } from "@/lib/club-feedback";
+import { fetchUnhandledClubFeedbackCount } from "@/lib/club-feedback";
 import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
-
-const RECENT_COMMENTS_HOURS = 24;
 
 const APP_SIDEBAR_TITLE = "LykkeCup KontrolCenter 2026";
 const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
@@ -75,7 +73,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [holdLevels, setHoldLevels] = useState<string[]>([]);
   const [turneringLevels, setTurneringLevels] = useState<string[]>([]);
-  const [kommentarerNye, setKommentarerNye] = useState(false);
+  const [kommentarerNyeCount, setKommentarerNyeCount] = useState(0);
   const [holdOpen, setHoldOpen] = useState(() => pathname.startsWith("/holddannelse"));
   const [turneringOpen, setTurneringOpen] = useState(() => pathname.startsWith("/turnering"));
   const [puljerOpen, setPuljerOpen] = useState(() => pathname.startsWith("/turnering/puljer"));
@@ -111,8 +109,8 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const has = await hasClubFeedbackInLastHours(RECENT_COMMENTS_HOURS);
-      if (!cancelled) setKommentarerNye(has);
+      const count = await fetchUnhandledClubFeedbackCount();
+      if (!cancelled) setKommentarerNyeCount(count);
     })();
     return () => {
       cancelled = true;
@@ -154,8 +152,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           const active = isActive(item.href);
           const NavIcon = item.icon;
 
-          const showKommentarerNyeTag =
-            item.href === "/kommentarer" && kommentarerNye;
+          const showKommentarerNyeTag = item.href === "/kommentarer" && kommentarerNyeCount > 0;
 
           return (
             <Link
@@ -164,7 +161,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
               onClick={() => setMobileOpen(false)}
               aria-label={
                 showKommentarerNyeTag
-                  ? `${item.label} — nye kommentarer inden for de seneste ${RECENT_COMMENTS_HOURS} timer`
+                  ? `${item.label} — ${kommentarerNyeCount} nye uhåndterede kommentarer`
                   : undefined
               }
               className={`flex items-center gap-3 rounded-md py-2.5 pr-3 text-[0.9375rem] font-medium transition-colors border-l-2 ${
@@ -181,10 +178,13 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
               {showKommentarerNyeTag ? (
                 <span
-                  title="Nye kommentarer registreret inden for de sidste 24 timer."
+                  title={`${kommentarerNyeCount} nye uhåndterede kommentarer`}
                   className="shrink-0 rounded-full bg-teal-100 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-[#0f766e] dark:bg-teal-900/50 dark:text-teal-200"
                 >
-                  Nye
+                  <span>Nye</span>
+                  <span className="ml-1 inline-flex min-w-[1rem] items-center justify-center rounded-full bg-[#0f766e] px-1 py-[1px] text-[0.58rem] font-bold leading-none text-white dark:bg-teal-300 dark:text-[#0f766e]">
+                    {kommentarerNyeCount}
+                  </span>
                 </span>
               ) : null}
             </Link>

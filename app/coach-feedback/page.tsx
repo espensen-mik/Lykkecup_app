@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { formatDaDateTime } from "@/lib/datetime";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
@@ -62,7 +63,7 @@ export default function CoachFeedbackPage() {
   const loadFeedbackForEvent = useCallback(async () => {
     const { data, error } = await supabase
       .from("club_feedback")
-      .select("id, event_id, home_club, author_name, comment_text, created_at")
+      .select("id, event_id, home_club, author_name, comment_text, created_at, handled_at, handled_by")
       .eq("event_id", LYKKECUP_EVENT_ID)
       .order("created_at", { ascending: false });
 
@@ -135,7 +136,7 @@ export default function CoachFeedbackPage() {
         author_name: name,
         comment_text: text,
       })
-      .select("id, event_id, home_club, author_name, comment_text, created_at")
+      .select("id, event_id, home_club, author_name, comment_text, created_at, handled_at, handled_by")
       .single();
 
     setSubmitting(false);
@@ -286,6 +287,17 @@ export default function CoachFeedbackPage() {
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
                       {c.comment_text}
                     </p>
+                    {c.handled_at ? (
+                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-xs text-emerald-900">
+                        <p className="flex items-center gap-1.5 font-semibold">
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          Håndteret af LykkeLiga
+                        </p>
+                        <p className="mt-1 leading-relaxed text-emerald-900/90">
+                          Din besked er blevet set og håndteret af LykkeLiga. Vi kan ikke love at alle ønsker bliver opfyldt.
+                        </p>
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>
