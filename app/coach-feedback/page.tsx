@@ -16,6 +16,14 @@ type PlayerRow = {
   level: string | null;
 };
 
+type IntroAuthor = {
+  name: string;
+  avatarUrl: string | null;
+};
+
+const INTRO_MESSAGE =
+  "Hej trænere. Vi glæder os helt vildt til at se jer til LykkeCup. Herunder kan I skrive kommentarer til jeres hold og spillere. Vi kan desværre ikke imødekomme alle ønsker og forholder os primært til kommentarer, der vedrører spillerens niveau, ønsker til holdsammensætning og træner/spiller kombination. Vi kommer ikke til at kommentere herunder, men du kan se, når vi har set og forholdt os til kommentaren";
+
 function uniqueClubsFromPlayers(players: PlayerRow[]): string[] {
   const seen = new Set<string>();
   for (const p of players) {
@@ -49,6 +57,7 @@ export default function CoachFeedbackPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [introAuthor, setIntroAuthor] = useState<IntroAuthor>({ name: "Frederikke", avatarUrl: null });
 
   const clubs = useMemo(() => uniqueClubsFromPlayers(players), [players]);
   const filteredPlayers = useMemo(
@@ -74,6 +83,20 @@ export default function CoachFeedbackPage() {
     setFeedbackByEvent((data ?? []) as ClubFeedbackRow[]);
   }, []);
 
+  const loadIntroAuthor = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("full_name, avatar_url")
+      .ilike("full_name", "%Frederikke%")
+      .limit(1)
+      .maybeSingle();
+    if (error) return;
+    setIntroAuthor({
+      name: data?.full_name?.trim() || "Frederikke",
+      avatarUrl: data?.avatar_url?.trim() || null,
+    });
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -95,7 +118,7 @@ export default function CoachFeedbackPage() {
         setPlayers((data ?? []) as PlayerRow[]);
       }
 
-      await loadFeedbackForEvent();
+      await Promise.all([loadFeedbackForEvent(), loadIntroAuthor()]);
       if (!cancelled) setLoadingBootstrap(false);
     }
 
@@ -103,7 +126,7 @@ export default function CoachFeedbackPage() {
     return () => {
       cancelled = true;
     };
-  }, [loadFeedbackForEvent]);
+  }, [loadFeedbackForEvent, loadIntroAuthor]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -270,6 +293,27 @@ export default function CoachFeedbackPage() {
               </p>
             ) : (
               <ul className="mt-4 space-y-3">
+                <li className="rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3.5">
+                  <div className="flex items-start gap-3">
+                    {introAuthor.avatarUrl ? (
+                      <img
+                        src={introAuthor.avatarUrl}
+                        alt={introAuthor.name}
+                        className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-sky-200"
+                      />
+                    ) : (
+                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-800 ring-1 ring-sky-200">
+                        F
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{introAuthor.name}</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                        {INTRO_MESSAGE}
+                      </p>
+                    </div>
+                  </div>
+                </li>
                 {comments.map((c) => (
                   <li
                     key={c.id}
