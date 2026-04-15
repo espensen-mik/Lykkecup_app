@@ -16,11 +16,6 @@ type PlayerRow = {
   level: string | null;
 };
 
-type IntroAuthor = {
-  name: string;
-  avatarUrl: string | null;
-};
-
 const INTRO_MESSAGE =
   "Hej trænere. Vi glæder os helt vildt til at se jer til LykkeCup. Herunder kan I skrive kommentarer til jeres hold og spillere. Vi kan desværre ikke imødekomme alle ønsker og forholder os primært til kommentarer, der vedrører spillerens niveau, ønsker til holdsammensætning og træner/spiller kombination. Vi kommer ikke til at kommentere herunder, men du kan se, når vi har set og forholdt os til kommentaren";
 
@@ -57,7 +52,6 @@ export default function CoachFeedbackPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [introAuthor, setIntroAuthor] = useState<IntroAuthor>({ name: "Frederikke", avatarUrl: null });
 
   const clubs = useMemo(() => uniqueClubsFromPlayers(players), [players]);
   const filteredPlayers = useMemo(
@@ -83,20 +77,6 @@ export default function CoachFeedbackPage() {
     setFeedbackByEvent((data ?? []) as ClubFeedbackRow[]);
   }, []);
 
-  const loadIntroAuthor = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("full_name, avatar_url")
-      .ilike("full_name", "%Frederikke%")
-      .limit(1)
-      .maybeSingle();
-    if (error) return;
-    setIntroAuthor({
-      name: data?.full_name?.trim() || "Frederikke",
-      avatarUrl: data?.avatar_url?.trim() || null,
-    });
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -118,7 +98,7 @@ export default function CoachFeedbackPage() {
         setPlayers((data ?? []) as PlayerRow[]);
       }
 
-      await Promise.all([loadFeedbackForEvent(), loadIntroAuthor()]);
+      await loadFeedbackForEvent();
       if (!cancelled) setLoadingBootstrap(false);
     }
 
@@ -126,7 +106,7 @@ export default function CoachFeedbackPage() {
     return () => {
       cancelled = true;
     };
-  }, [loadFeedbackForEvent, loadIntroAuthor]);
+  }, [loadFeedbackForEvent]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -287,65 +267,58 @@ export default function CoachFeedbackPage() {
 
           <section className="mb-8 rounded-2xl border border-gray-200/95 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-base font-semibold text-gray-900">Tidligere kommentarer</h2>
+            <ul className="mt-4 space-y-3">
+              <li className="rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3.5">
+                <div className="flex items-start gap-3">
+                  <img
+                    src="/Frede.jpg"
+                    alt="Frederikke"
+                    className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-sky-200"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">Frederikke</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                      {INTRO_MESSAGE}
+                    </p>
+                  </div>
+                </div>
+              </li>
+              {comments.map((c) => (
+                <li
+                  key={c.id}
+                  className="rounded-xl border border-gray-100 bg-gray-50/40 px-4 py-3.5"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-sm font-semibold text-gray-900">{c.author_name}</span>
+                    <time
+                      className="text-xs text-gray-500 tabular-nums"
+                      dateTime={c.created_at}
+                    >
+                      {formatDaDateTime(c.created_at)}
+                    </time>
+                  </div>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                    {c.comment_text}
+                  </p>
+                  {c.handled_at ? (
+                    <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-xs text-emerald-900">
+                      <p className="flex items-center gap-1.5 font-semibold">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        Håndteret af LykkeLiga
+                      </p>
+                      <p className="mt-1 leading-relaxed text-emerald-900/90">
+                        Din besked er blevet set og håndteret af LykkeLiga. Vi kan ikke love at alle ønsker bliver opfyldt.
+                      </p>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
             {comments.length === 0 ? (
               <p className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-4 py-6 text-center text-sm text-gray-500">
                 Der er endnu ingen kommentarer fra jeres klub. Skriv den første nedenfor.
               </p>
-            ) : (
-              <ul className="mt-4 space-y-3">
-                <li className="rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3.5">
-                  <div className="flex items-start gap-3">
-                    {introAuthor.avatarUrl ? (
-                      <img
-                        src={introAuthor.avatarUrl}
-                        alt={introAuthor.name}
-                        className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-sky-200"
-                      />
-                    ) : (
-                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-800 ring-1 ring-sky-200">
-                        F
-                      </span>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{introAuthor.name}</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                        {INTRO_MESSAGE}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-                {comments.map((c) => (
-                  <li
-                    key={c.id}
-                    className="rounded-xl border border-gray-100 bg-gray-50/40 px-4 py-3.5"
-                  >
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <span className="text-sm font-semibold text-gray-900">{c.author_name}</span>
-                      <time
-                        className="text-xs text-gray-500 tabular-nums"
-                        dateTime={c.created_at}
-                      >
-                        {formatDaDateTime(c.created_at)}
-                      </time>
-                    </div>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                      {c.comment_text}
-                    </p>
-                    {c.handled_at ? (
-                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-xs text-emerald-900">
-                        <p className="flex items-center gap-1.5 font-semibold">
-                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                          Håndteret af LykkeLiga
-                        </p>
-                        <p className="mt-1 leading-relaxed text-emerald-900/90">
-                          Din besked er blevet set og håndteret af LykkeLiga. Vi kan ikke love at alle ønsker bliver opfyldt.
-                        </p>
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
+            ) : null}
           </section>
 
           <section className="rounded-2xl border border-gray-200/95 bg-white p-5 shadow-sm sm:p-6">
