@@ -159,23 +159,50 @@ export default function CoachFeedbackPage() {
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-10 pb-16 sm:px-6 sm:py-14">
       <header className="mb-10 sm:mb-12">
-        <div className="flex flex-col items-center gap-6 border-b border-gray-200/80 pb-8 sm:flex-row sm:items-start sm:gap-8 sm:border-0 sm:pb-0">
-          <div className="flex shrink-0 justify-center sm:pt-1">
+        {/* Mobil: fuld bredde header-billede (1920×800), logo i bunden */}
+        <div className="relative left-1/2 mb-8 w-screen max-w-[100vw] -translate-x-1/2 lg:hidden">
+          <div className="relative aspect-[1920/800] w-full overflow-hidden bg-gray-200">
             <img
-              src="/lykkeliga-logo.svg"
-              alt="Lykkeliga"
-              className="h-12 w-auto max-w-[200px] object-contain object-center sm:h-14 sm:object-left"
+              src="/lykkecup_app_header.jpg"
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover object-center"
             />
+            <div className="absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-black/45 via-black/15 to-transparent px-4 pb-2.5 pt-16">
+              <img
+                src="/lykkeliga-logo.svg"
+                alt="Lykkeliga"
+                className="h-6 w-auto max-w-[7.5rem] object-contain object-bottom brightness-0 invert sm:h-7 sm:max-w-[8.5rem]"
+              />
+            </div>
           </div>
-          <div className="min-w-0 flex-1 text-center sm:text-left">
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-[1.65rem]">
-              Kommentarer fra trænere
-            </h1>
-            <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-gray-600 sm:mx-0">
-              Nu nærmer tiden sig for LykkeCup 2026. For at sikre den bedste oplevelse for alle har du nu
-              mulighed for at skrive kommentarer til dit hold og dine spillere før vi laver turneringsplanen.
-            </p>
+        </div>
+
+        {/* Desktop: LykkeCup øverst (centreret), Lykkeliga-logo i bunden — samme hierarki som mobil-hero */}
+        <div className="mb-10 hidden lg:block">
+          <div className="overflow-hidden rounded-2xl border border-gray-200/90 bg-gradient-to-b from-slate-50/90 to-gray-100/80 px-8 py-10 shadow-sm dark:border-gray-700 dark:from-gray-900/50 dark:to-gray-900/80">
+            <div className="mx-auto flex min-h-[14rem] max-w-xl flex-col items-center justify-between gap-10">
+              <img
+                src="/LykkeCUP26_blue.svg"
+                alt="LykkeCup 2026"
+                className="h-auto w-full max-w-md object-contain object-center"
+              />
+              <img
+                src="/lykkeliga-logo.svg"
+                alt="Lykkeliga"
+                className="h-7 w-auto max-w-[8.5rem] object-contain object-bottom opacity-95 sm:h-8"
+              />
+            </div>
           </div>
+        </div>
+
+        <div className="border-b border-gray-200/80 pb-8 text-center lg:border-0 lg:pb-0 lg:text-left">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-[1.65rem]">
+            Kommentarer fra trænere
+          </h1>
+          <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-gray-600 lg:mx-0">
+            Nu nærmer tiden sig for LykkeCup 2026. For at sikre den bedste oplevelse for alle har du nu mulighed
+            for at skrive kommentarer til dit hold og dine spillere før vi laver turneringsplanen.
+          </p>
         </div>
       </header>
 
