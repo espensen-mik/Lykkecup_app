@@ -51,6 +51,9 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
 
 export function AppShell({ children, currentUser }: { children: React.ReactNode; currentUser: AuthAppUser | null }) {
   const authClient = getAuthBrowserClient();
+  const isAdmin = currentUser?.role === "admin";
+  const turneringLocked = !isAdmin;
+  const turneringLockedHint = "Denne del af app er under udarbejdelse";
   function initialsFromName(name: string) {
     const parts = name
       .trim()
@@ -246,22 +249,38 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           ) : null}
         </div>
 
-        <div className="mt-1 space-y-0.5">
+        <div className="mt-1 space-y-0.5" title={turneringLocked ? turneringLockedHint : undefined}>
           <div
             className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
-              isActive("/turnering")
+              turneringLocked
+                ? "border-transparent text-gray-400 dark:text-gray-500"
+                : isActive("/turnering")
                 ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
                 : "border-transparent text-gray-700 dark:text-gray-300"
             }`}
           >
             <Link
               href="/turnering"
-              onClick={() => setMobileOpen(false)}
-              className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 pr-1 text-left text-[0.9375rem] font-medium"
+              onClick={(e) => {
+                if (turneringLocked) {
+                  e.preventDefault();
+                  return;
+                }
+                setMobileOpen(false);
+              }}
+              aria-disabled={turneringLocked}
+              tabIndex={turneringLocked ? -1 : undefined}
+              className={`flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 pr-1 text-left text-[0.9375rem] font-medium ${
+                turneringLocked ? "cursor-not-allowed text-gray-400 dark:text-gray-500" : ""
+              }`}
             >
               <CalendarDays
                 className={`h-4 w-4 shrink-0 ${
-                  isActive("/turnering") ? "text-[#0f766e] dark:text-teal-300" : "text-gray-400 dark:text-gray-500"
+                  turneringLocked
+                    ? "text-gray-400 dark:text-gray-500"
+                    : isActive("/turnering")
+                      ? "text-[#0f766e] dark:text-teal-300"
+                      : "text-gray-400 dark:text-gray-500"
                 }`}
                 strokeWidth={2}
                 aria-hidden
@@ -270,8 +289,14 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             </Link>
             <button
               type="button"
+              disabled={turneringLocked}
               onClick={() => setTurneringOpen((v) => !v)}
-              className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              title={turneringLocked ? turneringLockedHint : undefined}
+              className={`mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md ${
+                turneringLocked
+                  ? "cursor-not-allowed text-gray-400 dark:text-gray-500"
+                  : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              }`}
               aria-label={turneringOpen ? "Skjul sektion" : "Vis sektion"}
               aria-expanded={turneringOpen}
             >
@@ -286,22 +311,39 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
               <div className="space-y-0.5">
                 <div
                   className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
-                    isActive("/turnering/puljer")
+                    turneringLocked
+                      ? "border-transparent text-gray-400 dark:text-gray-500"
+                      : isActive("/turnering/puljer")
                       ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
                       : "border-transparent text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   <Link
                     href="/turnering/puljer"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex min-w-0 flex-1 items-center gap-2 py-1 pl-2 pr-1 text-[0.86rem] font-medium"
+                    onClick={(e) => {
+                      if (turneringLocked) {
+                        e.preventDefault();
+                        return;
+                      }
+                      setMobileOpen(false);
+                    }}
+                    aria-disabled={turneringLocked}
+                    tabIndex={turneringLocked ? -1 : undefined}
+                    className={`flex min-w-0 flex-1 items-center gap-2 py-1 pl-2 pr-1 text-[0.86rem] font-medium ${
+                      turneringLocked ? "cursor-not-allowed text-gray-400 dark:text-gray-500" : ""
+                    }`}
                   >
                     <span className="truncate">Puljer</span>
                   </Link>
                   <button
                     type="button"
+                    disabled={turneringLocked}
                     onClick={() => setPuljerOpen((v) => !v)}
-                    className="mr-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                    className={`mr-1 inline-flex h-6 w-6 items-center justify-center rounded-md ${
+                      turneringLocked
+                        ? "cursor-not-allowed text-gray-400 dark:text-gray-500"
+                        : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                    }`}
                     aria-label={puljerOpen ? "Skjul niveauer" : "Vis niveauer"}
                     aria-expanded={puljerOpen}
                   >
@@ -318,9 +360,19 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                           <Link
                             href={href}
                             title={levelKey}
-                            onClick={() => setMobileOpen(false)}
+                            onClick={(e) => {
+                              if (turneringLocked) {
+                                e.preventDefault();
+                                return;
+                              }
+                              setMobileOpen(false);
+                            }}
+                            aria-disabled={turneringLocked}
+                            tabIndex={turneringLocked ? -1 : undefined}
                             className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
-                              subActive
+                              turneringLocked
+                                ? "cursor-not-allowed text-gray-400 dark:text-gray-500"
+                                : subActive
                                 ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
                                 : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
                             }`}
@@ -337,22 +389,39 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
               <div className="space-y-0.5">
                 <div
                   className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
-                    isActive("/turnering/plan")
+                    turneringLocked
+                      ? "border-transparent text-gray-400 dark:text-gray-500"
+                      : isActive("/turnering/plan")
                       ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
                       : "border-transparent text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   <Link
                     href="/turnering/plan"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex min-w-0 flex-1 items-center gap-2 py-1 pl-2 pr-1 text-[0.86rem] font-medium"
+                    onClick={(e) => {
+                      if (turneringLocked) {
+                        e.preventDefault();
+                        return;
+                      }
+                      setMobileOpen(false);
+                    }}
+                    aria-disabled={turneringLocked}
+                    tabIndex={turneringLocked ? -1 : undefined}
+                    className={`flex min-w-0 flex-1 items-center gap-2 py-1 pl-2 pr-1 text-[0.86rem] font-medium ${
+                      turneringLocked ? "cursor-not-allowed text-gray-400 dark:text-gray-500" : ""
+                    }`}
                   >
                     <span className="truncate">Turneringsplan</span>
                   </Link>
                   <button
                     type="button"
+                    disabled={turneringLocked}
                     onClick={() => setPlanOpen((v) => !v)}
-                    className="mr-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                    className={`mr-1 inline-flex h-6 w-6 items-center justify-center rounded-md ${
+                      turneringLocked
+                        ? "cursor-not-allowed text-gray-400 dark:text-gray-500"
+                        : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                    }`}
                     aria-label={planOpen ? "Skjul niveauer" : "Vis niveauer"}
                     aria-expanded={planOpen}
                   >
@@ -369,9 +438,19 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                           <Link
                             href={href}
                             title={levelKey}
-                            onClick={() => setMobileOpen(false)}
+                            onClick={(e) => {
+                              if (turneringLocked) {
+                                e.preventDefault();
+                                return;
+                              }
+                              setMobileOpen(false);
+                            }}
+                            aria-disabled={turneringLocked}
+                            tabIndex={turneringLocked ? -1 : undefined}
                             className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
-                              subActive
+                              turneringLocked
+                                ? "cursor-not-allowed text-gray-400 dark:text-gray-500"
+                                : subActive
                                 ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
                                 : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
                             }`}
@@ -387,12 +466,23 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
 
               <Link
                 href="/turnering/baner"
-                onClick={() => setMobileOpen(false)}
+                onClick={(e) => {
+                  if (turneringLocked) {
+                    e.preventDefault();
+                    return;
+                  }
+                  setMobileOpen(false);
+                }}
+                aria-disabled={turneringLocked}
+                tabIndex={turneringLocked ? -1 : undefined}
                 className={`flex items-center gap-2 rounded-md border-l-2 py-1.5 pl-2 pr-2 text-[0.86rem] font-medium transition-colors ${
-                  isActive("/turnering/baner")
+                  turneringLocked
+                    ? "cursor-not-allowed border-transparent text-gray-400 dark:text-gray-500"
+                    : isActive("/turnering/baner")
                     ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
                     : "border-transparent text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800/60"
                 }`}
+                title={turneringLocked ? turneringLockedHint : undefined}
               >
                 Baner & tider
               </Link>
