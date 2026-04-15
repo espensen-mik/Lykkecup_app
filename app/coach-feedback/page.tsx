@@ -170,12 +170,12 @@ export default function CoachFeedbackPage() {
           </div>
         </div>
 
-        {/* Desktop: LykkeCup-logo centreret øverst — lille, uden ramme/kasse */}
-        <div className="mb-8 hidden justify-center lg:flex">
+        {/* Desktop: LykkeCup-logo centreret øverst — tydelig størrelse, uden ramme */}
+        <div className="mb-8 hidden justify-center px-2 lg:mb-10 lg:flex">
           <img
             src="/LykkeCUP26_blue.svg"
             alt="LykkeCup 2026"
-            className="h-8 w-auto max-w-[9rem] object-contain object-center sm:h-9 sm:max-w-[10rem]"
+            className="h-auto w-full max-w-[min(100%,17rem)] object-contain object-center sm:max-w-[19rem] lg:max-w-[22rem] xl:max-w-[26rem]"
           />
         </div>
 
