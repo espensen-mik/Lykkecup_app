@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const ICON = "/Kontrolcenter26.jpg";
+const ICON = "/favicon.png";
 
 /** Web App Manifest — ikon ved «Tilføj til hjemmeskærm» (især Android/Chrome). */
 export default function manifest(): MetadataRoute.Manifest {
@@ -16,13 +16,13 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         src: ICON,
         sizes: "512x512",
-        type: "image/jpeg",
+        type: "image/png",
         purpose: "any",
       },
       {
         src: ICON,
         sizes: "512x512",
-        type: "image/jpeg",
+        type: "image/png",
         purpose: "maskable",
       },
     ],
