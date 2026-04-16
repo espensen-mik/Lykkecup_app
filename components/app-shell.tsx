@@ -526,7 +526,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 sm:px-4 sm:py-2 sm:text-sm"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm"
             aria-label="Log ud"
             title="Log ud af KontrolCenter"
           >
