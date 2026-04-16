@@ -1,10 +1,10 @@
 "use client";
 
-import { Search, Users, UserCircle2, ChevronRight } from "lucide-react";
+import { Building2, Search, UserCircle2, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { Lc26HomeBundle, Lc26PlayerListRow } from "@/lib/lykkecup26-public";
+import type { Lc26HomeBundle } from "@/lib/lykkecup26-public";
 
 type Props = {
   bundle: Lc26HomeBundle;
@@ -12,27 +12,21 @@ type Props = {
 
 export function Lykkecup26HomeClient({ bundle }: Props) {
   const router = useRouter();
-  const { players, teams, members, error } = bundle;
+  const { players, error } = bundle;
 
   const [nameQuery, setNameQuery] = useState("");
-  const [teamId, setTeamId] = useState("");
+  /** Valgt hjemmeklub (præcis streng som i databasen). */
+  const [homeClub, setHomeClub] = useState("");
   const [playerPickId, setPlayerPickId] = useState("");
 
-  const playersByTeam = useMemo(() => {
-    const m = new Map<string, Lc26PlayerListRow[]>();
-    const pById = new Map(players.map((p) => [p.id, p]));
-    for (const link of members) {
-      const p = pById.get(link.player_id);
-      if (!p) continue;
-      const list = m.get(link.team_id) ?? [];
-      list.push(p);
-      m.set(link.team_id, list);
+  const clubOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of players) {
+      const c = p.home_club?.trim();
+      if (c) s.add(c);
     }
-    for (const list of m.values()) {
-      list.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
-    }
-    return m;
-  }, [players, members]);
+    return [...s].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" }));
+  }, [players]);
 
   const nameMatches = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
@@ -40,7 +34,12 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
     return players.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 12);
   }, [players, nameQuery]);
 
-  const teamPlayers = teamId ? (playersByTeam.get(teamId) ?? []) : [];
+  const playersInClub = useMemo(() => {
+    if (!homeClub) return [];
+    return players
+      .filter((p) => (p.home_club?.trim() ?? "") === homeClub)
+      .sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
+  }, [players, homeClub]);
 
   function goToPlayer(id: string) {
     if (!id) return;
@@ -64,7 +63,8 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
           Find din spiller
         </h1>
         <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-stone-600">
-          Søg efter navn, eller vælg hold og spiller — så ser du hold, holdkammerater, trænere og kampprogram.
+          Søg efter navn, eller vælg hjemmeklub og spiller — så ser du LykkeCup-hold, holdkammerater, trænere og
+          kampprogram.
         </p>
       </div>
 
@@ -111,39 +111,45 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
           </div>
         </section>
 
-        {/* Hold */}
+        {/* Hjemmeklub — "hold" i betydning LykkeLigahold / klub */}
         <section className="rounded-3xl border border-stone-200/80 bg-white p-5 shadow-[0_8px_30px_-12px_rgba(15,118,110,0.12)] sm:p-6">
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-900">
-              <Users className="h-5 w-5" strokeWidth={2} aria-hidden />
+              <Building2 className="h-5 w-5" strokeWidth={2} aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-500">Vælg hold</h2>
-              <label htmlFor="lc26-team" className="sr-only">
-                Vælg hold
+              <p className="mt-1 text-xs font-normal normal-case tracking-normal text-stone-500">
+                Baseret på spillerens hjemmeklub
+              </p>
+              <label htmlFor="lc26-club" className="sr-only">
+                Vælg hold ud fra hjemmeklub
               </label>
               <select
-                id="lc26-team"
+                id="lc26-club"
                 className="mt-3 w-full cursor-pointer rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-[15px] text-stone-900 outline-none ring-teal-500/0 transition focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
-                value={teamId}
+                value={homeClub}
                 onChange={(e) => {
-                  setTeamId(e.target.value);
+                  setHomeClub(e.target.value);
                   setPlayerPickId("");
                 }}
               >
-                <option value="">Vælg et hold …</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
+                <option value="">Vælg klub …</option>
+                {clubOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
                   </option>
                 ))}
               </select>
+              {!error && clubOptions.length === 0 ? (
+                <p className="mt-3 text-sm text-stone-500">Der er ingen klubber registreret endnu.</p>
+              ) : null}
             </div>
           </div>
         </section>
 
-        {/* Spiller på hold */}
-        {teamId ? (
+        {/* Spiller på valgt klub */}
+        {homeClub ? (
           <section className="rounded-3xl border border-stone-200/80 bg-white p-5 shadow-[0_8px_30px_-12px_rgba(15,118,110,0.12)] sm:p-6">
             <div className="flex items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/12 text-amber-950">
@@ -154,8 +160,8 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
                 <label htmlFor="lc26-player" className="sr-only">
                   Vælg spiller
                 </label>
-                {teamPlayers.length === 0 ? (
-                  <p className="mt-3 text-sm text-stone-500">Ingen spillere på dette hold endnu.</p>
+                {playersInClub.length === 0 ? (
+                  <p className="mt-3 text-sm text-stone-500">Ingen spillere fra denne klub.</p>
                 ) : (
                   <>
                     <select
@@ -169,7 +175,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
                       }}
                     >
                       <option value="">Vælg spiller …</option>
-                      {teamPlayers.map((p) => (
+                      {playersInClub.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name}
                         </option>
