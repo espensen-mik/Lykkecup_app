@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PrintTeamsLinkIcon } from "@/components/holddannelse/print-teams-link-icon";
 import { TeamBuilder } from "@/components/holddannelse/team-builder";
 import { fetchHoldLevelData, normalizeLevelKey } from "@/lib/holddannelse";
 
@@ -56,18 +57,24 @@ export default async function HoldLevelPage({ params }: PageProps) {
     <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-8">
       <div className="shrink-0">
         <BackLink />
-        <header className="mt-4 max-w-2xl">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">
-            Holddannelse
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-[2rem] dark:text-white">
-            {levelKey}
-          </h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Vælg et aktivt hold til højre og klik på spillere til venstre for at tilføje dem. Fjern spillere
-            med knappen på holdkortet.
-          </p>
-        </header>
+        <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+          <header className="max-w-2xl min-w-0">
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">
+              Holddannelse
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-[2rem] dark:text-white">
+              {levelKey}
+            </h1>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Vælg et aktivt hold til højre og klik på spillere til venstre for at tilføje dem. Fjern spillere
+              med knappen på holdkortet.
+            </p>
+          </header>
+          <PrintTeamsLinkIcon
+            href={`/print/teams?level=${encodeURIComponent(levelKey)}`}
+            title={`Print hold for ${levelKey}`}
+          />
+        </div>
       </div>
 
       <TeamBuilder
@@ -76,6 +83,8 @@ export default async function HoldLevelPage({ params }: PageProps) {
         initialTeams={bundle.teams}
         initialMembers={bundle.members}
         initialEventAssignedPlayerIds={bundle.eventAssignedPlayerIds}
+        initialCoaches={bundle.coaches}
+        initialTeamCoaches={bundle.teamCoaches}
       />
     </div>
   );

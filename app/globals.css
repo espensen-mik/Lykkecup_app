@@ -59,3 +59,17 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Print: holdoversigt (/print/teams) — undgå at et hold klippes midt på en side */
+@media print {
+  .print-team {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 24px;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+}

@@ -1,6 +1,6 @@
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
-import type { HoldPlayerRow, TeamMemberRow, TeamRow } from "@/types/teams";
+import type { HoldCoachRow, HoldPlayerRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 
 export const HOLD_EVENT_ID = LYKKECUP_EVENT_ID;
 
@@ -235,6 +235,8 @@ export type HoldLevelBundle = {
   members: TeamMemberRow[];
   /** Alle spillere der allerede er på et hold i dette arrangement (én hold-plads pr. spiller). */
   eventAssignedPlayerIds: string[];
+  coaches: HoldCoachRow[];
+  teamCoaches: TeamCoachRow[];
   error: string | null;
 };
 
@@ -256,7 +258,15 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
         .eq("level", normalized);
 
   if (pErr) {
-    return { players: [], teams: [], members: [], eventAssignedPlayerIds: [], error: pErr.message };
+    return {
+      players: [],
+      teams: [],
+      members: [],
+      eventAssignedPlayerIds: [],
+      coaches: [],
+      teamCoaches: [],
+      error: pErr.message,
+    };
   }
 
   let players = (allPlayers ?? []) as HoldPlayerRow[];
@@ -273,7 +283,15 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
     .order("name", { ascending: true });
 
   if (tErr) {
-    return { players: [], teams: [], members: [], eventAssignedPlayerIds: [], error: tErr.message };
+    return {
+      players: [],
+      teams: [],
+      members: [],
+      eventAssignedPlayerIds: [],
+      coaches: [],
+      teamCoaches: [],
+      error: tErr.message,
+    };
   }
 
   const teams = (teamsData ?? []) as TeamRow[];
@@ -284,7 +302,15 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
     .eq("event_id", eventId);
 
   if (mErr) {
-    return { players: [], teams: [], members: [], eventAssignedPlayerIds: [], error: mErr.message };
+    return {
+      players: [],
+      teams: [],
+      members: [],
+      eventAssignedPlayerIds: [],
+      coaches: [],
+      teamCoaches: [],
+      error: mErr.message,
+    };
   }
 
   const allMemberRows = (membersData ?? []) as TeamMemberRow[];
@@ -295,11 +321,184 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
   const teamIds = new Set(teams.map((t) => t.id));
   const members = allMemberRows.filter((m) => teamIds.has(m.team_id));
 
+  const [{ data: coachesData, error: cErr }, { data: teamCoachesData, error: tcErr }] = await Promise.all([
+    supabase.from("coaches").select("id, name, home_club").eq("event_id", eventId),
+    supabase.from("team_coaches").select("id, event_id, team_id, coach_id").eq("event_id", eventId),
+  ]);
+
+  if (cErr) {
+    return {
+      players,
+      teams,
+      members,
+      eventAssignedPlayerIds,
+      coaches: [],
+      teamCoaches: [],
+      error: cErr.message,
+    };
+  }
+  if (tcErr) {
+    return {
+      players,
+      teams,
+      members,
+      eventAssignedPlayerIds,
+      coaches: [],
+      teamCoaches: [],
+      error: tcErr.message,
+    };
+  }
+
+  let coaches = (coachesData ?? []) as HoldCoachRow[];
+  coaches.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
+
+  const allTeamCoachRows = (teamCoachesData ?? []) as TeamCoachRow[];
+  const teamCoaches = allTeamCoachRows.filter((r) => teamIds.has(r.team_id));
+
   players.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
 
-  return { players, teams, members, eventAssignedPlayerIds, error: null };
+  return { players, teams, members, eventAssignedPlayerIds, coaches, teamCoaches, error: null };
 }
 
 export function nextDefaultTeamName(levelKey: string, existingCount: number): string {
   return `${levelKey} Hold ${existingCount + 1}`;
+}
+
+/** Én holdblok til print (spillere og trænere er sorteret efter navn). */
+export type TeamPrintEntry = {
+  team: TeamRow;
+  players: { name: string; club: string }[];
+  coaches: { name: string }[];
+};
+
+export type TeamsPrintLevelGroup = {
+  levelKey: string;
+  teams: TeamPrintEntry[];
+};
+
+/**
+ * Henter alle hold for arrangementet med spillere og trænere til print.
+ * @param levelFilter – når sat, kun hold med præcis dette `teams.level` (samme som holddannelse-niveau).
+ */
+export async function fetchTeamsPrintData(levelFilter: string | null): Promise<{
+  groups: TeamsPrintLevelGroup[];
+  error: string | null;
+}> {
+  const eventId = HOLD_EVENT_ID;
+
+  let q = supabase
+    .from("teams")
+    .select("id, event_id, pool_id, name, level, sort_order, is_completed")
+    .eq("event_id", eventId);
+
+  if (levelFilter != null && levelFilter.trim() !== "") {
+    q = q.eq("level", normalizeLevelKey(levelFilter));
+  }
+
+  const { data: teamsData, error: tErr } = await q
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (tErr) {
+    return { groups: [], error: tErr.message };
+  }
+
+  const teams = (teamsData ?? []) as TeamRow[];
+  if (teams.length === 0) {
+    return { groups: [], error: null };
+  }
+
+  const teamIds = teams.map((t) => t.id);
+
+  const [
+    { data: membersData, error: mErr },
+    { data: tcData, error: tcErr },
+    { data: playersData, error: pErr },
+    { data: coachesData, error: cErr },
+  ] = await Promise.all([
+    supabase
+      .from("team_members")
+      .select("team_id, player_id")
+      .eq("event_id", eventId)
+      .in("team_id", teamIds),
+    supabase
+      .from("team_coaches")
+      .select("team_id, coach_id")
+      .eq("event_id", eventId)
+      .in("team_id", teamIds),
+    supabase.from("players").select("id, name, home_club").eq("event_id", eventId),
+    supabase.from("coaches").select("id, name").eq("event_id", eventId),
+  ]);
+
+  if (mErr) return { groups: [], error: mErr.message };
+  if (tcErr) return { groups: [], error: tcErr.message };
+  if (pErr) return { groups: [], error: pErr.message };
+  if (cErr) return { groups: [], error: cErr.message };
+
+  const playerById = new Map<string, { name: string; home_club: string | null }>();
+  for (const p of (playersData ?? []) as { id: string; name: string; home_club: string | null }[]) {
+    playerById.set(p.id, p);
+  }
+
+  const coachById = new Map<string, string>();
+  for (const c of (coachesData ?? []) as { id: string; name: string }[]) {
+    coachById.set(c.id, c.name);
+  }
+
+  const membersByTeam = new Map<string, string[]>();
+  for (const row of (membersData ?? []) as { team_id: string; player_id: string }[]) {
+    const list = membersByTeam.get(row.team_id) ?? [];
+    list.push(row.player_id);
+    membersByTeam.set(row.team_id, list);
+  }
+
+  const coachesByTeam = new Map<string, string[]>();
+  for (const row of (tcData ?? []) as { team_id: string; coach_id: string }[]) {
+    const list = coachesByTeam.get(row.team_id) ?? [];
+    list.push(row.coach_id);
+    coachesByTeam.set(row.team_id, list);
+  }
+
+  const byLevel = new Map<string, TeamPrintEntry[]>();
+  for (const team of teams) {
+    const levelKey = normalizeLevelKey(team.level);
+
+    const pids = membersByTeam.get(team.id) ?? [];
+    const players: { name: string; club: string }[] = [];
+    for (const pid of pids) {
+      const pl = playerById.get(pid);
+      players.push({
+        name: pl?.name?.trim() || pid,
+        club: pl?.home_club?.trim() || "—",
+      });
+    }
+    players.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
+
+    const cids = coachesByTeam.get(team.id) ?? [];
+    const coaches: { name: string }[] = [];
+    for (const cid of cids) {
+      coaches.push({ name: coachById.get(cid)?.trim() || cid });
+    }
+    coaches.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
+
+    const entry: TeamPrintEntry = { team, players, coaches };
+    const list = byLevel.get(levelKey) ?? [];
+    list.push(entry);
+    byLevel.set(levelKey, list);
+  }
+
+  for (const list of byLevel.values()) {
+    list.sort(
+      (a, b) =>
+        a.team.sort_order - b.team.sort_order ||
+        a.team.name.localeCompare(b.team.name, "da", { sensitivity: "base" }),
+    );
+  }
+
+  const levelKeys = sortLevelKeysForNav([...byLevel.keys()]);
+  const groups: TeamsPrintLevelGroup[] = levelKeys.map((levelKey) => ({
+    levelKey,
+    teams: byLevel.get(levelKey) ?? [],
+  }));
+
+  return { groups, error: null };
 }

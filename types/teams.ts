@@ -16,6 +16,21 @@ export type TeamMemberRow = {
   team_id: string;
 };
 
+/** Tilknytning mellem hold og træner (`team_coaches`). */
+export type TeamCoachRow = {
+  id: string;
+  event_id: string;
+  team_id: string;
+  coach_id: string;
+};
+
+/** Træner til listen i holddannelse (minimalt udtræk). */
+export type HoldCoachRow = {
+  id: string;
+  name: string;
+  home_club: string | null;
+};
+
 /** Spiller til holddannelse (felt udvidet ift. listevisning) */
 export type HoldPlayerRow = {
   id: string;

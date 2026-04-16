@@ -9,7 +9,7 @@ import {
   type PreferenceBadgeLabel,
 } from "@/lib/player-preferences";
 import { supabase } from "@/lib/supabase";
-import type { HoldPlayerRow, TeamMemberRow, TeamRow } from "@/types/teams";
+import type { HoldCoachRow, HoldPlayerRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 import { StyledSelect } from "@/components/ui/styled-select";
 
 type Props = {
@@ -18,6 +18,8 @@ type Props = {
   initialTeams: TeamRow[];
   initialMembers: TeamMemberRow[];
   initialEventAssignedPlayerIds: string[];
+  initialCoaches: HoldCoachRow[];
+  initialTeamCoaches: TeamCoachRow[];
 };
 
 const BADGE_CLASS: Record<PreferenceBadgeLabel, string> = {
@@ -54,6 +56,8 @@ export function TeamBuilder({
   initialTeams,
   initialMembers,
   initialEventAssignedPlayerIds,
+  initialCoaches,
+  initialTeamCoaches,
 }: Props) {
   const canonical = normalizeLevelKey(levelKey);
 
@@ -63,12 +67,18 @@ export function TeamBuilder({
   const [assignedGlobally, setAssignedGlobally] = useState<Set<string>>(
     () => new Set(initialEventAssignedPlayerIds),
   );
+  const [coaches] = useState<HoldCoachRow[]>(initialCoaches);
+  const [teamCoachLinks, setTeamCoachLinks] = useState<TeamCoachRow[]>(initialTeamCoaches);
 
   const [activeTeamId, setActiveTeamId] = useState<string | null>(() => initialTeams[0]?.id ?? null);
+  const [leftTab, setLeftTab] = useState<"spillere" | "traenere">("spillere");
   const [search, setSearch] = useState("");
   const [clubFilter, setClubFilter] = useState<string>("");
+  const [coachSearch, setCoachSearch] = useState("");
+  const [coachClubFilter, setCoachClubFilter] = useState<string>("");
   const [prefFilter, setPrefFilter] = useState<string>("alle");
   const [onlyUnassigned, setOnlyUnassigned] = useState(true);
+  const [onlyUnassignedCoaches, setOnlyUnassignedCoaches] = useState(true);
 
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -82,6 +92,12 @@ export function TeamBuilder({
     for (const p of players) m.set(p.id, p);
     return m;
   }, [players]);
+
+  const coachById = useMemo(() => {
+    const m = new Map<string, HoldCoachRow>();
+    for (const c of coaches) m.set(c.id, c);
+    return m;
+  }, [coaches]);
 
   const playerToTeamInLevel = useMemo(() => {
     const m = new Map<string, string>();
@@ -114,6 +130,23 @@ export function TeamBuilder({
     return m;
   }, [members, playerById]);
 
+  const coachesByTeam = useMemo(() => {
+    const m = new Map<string, TeamCoachRow[]>();
+    for (const tc of teamCoachLinks) {
+      const list = m.get(tc.team_id) ?? [];
+      list.push(tc);
+      m.set(tc.team_id, list);
+    }
+    for (const list of m.values()) {
+      list.sort((a, b) => {
+        const na = coachById.get(a.coach_id)?.name ?? "";
+        const nb = coachById.get(b.coach_id)?.name ?? "";
+        return na.localeCompare(nb, "da");
+      });
+    }
+    return m;
+  }, [teamCoachLinks, coachById]);
+
   const clubOptions = useMemo(() => {
     const s = new Set<string>();
     for (const p of players) {
@@ -122,6 +155,15 @@ export function TeamBuilder({
     }
     return [...s].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" }));
   }, [players]);
+
+  const coachClubOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of coaches) {
+      const x = c.home_club?.trim();
+      if (x) s.add(x);
+    }
+    return [...s].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" }));
+  }, [coaches]);
 
   const kpis = useMemo(() => {
     const total = players.length;
@@ -157,6 +199,28 @@ export function TeamBuilder({
       return true;
     });
   }, [players, search, clubFilter, prefFilter, onlyUnassigned, playerToTeamInLevel]);
+
+  /** Trænere der allerede er knyttet til mindst ét hold på dette niveau. */
+  const coachIdsOnAnyTeamInLevel = useMemo(() => {
+    const s = new Set<string>();
+    for (const tc of teamCoachLinks) {
+      s.add(tc.coach_id);
+    }
+    return s;
+  }, [teamCoachLinks]);
+
+  const filteredCoaches = useMemo(() => {
+    const q = coachSearch.trim().toLowerCase();
+    return coaches.filter((c) => {
+      if (onlyUnassignedCoaches && coachIdsOnAnyTeamInLevel.has(c.id)) return false;
+      if (q && !c.name.toLowerCase().includes(q)) return false;
+      if (coachClubFilter) {
+        const club = c.home_club?.trim() ?? "";
+        if (club !== coachClubFilter) return false;
+      }
+      return true;
+    });
+  }, [coaches, coachSearch, coachClubFilter, onlyUnassignedCoaches, coachIdsOnAnyTeamInLevel]);
 
   const addPlayerToActiveTeam = useCallback(
     async (playerId: string) => {
@@ -209,6 +273,56 @@ export function TeamBuilder({
       next.delete(member.player_id);
       return next;
     });
+  }, []);
+
+  const addCoachToActiveTeam = useCallback(
+    async (coachId: string) => {
+      setActionError(null);
+      if (!activeTeamId) {
+        setActionError("Vælg et hold til højre før du tilføjer trænere.");
+        return;
+      }
+      if (teamCoachLinks.some((tc) => tc.team_id === activeTeamId && tc.coach_id === coachId)) {
+        return;
+      }
+
+      setBusy(true);
+      const { data, error } = await supabase
+        .from("team_coaches")
+        .insert({
+          event_id: HOLD_EVENT_ID,
+          team_id: activeTeamId,
+          coach_id: coachId,
+        })
+        .select("id, event_id, team_id, coach_id")
+        .single();
+
+      setBusy(false);
+      if (error) {
+        if (error.code === "23505") {
+          setActionError("Træneren er allerede på dette hold.");
+        } else {
+          setActionError(error.message);
+        }
+        return;
+      }
+
+      const row = data as TeamCoachRow;
+      setTeamCoachLinks((prev) => [...prev, row]);
+    },
+    [activeTeamId, teamCoachLinks],
+  );
+
+  const removeTeamCoach = useCallback(async (link: TeamCoachRow) => {
+    setActionError(null);
+    setBusy(true);
+    const { error } = await supabase.from("team_coaches").delete().eq("id", link.id);
+    setBusy(false);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
+    setTeamCoachLinks((prev) => prev.filter((x) => x.id !== link.id));
   }, []);
 
   const toggleTeamCollapsed = useCallback((teamId: string) => {
@@ -289,104 +403,139 @@ export function TeamBuilder({
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-8">
         <section className="flex min-h-0 min-w-0 flex-col rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none sm:p-5 lg:min-h-0 lg:flex-1">
-          <h2 className="shrink-0 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            Tilgængelige spillere
-          </h2>
-          <p className="mt-1 shrink-0 text-xs text-gray-500 dark:text-gray-400">
-            Klik på en spiller for at tilføje til det aktive hold (
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              {activeTeamId ? teamById.get(activeTeamId)?.name ?? "—" : "vælg hold"}
-            </span>
-            ).
-          </p>
-
-          <div className="mt-4 shrink-0 space-y-3">
-            <div>
-              <label
-                htmlFor="holddannelse-search"
-                className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
-              >
-                Søg
-              </label>
-              <div className="relative">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                  strokeWidth={2}
-                  aria-hidden
-                />
-                <input
-                  id="holddannelse-search"
-                  type="search"
-                  placeholder="Navn på spiller…"
-                  autoComplete="off"
-                  className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="min-w-0">
-                <label
-                  htmlFor="holddannelse-club"
-                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
-                >
-                  Klub
-                </label>
-                <StyledSelect
-                  id="holddannelse-club"
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  value={clubFilter}
-                  onChange={(e) => setClubFilter(e.target.value)}
-                >
-                  <option value="">Alle klubber</option>
-                  {clubOptions.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </StyledSelect>
-              </div>
-              <div className="min-w-0">
-                <label
-                  htmlFor="holddannelse-pref"
-                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
-                >
-                  Præference
-                </label>
-                <StyledSelect
-                  id="holddannelse-pref"
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  value={prefFilter}
-                  onChange={(e) => setPrefFilter(e.target.value)}
-                >
-                  <option value="alle">Alle præferencer</option>
-                  <option value="Egen klub">Egen klub</option>
-                  <option value="Nye venner">Nye venner</option>
-                  <option value="Alt ok">Alt ok</option>
-                  <option value="uden">Uden badge</option>
-                </StyledSelect>
-              </div>
-            </div>
+          <div
+            className="flex shrink-0 gap-2 border-b border-gray-200 pb-3 dark:border-gray-600"
+            role="tablist"
+            aria-label="Vælg liste"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={leftTab === "spillere"}
+              onClick={() => setLeftTab("spillere")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                leftTab === "spillere"
+                  ? "bg-teal-50 text-[#0f766e] ring-1 ring-teal-200 dark:bg-teal-950/40 dark:text-teal-200 dark:ring-teal-800"
+                  : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800/60"
+              }`}
+            >
+              Spillere
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={leftTab === "traenere"}
+              onClick={() => setLeftTab("traenere")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                leftTab === "traenere"
+                  ? "bg-teal-50 text-[#0f766e] ring-1 ring-teal-200 dark:bg-teal-950/40 dark:text-teal-200 dark:ring-teal-800"
+                  : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800/60"
+              }`}
+            >
+              Trænere
+            </button>
           </div>
 
-          <label className="mt-3 flex shrink-0 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input
-              type="checkbox"
-              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-              checked={onlyUnassigned}
-              onChange={(e) => setOnlyUnassigned(e.target.checked)}
-            />
-            Vis kun spillere uden hold
-          </label>
+          {leftTab === "spillere" ? (
+            <>
+              <h2 className="mt-4 shrink-0 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Spillere
+              </h2>
+              <p className="mt-1 shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                Klik på en spiller for at tilføje til det aktive hold (
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {activeTeamId ? teamById.get(activeTeamId)?.name ?? "—" : "vælg hold"}
+                </span>
+                ).
+              </p>
 
-          <ul className="mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 max-lg:max-h-[min(520px,65vh)] lg:flex-1">
-            {filteredPlayers.length === 0 ? (
-              <li className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-                Ingen spillere matcher filtrene.
-              </li>
-            ) : (
-              filteredPlayers.map((p) => {
+              <div className="mt-4 shrink-0 space-y-3">
+                <div>
+                  <label
+                    htmlFor="holddannelse-search"
+                    className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                  >
+                    Søg
+                  </label>
+                  <div className="relative">
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                    <input
+                      id="holddannelse-search"
+                      type="search"
+                      placeholder="Navn på spiller…"
+                      autoComplete="off"
+                      className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="min-w-0">
+                    <label
+                      htmlFor="holddannelse-club"
+                      className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                    >
+                      Klub
+                    </label>
+                    <StyledSelect
+                      id="holddannelse-club"
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      value={clubFilter}
+                      onChange={(e) => setClubFilter(e.target.value)}
+                    >
+                      <option value="">Alle klubber</option>
+                      {clubOptions.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </StyledSelect>
+                  </div>
+                  <div className="min-w-0">
+                    <label
+                      htmlFor="holddannelse-pref"
+                      className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                    >
+                      Præference
+                    </label>
+                    <StyledSelect
+                      id="holddannelse-pref"
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      value={prefFilter}
+                      onChange={(e) => setPrefFilter(e.target.value)}
+                    >
+                      <option value="alle">Alle præferencer</option>
+                      <option value="Egen klub">Egen klub</option>
+                      <option value="Nye venner">Nye venner</option>
+                      <option value="Alt ok">Alt ok</option>
+                      <option value="uden">Uden badge</option>
+                    </StyledSelect>
+                  </div>
+                </div>
+              </div>
+
+              <label className="mt-3 flex shrink-0 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  checked={onlyUnassigned}
+                  onChange={(e) => setOnlyUnassigned(e.target.checked)}
+                />
+                Vis kun spillere uden hold
+              </label>
+
+              <ul className="mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 max-lg:max-h-[min(520px,65vh)] lg:flex-1">
+                {filteredPlayers.length === 0 ? (
+                  <li className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                    Ingen spillere matcher filtrene.
+                  </li>
+                ) : (
+                  filteredPlayers.map((p) => {
                 const teamIdHere = playerToTeamInLevel.get(p.id);
                 const assignedOther =
                   assignedGlobally.has(p.id) && !teamIdHere ? true : false;
@@ -449,8 +598,127 @@ export function TeamBuilder({
                   </li>
                 );
               })
-            )}
-          </ul>
+                )}
+              </ul>
+            </>
+          ) : (
+            <>
+              <h2 className="mt-4 shrink-0 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Trænere
+              </h2>
+              <p className="mt-1 shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                Klik på en træner for at tilføje til det aktive hold (
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {activeTeamId ? teamById.get(activeTeamId)?.name ?? "—" : "vælg hold"}
+                </span>
+                ).
+              </p>
+
+              <div className="mt-4 shrink-0 space-y-3">
+                <div>
+                  <label
+                    htmlFor="holddannelse-coach-search"
+                    className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                  >
+                    Søg
+                  </label>
+                  <div className="relative">
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                    <input
+                      id="holddannelse-coach-search"
+                      type="search"
+                      placeholder="Navn på træner…"
+                      autoComplete="off"
+                      className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      value={coachSearch}
+                      onChange={(e) => setCoachSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <label
+                    htmlFor="holddannelse-coach-club"
+                    className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                  >
+                    Klub
+                  </label>
+                  <StyledSelect
+                    id="holddannelse-coach-club"
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                    value={coachClubFilter}
+                    onChange={(e) => setCoachClubFilter(e.target.value)}
+                  >
+                    <option value="">Alle klubber</option>
+                    {coachClubOptions.map((club) => (
+                      <option key={club} value={club}>
+                        {club}
+                      </option>
+                    ))}
+                  </StyledSelect>
+                </div>
+              </div>
+
+              <label className="mt-3 flex shrink-0 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  checked={onlyUnassignedCoaches}
+                  onChange={(e) => setOnlyUnassignedCoaches(e.target.checked)}
+                />
+                Kun trænere uden hold
+              </label>
+
+              <ul className="mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 max-lg:max-h-[min(520px,65vh)] lg:flex-1">
+                {filteredCoaches.length === 0 ? (
+                  <li className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                    {coaches.length === 0
+                      ? "Ingen trænere registreret for dette arrangement."
+                      : "Ingen trænere matcher filtrene."}
+                  </li>
+                ) : (
+                  filteredCoaches.map((c) => {
+                    const onActive =
+                      Boolean(activeTeamId) &&
+                      teamCoachLinks.some((tc) => tc.team_id === activeTeamId && tc.coach_id === c.id);
+                    const canClick = Boolean(activeTeamId) && !onActive && !busy;
+                    return (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          disabled={!canClick}
+                          onClick={() => void addCoachToActiveTeam(c.id)}
+                          className={`w-full rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                            canClick
+                              ? "cursor-pointer border-gray-200 bg-white hover:border-teal-400 hover:bg-teal-50/50 dark:border-gray-600 dark:bg-gray-900/50 dark:hover:border-teal-600 dark:hover:bg-teal-950/20"
+                              : "cursor-not-allowed border-gray-100 bg-gray-50/80 opacity-80 dark:border-gray-700 dark:bg-gray-800/40"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-medium text-gray-900 dark:text-white">{c.name}</span>
+                            {onActive ? (
+                              <span
+                                title="Træneren er allerede på dette hold."
+                                className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
+                              >
+                                På dette hold
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            <span>{c.home_club?.trim() || "—"}</span>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
+            </>
+          )}
         </section>
 
         <section className="flex min-h-0 min-w-0 flex-col space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
@@ -477,6 +745,7 @@ export function TeamBuilder({
             <ul className="space-y-3">
               {teams.map((t) => {
                 const tMembers = membersByTeam.get(t.id) ?? [];
+                const tCoaches = coachesByTeam.get(t.id) ?? [];
                 const ids = tMembers.map((m) => m.player_id);
                 const { avgAge, clubCount } = teamStatsForMembers(ids, playerById);
                 const active = t.id === activeTeamId;
@@ -522,6 +791,9 @@ export function TeamBuilder({
                             </span>
                             <span className="mt-0.5 block text-xs tabular-nums text-emerald-800/90 dark:text-emerald-200/90">
                               {tMembers.length} {tMembers.length === 1 ? "spiller" : "spillere"}
+                              {tCoaches.length > 0
+                                ? ` · ${tCoaches.length} ${tCoaches.length === 1 ? "træner" : "trænere"}`
+                                : ""}
                               {avgAge != null ? ` · snit alder ${avgAge}` : ""}
                             </span>
                           </span>
@@ -610,6 +882,9 @@ export function TeamBuilder({
                                 }`}
                               >
                                 {tMembers.length} {tMembers.length === 1 ? "spiller" : "spillere"}
+                                {tCoaches.length > 0
+                                  ? ` · ${tCoaches.length} ${tCoaches.length === 1 ? "træner" : "trænere"}`
+                                  : ""}
                                 {avgAge != null ? ` · snit alder ${avgAge}` : ""}
                                 {clubCount > 0
                                   ? ` · ${clubCount} ${clubCount === 1 ? "klub" : "klubber"}`
@@ -647,54 +922,115 @@ export function TeamBuilder({
                           </div>
 
                           {!collapsed ? (
-                            tMembers.length === 0 ? (
-                              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                                Ingen spillere på holdet endnu.
-                              </p>
-                            ) : (
-                              <ul
-                                className={`mt-3 divide-y ${
-                                  completed
-                                    ? "divide-emerald-100 dark:divide-emerald-900/45"
-                                    : "divide-gray-100 dark:divide-gray-700"
-                                }`}
-                              >
-                                {tMembers.map((m) => {
-                                  const pl = playerById.get(m.player_id);
-                                  return (
-                                    <li
-                                      key={m.id}
-                                      className="flex items-start justify-between gap-3 py-2.5 first:pt-0"
-                                    >
-                                      <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                          {pl?.name ?? m.player_id}
-                                        </p>
-                                        {pl ? (
-                                          <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-gray-500 dark:text-gray-400">
-                                            <span>{pl.home_club?.trim() || "—"}</span>
-                                            <span className="tabular-nums">
-                                              {pl.age != null && !Number.isNaN(pl.age)
-                                                ? `${pl.age} år`
-                                                : "Alder —"}
-                                            </span>
-                                            <span>{pl.gender?.trim() || "Køn —"}</span>
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                      <button
-                                        type="button"
-                                        disabled={busy}
-                                        onClick={() => void removeMember(m)}
-                                        className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-800 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-200"
+                            <>
+                              {tMembers.length === 0 ? (
+                                <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                                  Ingen spillere på holdet endnu.
+                                </p>
+                              ) : (
+                                <ul
+                                  className={`mt-3 divide-y ${
+                                    completed
+                                      ? "divide-emerald-100 dark:divide-emerald-900/45"
+                                      : "divide-gray-100 dark:divide-gray-700"
+                                  }`}
+                                >
+                                  {tMembers.map((m) => {
+                                    const pl = playerById.get(m.player_id);
+                                    return (
+                                      <li
+                                        key={m.id}
+                                        className="flex items-start justify-between gap-3 py-2.5 first:pt-0"
                                       >
-                                        Fjern
-                                      </button>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            )
+                                        <div className="min-w-0 flex-1">
+                                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                            {pl?.name ?? m.player_id}
+                                          </p>
+                                          {pl ? (
+                                            <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-gray-500 dark:text-gray-400">
+                                              <span>{pl.home_club?.trim() || "—"}</span>
+                                              <span className="tabular-nums">
+                                                {pl.age != null && !Number.isNaN(pl.age)
+                                                  ? `${pl.age} år`
+                                                  : "Alder —"}
+                                              </span>
+                                              <span>{pl.gender?.trim() || "Køn —"}</span>
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          disabled={busy}
+                                          onClick={() => void removeMember(m)}
+                                          className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-800 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-200"
+                                        >
+                                          Fjern
+                                        </button>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                              <div
+                                className={
+                                  completed
+                                    ? "mt-4 border-t border-emerald-100 pt-4 dark:border-emerald-900/45"
+                                    : "mt-4 border-t border-gray-100 pt-4 dark:border-gray-700"
+                                }
+                              >
+                                <p
+                                  className={`text-xs font-semibold uppercase tracking-wide ${
+                                    completed
+                                      ? "text-emerald-800/90 dark:text-emerald-200/85"
+                                      : "text-gray-500 dark:text-gray-400"
+                                  }`}
+                                >
+                                  Trænere
+                                </p>
+                                {tCoaches.length === 0 ? (
+                                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    Ingen trænere på holdet endnu.
+                                  </p>
+                                ) : (
+                                  <ul
+                                    className={`mt-2 divide-y ${
+                                      completed
+                                        ? "divide-emerald-100 dark:divide-emerald-900/45"
+                                        : "divide-gray-100 dark:divide-gray-700"
+                                    }`}
+                                  >
+                                    {tCoaches.map((tc) => {
+                                      const c = coachById.get(tc.coach_id);
+                                      return (
+                                        <li
+                                          key={tc.id}
+                                          className="flex items-start justify-between gap-3 py-2.5 first:pt-0"
+                                        >
+                                          <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                              {c?.name ?? tc.coach_id}
+                                            </p>
+                                            {c ? (
+                                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                {c.home_club?.trim() || "—"}
+                                              </p>
+                                            ) : null}
+                                          </div>
+                                          <button
+                                            type="button"
+                                            disabled={busy}
+                                            onClick={() => void removeTeamCoach(tc)}
+                                            className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-red-200 hover:bg-red-50 hover:text-red-800 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-200"
+                                          >
+                                            Fjern
+                                          </button>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                )}
+                              </div>
+                            </>
                           ) : null}
                         </div>
                       </div>

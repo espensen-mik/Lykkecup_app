@@ -25,6 +25,8 @@ const INTRO_TEXT =
 const FREDE_MESSAGE =
   "Hej alle. Vi glæder os helt vildt til at se jer til LykkeCup. Her kan I se, hvem der er tilmeldt fra jeres hold. Når tilmeldingen er lukket får trænerne på det enkelte hold mulighed for at kommentere på niveauer og holdsammensætning. Hvis I har spørgsmål her og nu så skriv til mig på frederikke@lykkeliga.dk.\n\nOg hvis I kan se, at der er spillere og trænere på jeres hold der mangler at melde sig til - så prik lige til dem. Sidste frist for tilmelding er 1. maj";
 
+const FREDE_TITLE = "Lykkelig medarbejder hos LykkeLiga";
+
 function uniqueClubs(rows: { home_club: string | null }[]): string[] {
   const set = new Set<string>();
   for (const r of rows) {
@@ -90,7 +92,7 @@ export default function StatusPage() {
     ]);
     setClubs(clubList);
 
-    setSelectedClub((prev) => prev || (clubList[0] ?? ""));
+    setSelectedClub("");
     setLoadingBootstrap(false);
   }, []);
 
@@ -162,7 +164,7 @@ export default function StatusPage() {
             </option>
           ))}
         </StyledSelect>
-        {!loadingBootstrap && selectedClub && clubs.length === 0 ? (
+        {!loadingBootstrap && clubs.length === 0 ? (
           <p className="mt-3 text-sm text-gray-500">Der er ingen klubber registreret for dette arrangement.</p>
         ) : null}
       </section>
@@ -173,7 +175,9 @@ export default function StatusPage() {
         <>
           <section className="mb-8 rounded-2xl border border-gray-200/95 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-base font-semibold text-gray-900">Tilmeldte spillere</h2>
-            {filteredPlayers.length === 0 ? (
+            {!selectedClub ? (
+              <p className="mt-4 text-sm text-gray-500">Vælg en klub ovenfor for at se spillere.</p>
+            ) : filteredPlayers.length === 0 ? (
               <p className="mt-4 text-sm text-gray-500">Ingen spillere fundet for denne klub.</p>
             ) : (
               <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200/90 shadow-sm">
@@ -209,7 +213,9 @@ export default function StatusPage() {
 
           <section className="mb-8 rounded-2xl border border-gray-200/95 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-base font-semibold text-gray-900">Tilmeldte trænere</h2>
-            {filteredCoaches.length === 0 ? (
+            {!selectedClub ? (
+              <p className="mt-4 text-sm text-gray-500">Vælg en klub ovenfor for at se trænere.</p>
+            ) : filteredCoaches.length === 0 ? (
               <p className="mt-4 text-sm text-gray-500">Ingen trænere fundet for denne klub.</p>
             ) : (
               <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200/90 shadow-sm">
@@ -244,17 +250,14 @@ export default function StatusPage() {
         <div className="flex items-start gap-3 sm:gap-4">
           <img
             src="/Frede.jpg"
-            alt="Frederikke, Lykkelig medarbejder i LykkeLiga"
-            title="Frederikke, Lykkelig medarbejder i LykkeLiga"
+            alt="Frederikke"
             className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-sky-200 sm:h-11 sm:w-11"
           />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900">Frederikke</p>
+            <p className="mt-0.5 text-xs text-gray-600">{FREDE_TITLE}</p>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-              {FREDE_MESSAGE.split("\n\n")[0].replace(
-                "frederikke@lykkeliga.dk",
-                "",
-              )}
+              {FREDE_MESSAGE.split("\n\n")[0].replace(/frederikke@lykkeliga\.dk\.?/i, "")}
               <a
                 href="mailto:frederikke@lykkeliga.dk"
                 className="font-semibold text-sky-800 underline-offset-2 hover:underline"
