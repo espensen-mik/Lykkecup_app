@@ -6,6 +6,7 @@ const AUTH_ENTRY_PAGES = new Set(["/login", "/glemt-kode"]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  if (pathname === "/lykkecup26" || pathname.startsWith("/lykkecup26/")) return true;
   return false;
 }
 
