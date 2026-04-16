@@ -21,11 +21,12 @@ export function KontrolcenterHelp() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="shrink-0 rounded-md p-2 text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/40"
+        className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 sm:px-4 sm:py-2 sm:text-sm"
         aria-label="Hjælp og vejledning"
         title="Åbn hjælp — vejledning til KontrolCenter"
       >
-        <HelpCircle className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+        <HelpCircle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+        Hjælp
       </button>
 
       {open ? (
@@ -85,7 +86,9 @@ function GuideSections() {
         <h3 className="font-semibold text-gray-900 dark:text-white">Log ind og log ud</h3>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>Du logger ind med den e-mail og adgangskode, som er oprettet til dig i systemet.</li>
-          <li>Tryk <strong>Log ud</strong> (ikon ved dit navn øverst til højre), når du er færdig — særligt på delte computere.</li>
+          <li>
+            Tryk <strong>Log ud</strong> (øverst til højre), når du er færdig — særligt på delte computere.
+          </li>
         </ul>
       </section>
 
@@ -153,8 +156,8 @@ function GuideSections() {
       <section>
         <h3 className="font-semibold text-gray-900 dark:text-white">Din bruger øverst til højre</h3>
         <p className="mt-2">
-          Du ser dit navn (og evt. billede), din rolle og kan logge ud. <strong>Hjælp</strong> (spørgsmålstegn-ikonet) åbner
-          denne vejledning.
+          Du ser dit navn (og evt. billede), din rolle og kan logge ud. Knappen <strong>Hjælp</strong> åbner denne
+          vejledning.
         </p>
       </section>
 

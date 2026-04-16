@@ -521,16 +521,17 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             {HEADER_TITLE}
           </span>
         </Link>
-        <div className="flex shrink-0 items-center gap-1 sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <KontrolcenterHelp />
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="shrink-0 rounded-md p-2 text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/40"
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 sm:px-4 sm:py-2 sm:text-sm"
             aria-label="Log ud"
             title="Log ud af KontrolCenter"
           >
-            <LogOut className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            <LogOut className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            Log ud
           </button>
           <div className="flex min-w-0 items-center gap-3 pl-1 sm:pl-2">
             {currentUser?.avatarUrl ? (
