@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/login", "/glemt-kode", "/nulstil-kode"]);
+const PUBLIC_PATHS = new Set(["/login", "/glemt-kode", "/nulstil-kode", "/status"]);
 const AUTH_ENTRY_PAGES = new Set(["/login", "/glemt-kode"]);
 
 function isPublicPath(pathname: string): boolean {
