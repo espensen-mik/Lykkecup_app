@@ -16,13 +16,23 @@ type PlayerRow = {
   level: string | null;
 };
 
+type CoachRow = {
+  id: string;
+  name: string;
+  home_club: string | null;
+};
+
 const INTRO_MESSAGE =
   "Hej trænere. Vi glæder os helt vildt til at se jer til LykkeCup. Herunder kan I skrive kommentarer til jeres hold og spillere. Vi kan desværre ikke imødekomme alle ønsker og forholder os primært til kommentarer, der vedrører spillerens niveau, ønsker til holdsammensætning og træner/spiller kombination. Vi kommer ikke til at kommentere herunder, men du kan se, når vi har set og forholdt os til kommentaren";
 
-function uniqueClubsFromPlayers(players: PlayerRow[]): string[] {
+function uniqueClubsFromPlayersAndCoaches(players: PlayerRow[], coaches: CoachRow[]): string[] {
   const seen = new Set<string>();
   for (const p of players) {
     const t = p.home_club?.trim();
+    if (t) seen.add(t);
+  }
+  for (const c of coaches) {
+    const t = c.home_club?.trim();
     if (t) seen.add(t);
   }
   return [...seen].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" }));
@@ -34,6 +44,12 @@ function playersForClub(players: PlayerRow[], club: string): PlayerRow[] {
     .sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
 }
 
+function coachesForClub(coaches: CoachRow[], club: string): CoachRow[] {
+  return coaches
+    .filter((c) => (c.home_club?.trim() ?? "") === club)
+    .sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
+}
+
 function feedbackForClub(rows: ClubFeedbackRow[], club: string): ClubFeedbackRow[] {
   return rows
     .filter((r) => (r.home_club?.trim() ?? "") === club)
@@ -42,6 +58,7 @@ function feedbackForClub(rows: ClubFeedbackRow[], club: string): ClubFeedbackRow
 
 export default function CoachFeedbackPage() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [coaches, setCoaches] = useState<CoachRow[]>([]);
   const [feedbackByEvent, setFeedbackByEvent] = useState<ClubFeedbackRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingBootstrap, setLoadingBootstrap] = useState(true);
@@ -53,10 +70,14 @@ export default function CoachFeedbackPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const clubs = useMemo(() => uniqueClubsFromPlayers(players), [players]);
+  const clubs = useMemo(() => uniqueClubsFromPlayersAndCoaches(players, coaches), [players, coaches]);
   const filteredPlayers = useMemo(
     () => (selectedClub ? playersForClub(players, selectedClub) : []),
     [players, selectedClub],
+  );
+  const filteredCoaches = useMemo(
+    () => (selectedClub ? coachesForClub(coaches, selectedClub) : []),
+    [coaches, selectedClub],
   );
   const comments = useMemo(
     () => (selectedClub ? feedbackForClub(feedbackByEvent, selectedClub) : []),
@@ -84,18 +105,31 @@ export default function CoachFeedbackPage() {
       setLoadingBootstrap(true);
       setLoadError(null);
 
-      const { data, error } = await supabase
-        .from("players")
-        .select("id, name, home_club, age, level")
-        .eq("event_id", LYKKECUP_EVENT_ID);
+      const [
+        { data: playerData, error: playerError },
+        { data: coachData, error: coachError },
+      ] = await Promise.all([
+        supabase
+          .from("players")
+          .select("id, name, home_club, age, level")
+          .eq("event_id", LYKKECUP_EVENT_ID),
+        supabase.from("coaches").select("id, name, home_club").eq("event_id", LYKKECUP_EVENT_ID),
+      ]);
 
       if (cancelled) return;
 
-      if (error) {
-        setLoadError(error.message);
+      if (playerError) {
+        setLoadError(playerError.message);
         setPlayers([]);
       } else {
-        setPlayers((data ?? []) as PlayerRow[]);
+        setPlayers((playerData ?? []) as PlayerRow[]);
+      }
+
+      if (coachError) {
+        setLoadError((prev) => prev ?? coachError.message);
+        setCoaches([]);
+      } else {
+        setCoaches((coachData ?? []) as CoachRow[]);
       }
 
       await loadFeedbackForEvent();
@@ -257,6 +291,36 @@ export default function CoachFeedbackPage() {
                           {p.age != null && !Number.isNaN(p.age) ? p.age : "—"}
                         </td>
                         <td className="px-3 py-2.5 text-gray-600">{p.level?.trim() || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="mb-8 rounded-2xl border border-gray-200/95 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="text-base font-semibold text-gray-900">Tilmeldte trænere</h2>
+            {filteredCoaches.length === 0 ? (
+              <p className="mt-4 text-sm text-gray-500">Ingen trænere fundet for denne klub.</p>
+            ) : (
+              <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200/90 shadow-sm">
+                <table className="w-full min-w-[200px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="px-3 py-2.5 font-medium text-gray-700">Navn</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCoaches.map((c, index) => (
+                      <tr
+                        key={c.id}
+                        className={
+                          (index % 2 === 0 ? "bg-white" : "bg-emerald-50/70") +
+                          (index < filteredCoaches.length - 1 ? " border-b border-gray-100/90" : "")
+                        }
+                      >
+                        <td className="px-3 py-2.5 font-medium text-gray-900">{c.name}</td>
                       </tr>
                     ))}
                   </tbody>
