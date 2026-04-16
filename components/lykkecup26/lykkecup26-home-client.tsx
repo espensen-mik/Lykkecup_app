@@ -10,6 +10,12 @@ type Props = {
   bundle: Lc26HomeBundle;
 };
 
+const card =
+  "rounded-[1.65rem] border border-lc26-navy/[0.09] bg-white/88 shadow-[0_12px_44px_-20px_rgb(22_51_88/0.14)] backdrop-blur-[2px] sm:p-6";
+
+const fieldBase =
+  "mt-3 w-full rounded-2xl border border-lc26-navy/[0.1] bg-white/90 px-4 py-3 text-base leading-snug text-lc26-navy outline-none transition placeholder:text-lc26-navy/35 focus:border-lc26-teal/45 focus:bg-white focus:ring-4 focus:ring-lc26-teal/[0.12]";
+
 export function Lykkecup26HomeClient({ bundle }: Props) {
   const router = useRouter();
   const { players, error } = bundle;
@@ -49,7 +55,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
   if (error) {
     return (
       <div className="mx-auto w-full max-w-lg px-4 py-16 sm:px-6">
-        <div className="rounded-2xl border border-red-200 bg-red-50/90 px-5 py-4 text-sm text-red-900">
+        <div className="rounded-2xl border border-red-200/90 bg-red-50/95 px-5 py-4 text-sm text-red-950">
           Kunne ikke indlæse data. Prøv igen senere.
         </div>
       </div>
@@ -59,10 +65,10 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
   return (
     <div className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:max-w-2xl sm:px-6 sm:py-14">
       <div className="mb-10 text-center sm:mb-12">
-        <h1 className="text-balance text-2xl font-semibold tracking-[-0.03em] text-stone-900 sm:text-[1.75rem]">
+        <h1 className="text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.75rem]">
           Find din spiller
         </h1>
-        <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-stone-600">
+        <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-lc26-navy/58">
           Søg efter navn, eller vælg hjemmeklub og spiller — så ser du LykkeCup-hold, holdkammerater, trænere og
           kampprogram.
         </p>
@@ -70,13 +76,13 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
       <div className="flex flex-col gap-5 sm:gap-6">
         {/* Navn */}
-        <section className="rounded-3xl border border-stone-200/80 bg-white p-5 shadow-[0_8px_30px_-12px_rgba(15,118,110,0.12)] sm:p-6">
+        <section className={`${card} p-5`}>
           <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-500/10 text-teal-800 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.5)]">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-lc26-mint/50 text-lc26-teal shadow-[inset_0_1px_0_0_rgb(255_255_255/0.55)]">
               <Search className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-500">Søg på navn</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-navy/45">Søg på navn</h2>
               <label htmlFor="lc26-name" className="sr-only">
                 Søg på navn
               </label>
@@ -85,41 +91,41 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
                 type="search"
                 autoComplete="off"
                 placeholder="Fx Mads eller Emma …"
-                className="mt-3 w-full rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-base leading-snug text-stone-900 outline-none ring-teal-500/0 transition placeholder:text-stone-400 focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
+                className={fieldBase}
                 value={nameQuery}
                 onChange={(e) => setNameQuery(e.target.value)}
               />
               {nameMatches.length > 0 ? (
-                <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-stone-100 bg-white py-1">
+                <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-lc26-mint/50 bg-white/95 py-1">
                   {nameMatches.map((p) => (
                     <li key={p.id}>
                       <button
                         type="button"
-                        className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-stone-800 transition hover:bg-teal-50/80"
+                        className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-lc26-navy transition hover:bg-lc26-mint/30"
                         onClick={() => goToPlayer(p.id)}
                       >
                         <span>{p.name}</span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-stone-400" strokeWidth={1.75} aria-hidden />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-lc26-navy/30" strokeWidth={1.75} aria-hidden />
                       </button>
                     </li>
                   ))}
                 </ul>
               ) : nameQuery.trim().length >= 2 ? (
-                <p className="mt-3 text-sm text-stone-500">Ingen spillere matcher.</p>
+                <p className="mt-3 text-sm text-lc26-navy/48">Ingen spillere matcher.</p>
               ) : null}
             </div>
           </div>
         </section>
 
-        {/* Hjemmeklub — "hold" i betydning LykkeLigahold / klub */}
-        <section className="rounded-3xl border border-stone-200/80 bg-white p-5 shadow-[0_8px_30px_-12px_rgba(15,118,110,0.12)] sm:p-6">
+        {/* Hjemmeklub */}
+        <section className={`${card} p-5`}>
           <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-900 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.5)]">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-lc26-mint/40 text-lc26-navy shadow-[inset_0_1px_0_0_rgb(255_255_255/0.55)]">
               <Building2 className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-500">Vælg hold</h2>
-              <p className="mt-1 text-xs font-normal normal-case tracking-normal text-stone-500">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-navy/45">Vælg hold</h2>
+              <p className="mt-1 text-xs font-normal normal-case tracking-normal text-lc26-navy/42">
                 Baseret på spillerens hjemmeklub
               </p>
               <label htmlFor="lc26-club" className="sr-only">
@@ -127,7 +133,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
               </label>
               <select
                 id="lc26-club"
-                className="mt-3 w-full cursor-pointer rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-base leading-snug text-stone-900 outline-none ring-teal-500/0 transition focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
+                className={`${fieldBase} cursor-pointer`}
                 value={homeClub}
                 onChange={(e) => {
                   setHomeClub(e.target.value);
@@ -142,55 +148,65 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
                 ))}
               </select>
               {!error && clubOptions.length === 0 ? (
-                <p className="mt-3 text-sm text-stone-500">Der er ingen klubber registreret endnu.</p>
+                <div className="mt-4 rounded-2xl border border-dashed border-lc26-teal/25 bg-lc26-mint/25 px-4 py-4 text-center">
+                  <p className="text-sm font-medium text-lc26-navy/75">Ingen klubber endnu</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-lc26-navy/48">
+                    Når spillere er tilmeldt med hjemmeklub, kan du vælge klub her.
+                  </p>
+                </div>
               ) : null}
             </div>
           </div>
         </section>
 
-        {/* Spiller på valgt klub */}
         {homeClub ? (
-          <section className="rounded-3xl border border-stone-200/80 bg-white p-5 shadow-[0_8px_30px_-12px_rgba(15,118,110,0.12)] sm:p-6">
+          <section className={`${card} p-5`}>
             <div className="flex items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/12 text-amber-950 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.45)]">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-lc26-mint/45 text-lc26-teal shadow-[inset_0_1px_0_0_rgb(255_255_255/0.5)]">
                 <UserCircle2 className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
               </span>
               <div className="min-w-0 flex-1">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-500">Vælg spiller</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-navy/45">Vælg spiller</h2>
                 <label htmlFor="lc26-player" className="sr-only">
                   Vælg spiller
                 </label>
                 {playersInClub.length === 0 ? (
-                  <p className="mt-3 text-sm text-stone-500">Ingen spillere fra denne klub.</p>
+                  <div className="mt-4 rounded-2xl border border-lc26-navy/[0.08] bg-lc26-cream/80 px-4 py-5 text-center">
+                    <p className="text-sm font-medium text-lc26-navy/72">Ingen spillere fra denne klub</p>
+                    <p className="mt-1.5 text-xs leading-relaxed text-lc26-navy/45">
+                      Tjek at klubnavnet matcher, eller søg på navn øverst.
+                    </p>
+                  </div>
                 ) : (
-                  <>
-                    <select
-                      id="lc26-player"
-                      className="mt-3 w-full cursor-pointer rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-base leading-snug text-stone-900 outline-none ring-teal-500/0 transition focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
-                      value={playerPickId}
-                      onChange={(e) => {
-                        const id = e.target.value;
-                        setPlayerPickId(id);
-                        if (id) goToPlayer(id);
-                      }}
-                    >
-                      <option value="">Vælg spiller …</option>
-                      {playersInClub.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </>
+                  <select
+                    id="lc26-player"
+                    className={`${fieldBase} cursor-pointer`}
+                    value={playerPickId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setPlayerPickId(id);
+                      if (id) goToPlayer(id);
+                    }}
+                  >
+                    <option value="">Vælg spiller …</option>
+                    {playersInClub.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
                 )}
               </div>
             </div>
           </section>
         ) : null}
 
-        <p className="text-center text-xs text-stone-500">
+        <p className="text-center text-xs text-lc26-navy/42">
           Har du brug for hjælp?{" "}
-          <Link href="/lykkecup26/side-1" className="font-medium text-teal-800 underline-offset-2 hover:underline">
+          <Link
+            href="/lykkecup26/side-1"
+            className="font-medium text-lc26-teal underline-offset-2 hover:underline"
+          >
             Se mere her
           </Link>
         </p>
