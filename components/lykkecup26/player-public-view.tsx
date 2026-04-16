@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { formatDaDateTime } from "@/lib/datetime";
 import type { Lc26PlayerPageData } from "@/lib/lykkecup26-public";
@@ -27,17 +28,19 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
   return (
     <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
       <div className="mb-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-700/90">LykkeCup 26</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900 sm:text-[2rem]">{player.name}</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-700/90">LykkeCup 26</p>
+        <h1 className="mt-2 text-balance text-3xl font-semibold tracking-[-0.03em] text-stone-900 sm:text-[2rem]">
+          {player.name}
+        </h1>
         {player.home_club?.trim() ? (
-          <p className="mt-2 text-[15px] text-stone-600">{player.home_club.trim()}</p>
+          <p className="mt-2 text-base leading-snug text-stone-600">{player.home_club.trim()}</p>
         ) : null}
       </div>
 
       {!team ? (
-        <div className="rounded-3xl border border-amber-200/90 bg-amber-50/50 px-6 py-8 text-center shadow-sm">
-          <p className="text-[15px] font-medium text-amber-950">Du er ikke tilknyttet et hold endnu.</p>
-          <p className="mt-2 text-sm text-amber-900/85">
+        <div className="rounded-3xl border border-amber-200/85 bg-amber-50/55 px-6 py-8 text-center shadow-[0_8px_28px_-12px_rgb(180_83_9/0.2)]">
+          <p className="text-base font-medium leading-snug text-amber-950">Du er ikke tilknyttet et hold endnu.</p>
+          <p className="mt-2 text-sm leading-relaxed text-amber-900/85">
             Når dit hold er registreret, vises det automatisk her.
           </p>
         </div>
@@ -158,12 +161,13 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
         )}
       </section>
 
-      <div className="pt-4 text-center">
+      <div className="pt-6 text-center">
         <Link
           href="/lykkecup26"
-          className="inline-flex items-center gap-2 text-sm font-medium text-teal-800 underline-offset-4 hover:underline"
+          className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-teal-900 transition hover:bg-teal-500/10 active:scale-[0.98]"
         >
-          ← Tilbage til forsiden
+          <ArrowLeft className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+          Tilbage til forsiden
         </Link>
       </div>
     </div>

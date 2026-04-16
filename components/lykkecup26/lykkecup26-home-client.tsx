@@ -59,10 +59,10 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
   return (
     <div className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:max-w-2xl sm:px-6 sm:py-14">
       <div className="mb-10 text-center sm:mb-12">
-        <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-[1.75rem]">
+        <h1 className="text-balance text-2xl font-semibold tracking-[-0.03em] text-stone-900 sm:text-[1.75rem]">
           Find din spiller
         </h1>
-        <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-stone-600">
+        <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-stone-600">
           Søg efter navn, eller vælg hjemmeklub og spiller — så ser du LykkeCup-hold, holdkammerater, trænere og
           kampprogram.
         </p>
@@ -72,8 +72,8 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
         {/* Navn */}
         <section className="rounded-3xl border border-stone-200/80 bg-white p-5 shadow-[0_8px_30px_-12px_rgba(15,118,110,0.12)] sm:p-6">
           <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-500/10 text-teal-800">
-              <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-500/10 text-teal-800 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.5)]">
+              <Search className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-500">Søg på navn</h2>
@@ -85,7 +85,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
                 type="search"
                 autoComplete="off"
                 placeholder="Fx Mads eller Emma …"
-                className="mt-3 w-full rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-[15px] text-stone-900 outline-none ring-teal-500/0 transition placeholder:text-stone-400 focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
+                className="mt-3 w-full rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-base leading-snug text-stone-900 outline-none ring-teal-500/0 transition placeholder:text-stone-400 focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
                 value={nameQuery}
                 onChange={(e) => setNameQuery(e.target.value)}
               />
@@ -99,7 +99,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
                         onClick={() => goToPlayer(p.id)}
                       >
                         <span>{p.name}</span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-stone-400" aria-hidden />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-stone-400" strokeWidth={1.75} aria-hidden />
                       </button>
                     </li>
                   ))}
@@ -114,8 +114,8 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
         {/* Hjemmeklub — "hold" i betydning LykkeLigahold / klub */}
         <section className="rounded-3xl border border-stone-200/80 bg-white p-5 shadow-[0_8px_30px_-12px_rgba(15,118,110,0.12)] sm:p-6">
           <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-900">
-              <Building2 className="h-5 w-5" strokeWidth={2} aria-hidden />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-900 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.5)]">
+              <Building2 className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-500">Vælg hold</h2>
@@ -127,7 +127,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
               </label>
               <select
                 id="lc26-club"
-                className="mt-3 w-full cursor-pointer rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-[15px] text-stone-900 outline-none ring-teal-500/0 transition focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
+                className="mt-3 w-full cursor-pointer rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-base leading-snug text-stone-900 outline-none ring-teal-500/0 transition focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
                 value={homeClub}
                 onChange={(e) => {
                   setHomeClub(e.target.value);
@@ -152,8 +152,8 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
         {homeClub ? (
           <section className="rounded-3xl border border-stone-200/80 bg-white p-5 shadow-[0_8px_30px_-12px_rgba(15,118,110,0.12)] sm:p-6">
             <div className="flex items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/12 text-amber-950">
-                <UserCircle2 className="h-5 w-5" strokeWidth={2} aria-hidden />
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/12 text-amber-950 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.45)]">
+                <UserCircle2 className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-500">Vælg spiller</h2>
@@ -166,7 +166,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
                   <>
                     <select
                       id="lc26-player"
-                      className="mt-3 w-full cursor-pointer rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-[15px] text-stone-900 outline-none ring-teal-500/0 transition focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
+                      className="mt-3 w-full cursor-pointer rounded-2xl border border-stone-200 bg-stone-50/50 px-4 py-3 text-base leading-snug text-stone-900 outline-none ring-teal-500/0 transition focus:border-teal-400/80 focus:bg-white focus:ring-4 focus:ring-teal-500/15"
                       value={playerPickId}
                       onChange={(e) => {
                         const id = e.target.value;

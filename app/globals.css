@@ -60,6 +60,13 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* LykkeCup 26 public — native-app feel: no text inflation on rotate, snappier taps */
+.lc26-app {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 /* Print: holdoversigt (/print/teams) — undgå at et hold klippes midt på en side */
 @media print {
   .print-team {
