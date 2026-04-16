@@ -1,0 +1,27 @@
+{
+  "id": "/lykkecup26",
+  "name": "LykkeCup 26 — Spillere & familier",
+  "short_name": "LykkeCup 26",
+  "description": "Find dit hold, holdkammerater og kampprogram til LykkeCup 26.",
+  "start_url": "/lykkecup26",
+  "scope": "/lykkecup26",
+  "display": "standalone",
+  "display_override": ["standalone", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#fafafa",
+  "theme_color": "#00a182",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

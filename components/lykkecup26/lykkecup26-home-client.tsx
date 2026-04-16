@@ -2,9 +2,15 @@
 
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import type { Lc26HomeBundle } from "@/lib/lykkecup26-public";
+import {
+  clearSavedPlayer,
+  getSavedPlayer,
+  LC26_SAVED_PLAYER_KEY,
+  type Lc26SavedPlayer,
+} from "@/lib/lc26-saved-player";
 
 type Props = {
   bundle: Lc26HomeBundle;
@@ -18,11 +24,27 @@ const fieldBase =
 
 export function Lykkecup26HomeClient({ bundle }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const { players, error } = bundle;
 
+  const [savedPlayer, setSavedPlayer] = useState<Lc26SavedPlayer | null>(null);
   const [nameQuery, setNameQuery] = useState("");
   const [homeClub, setHomeClub] = useState("");
   const [playerPickId, setPlayerPickId] = useState("");
+
+  useEffect(() => {
+    setSavedPlayer(getSavedPlayer());
+  }, [pathname]);
+
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === LC26_SAVED_PLAYER_KEY || e.key === null) {
+        setSavedPlayer(getSavedPlayer());
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const clubOptions = useMemo(() => {
     const s = new Set<string>();
@@ -63,6 +85,50 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:max-w-2xl sm:px-6 sm:py-14">
+      {savedPlayer ? (
+        <section
+          className="mb-8 rounded-2xl border border-lc26-teal/20 bg-white p-5 shadow-sm sm:mb-10 sm:p-6"
+          aria-labelledby="lc26-saved-heading"
+        >
+          <p id="lc26-saved-heading" className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">
+            Din spiller
+          </p>
+          <p className="mt-2 text-xl font-semibold tracking-tight text-lc26-navy">{savedPlayer.name}</p>
+          <p className="mt-1 text-xs text-lc26-navy/45">Vi husker kun på denne telefon eller browser — uden login.</p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <button
+              type="button"
+              onClick={() => router.push(`/lykkecup26/spiller/${savedPlayer.id}`)}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-lc26-teal px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-lc26-teal/92 active:scale-[0.99] sm:w-auto"
+            >
+              Se min side
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearSavedPlayer();
+                setSavedPlayer(null);
+              }}
+              className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-lc26-navy/75 transition hover:bg-stone-50 sm:w-auto"
+            >
+              Skift spiller
+            </button>
+          </div>
+          <p className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                clearSavedPlayer();
+                setSavedPlayer(null);
+              }}
+              className="text-xs font-medium text-lc26-navy/38 underline-offset-2 hover:text-lc26-navy/55 hover:underline"
+            >
+              Fjern som min spiller
+            </button>
+          </p>
+        </section>
+      ) : null}
+
       <div className="mb-10 text-center sm:mb-12">
         <h1 className="text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.75rem]">
           Find din spiller

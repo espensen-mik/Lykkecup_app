@@ -9,12 +9,15 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  applicationName: "LykkeCup 26",
   title: "LykkeCup 26",
   description: "Find dit hold, holdkammerater og kampprogram til LykkeCup 26.",
+  /** Egen manifest så «Tilføj til hjemmeskårm» får start_url + scope under /lykkecup26 (bedre standalone på iOS). */
+  manifest: "/lykkecup26.webmanifest",
   appleWebApp: {
     capable: true,
     title: "LykkeCup 26",
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
   },
 };
 

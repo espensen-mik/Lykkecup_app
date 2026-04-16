@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-player-controls";
 import { formatDaDateTime } from "@/lib/datetime";
 import type { Lc26PlayerPageData } from "@/lib/lykkecup26-public";
 
@@ -38,6 +39,8 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
           <p className="mt-2 text-base leading-snug text-lc26-navy/55">{player.home_club.trim()}</p>
         ) : null}
       </div>
+
+      <Lc26SavedPlayerControls playerId={currentPlayerId} playerName={player.name} />
 
       {!team ? (
         <div className="rounded-2xl border border-lc26-teal/20 bg-white px-6 py-8 text-center shadow-sm">
