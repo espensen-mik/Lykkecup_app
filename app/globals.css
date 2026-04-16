@@ -32,11 +32,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* LykkeCup 26 — palette (brug subtilt som kontrast) */
+  /* LykkeCup 26 — navy + primær teal (#00a182) */
   --color-lc26-navy: #163358;
-  --color-lc26-cream: #f9eedc;
   --color-lc26-teal: #00a182;
-  --color-lc26-mint: #b6e2d5;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --color-lc-primary: var(--lc-primary);

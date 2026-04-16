@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Search, UserCircle2, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -11,17 +11,16 @@ type Props = {
 };
 
 const card =
-  "rounded-[1.65rem] border border-lc26-navy/[0.09] bg-white/88 shadow-[0_12px_44px_-20px_rgb(22_51_88/0.14)] backdrop-blur-[2px] sm:p-6";
+  "rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6";
 
 const fieldBase =
-  "mt-3 w-full rounded-2xl border border-lc26-navy/[0.1] bg-white/90 px-4 py-3 text-base leading-snug text-lc26-navy outline-none transition placeholder:text-lc26-navy/35 focus:border-lc26-teal/45 focus:bg-white focus:ring-4 focus:ring-lc26-teal/[0.12]";
+  "mt-3 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-base leading-snug text-lc26-navy outline-none transition placeholder:text-lc26-navy/35 focus:border-lc26-teal focus:ring-2 focus:ring-lc26-teal/20";
 
 export function Lykkecup26HomeClient({ bundle }: Props) {
   const router = useRouter();
   const { players, error } = bundle;
 
   const [nameQuery, setNameQuery] = useState("");
-  /** Valgt hjemmeklub (præcis streng som i databasen). */
   const [homeClub, setHomeClub] = useState("");
   const [playerPickId, setPlayerPickId] = useState("");
 
@@ -68,145 +67,117 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
         <h1 className="text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.75rem]">
           Find din spiller
         </h1>
-        <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-lc26-navy/58">
+        <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-lc26-navy/55">
           Søg efter navn, eller vælg hjemmeklub og spiller — så ser du LykkeCup-hold, holdkammerater, trænere og
           kampprogram.
         </p>
       </div>
 
       <div className="flex flex-col gap-5 sm:gap-6">
-        {/* Navn */}
-        <section className={`${card} p-5`}>
-          <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-lc26-mint/50 text-lc26-teal shadow-[inset_0_1px_0_0_rgb(255_255_255/0.55)]">
-              <Search className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-navy/45">Søg på navn</h2>
-              <label htmlFor="lc26-name" className="sr-only">
-                Søg på navn
-              </label>
-              <input
-                id="lc26-name"
-                type="search"
-                autoComplete="off"
-                placeholder="Fx Mads eller Emma …"
-                className={fieldBase}
-                value={nameQuery}
-                onChange={(e) => setNameQuery(e.target.value)}
-              />
-              {nameMatches.length > 0 ? (
-                <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-lc26-mint/50 bg-white/95 py-1">
-                  {nameMatches.map((p) => (
-                    <li key={p.id}>
-                      <button
-                        type="button"
-                        className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-lc26-navy transition hover:bg-lc26-mint/30"
-                        onClick={() => goToPlayer(p.id)}
-                      >
-                        <span>{p.name}</span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-lc26-navy/30" strokeWidth={1.75} aria-hidden />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : nameQuery.trim().length >= 2 ? (
-                <p className="mt-3 text-sm text-lc26-navy/48">Ingen spillere matcher.</p>
-              ) : null}
-            </div>
-          </div>
+        <section className={card}>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">Søg på navn</h2>
+          <label htmlFor="lc26-name" className="sr-only">
+            Søg på navn
+          </label>
+          <input
+            id="lc26-name"
+            type="search"
+            autoComplete="off"
+            placeholder="Fx Mads eller Emma …"
+            className={fieldBase}
+            value={nameQuery}
+            onChange={(e) => setNameQuery(e.target.value)}
+          />
+          {nameMatches.length > 0 ? (
+            <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-stone-100 bg-stone-50/50 py-1">
+              {nameMatches.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-lc26-navy transition hover:bg-lc26-teal/[0.07]"
+                    onClick={() => goToPlayer(p.id)}
+                  >
+                    <span>{p.name}</span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-lc26-teal/50" strokeWidth={1.75} aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : nameQuery.trim().length >= 2 ? (
+            <p className="mt-3 text-sm text-lc26-navy/45">Ingen spillere matcher.</p>
+          ) : null}
         </section>
 
-        {/* Hjemmeklub */}
-        <section className={`${card} p-5`}>
-          <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-lc26-mint/40 text-lc26-navy shadow-[inset_0_1px_0_0_rgb(255_255_255/0.55)]">
-              <Building2 className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-navy/45">Vælg hold</h2>
-              <p className="mt-1 text-xs font-normal normal-case tracking-normal text-lc26-navy/42">
-                Baseret på spillerens hjemmeklub
+        <section className={card}>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">Vælg hold</h2>
+          <p className="mt-1 text-xs text-lc26-navy/45">Baseret på spillerens hjemmeklub</p>
+          <label htmlFor="lc26-club" className="sr-only">
+            Vælg hold ud fra hjemmeklub
+          </label>
+          <select
+            id="lc26-club"
+            className={`${fieldBase} cursor-pointer`}
+            value={homeClub}
+            onChange={(e) => {
+              setHomeClub(e.target.value);
+              setPlayerPickId("");
+            }}
+          >
+            <option value="">Vælg klub …</option>
+            {clubOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          {!error && clubOptions.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-lc26-teal/30 bg-stone-50/80 px-4 py-4 text-center">
+              <p className="text-sm font-medium text-lc26-navy/75">Ingen klubber endnu</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-lc26-navy/45">
+                Når spillere er tilmeldt med hjemmeklub, kan du vælge klub her.
               </p>
-              <label htmlFor="lc26-club" className="sr-only">
-                Vælg hold ud fra hjemmeklub
-              </label>
-              <select
-                id="lc26-club"
-                className={`${fieldBase} cursor-pointer`}
-                value={homeClub}
-                onChange={(e) => {
-                  setHomeClub(e.target.value);
-                  setPlayerPickId("");
-                }}
-              >
-                <option value="">Vælg klub …</option>
-                {clubOptions.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              {!error && clubOptions.length === 0 ? (
-                <div className="mt-4 rounded-2xl border border-dashed border-lc26-teal/25 bg-lc26-mint/25 px-4 py-4 text-center">
-                  <p className="text-sm font-medium text-lc26-navy/75">Ingen klubber endnu</p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-lc26-navy/48">
-                    Når spillere er tilmeldt med hjemmeklub, kan du vælge klub her.
-                  </p>
-                </div>
-              ) : null}
             </div>
-          </div>
+          ) : null}
         </section>
 
         {homeClub ? (
-          <section className={`${card} p-5`}>
-            <div className="flex items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-lc26-mint/45 text-lc26-teal shadow-[inset_0_1px_0_0_rgb(255_255_255/0.5)]">
-                <UserCircle2 className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-navy/45">Vælg spiller</h2>
-                <label htmlFor="lc26-player" className="sr-only">
-                  Vælg spiller
-                </label>
-                {playersInClub.length === 0 ? (
-                  <div className="mt-4 rounded-2xl border border-lc26-navy/[0.08] bg-lc26-cream/80 px-4 py-5 text-center">
-                    <p className="text-sm font-medium text-lc26-navy/72">Ingen spillere fra denne klub</p>
-                    <p className="mt-1.5 text-xs leading-relaxed text-lc26-navy/45">
-                      Tjek at klubnavnet matcher, eller søg på navn øverst.
-                    </p>
-                  </div>
-                ) : (
-                  <select
-                    id="lc26-player"
-                    className={`${fieldBase} cursor-pointer`}
-                    value={playerPickId}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setPlayerPickId(id);
-                      if (id) goToPlayer(id);
-                    }}
-                  >
-                    <option value="">Vælg spiller …</option>
-                    {playersInClub.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
+          <section className={card}>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">Vælg spiller</h2>
+            <label htmlFor="lc26-player" className="sr-only">
+              Vælg spiller
+            </label>
+            {playersInClub.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-5 text-center">
+                <p className="text-sm font-medium text-lc26-navy/75">Ingen spillere fra denne klub</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-lc26-navy/45">
+                  Tjek at klubnavnet matcher, eller søg på navn øverst.
+                </p>
               </div>
-            </div>
+            ) : (
+              <select
+                id="lc26-player"
+                className={`${fieldBase} cursor-pointer`}
+                value={playerPickId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setPlayerPickId(id);
+                  if (id) goToPlayer(id);
+                }}
+              >
+                <option value="">Vælg spiller …</option>
+                {playersInClub.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </section>
         ) : null}
 
         <p className="text-center text-xs text-lc26-navy/42">
           Har du brug for hjælp?{" "}
-          <Link
-            href="/lykkecup26/side-1"
-            className="font-medium text-lc26-teal underline-offset-2 hover:underline"
-          >
+          <Link href="/lykkecup26/side-1" className="font-medium text-lc26-teal underline-offset-2 hover:underline">
             Se mere her
           </Link>
         </p>

@@ -5,7 +5,7 @@ export default function Side1Page() {
       <p className="mt-4 max-w-lg text-base leading-relaxed text-lc26-navy/55">
         Her kommer indhold senere. Denne side er en pladsholder i den første version af LykkeCup 26-webappen.
       </p>
-      <div className="mt-10 rounded-[1.5rem] border border-dashed border-lc26-teal/20 bg-lc26-mint/20 px-6 py-10 text-center">
+      <div className="mt-10 rounded-xl border border-dashed border-lc26-teal/30 bg-white px-6 py-10 text-center shadow-sm">
         <p className="text-sm font-medium text-lc26-navy/65">Tom side</p>
         <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-lc26-navy/42">
           Indhold tilføjes, når det er klar — layoutet er klar til tekst, links eller billeder.
