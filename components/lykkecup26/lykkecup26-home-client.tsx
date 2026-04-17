@@ -164,14 +164,9 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
         </section>
       ) : null}
 
-      <div className="mb-10 text-center sm:mb-12">
-        <h1 className="text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.75rem]">
-          Dit LykkeCup
-        </h1>
-        <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-lc26-navy/55">
-          Søg efter spiller eller træner og se LykkeCup hold, holdkammerater og kampprogram
-        </p>
-      </div>
+      <p className="mx-auto mb-6 max-w-md text-balance text-center text-base leading-snug text-lc26-navy/55 sm:mb-8">
+        Søg efter spiller eller træner og se LykkeCup hold, holdkammerater og kampprogram
+      </p>
 
       <div className="flex flex-col gap-5 sm:gap-6">
         <section className={card}>
