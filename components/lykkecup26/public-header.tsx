@@ -4,7 +4,13 @@ import { AlignJustify, Trophy, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getSavedProfile, LC26_SAVED_PLAYER_KEY, LC26_SAVED_PROFILE_EVENT } from "@/lib/lc26-saved-player";
+import {
+  getSavedProfile,
+  getSavedProfileHref,
+  LC26_SAVED_PLAYER_KEY,
+  LC26_SAVED_PROFILE_EVENT,
+  type Lc26SavedProfile,
+} from "@/lib/lc26-saved-player";
 
 const NAV_BASE = [
   { href: "/lykkecup26", label: "Forside" },
@@ -16,7 +22,7 @@ const NAV_BASE = [
 export function PublicHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [hasSaved, setHasSaved] = useState(false);
+  const [savedProfile, setSavedProfile] = useState<Lc26SavedProfile | null>(null);
 
   useEffect(() => {
     setOpen(false);
@@ -32,9 +38,9 @@ export function PublicHeader() {
   }, [open]);
 
   useEffect(() => {
-    setHasSaved(Boolean(getSavedProfile()));
+    setSavedProfile(getSavedProfile());
     function updateSaved() {
-      setHasSaved(Boolean(getSavedProfile()));
+      setSavedProfile(getSavedProfile());
     }
     function onStorage(e: StorageEvent) {
       if (e.key === LC26_SAVED_PLAYER_KEY || e.key === null) {
@@ -49,9 +55,8 @@ export function PublicHeader() {
     };
   }, [pathname]);
 
-  const nav = hasSaved
-    ? ([NAV_BASE[0], { href: "/lykkecup26/mit", label: "Mit LykkeCup" }, ...NAV_BASE.slice(1)] as const)
-    : NAV_BASE;
+  const mitHref = savedProfile ? getSavedProfileHref(savedProfile) : null;
+  const nav = mitHref ? ([NAV_BASE[0], { href: mitHref, label: "Mit LykkeCup" }, ...NAV_BASE.slice(1)] as const) : NAV_BASE;
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200/90 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
@@ -107,12 +112,17 @@ export function PublicHeader() {
                   item.href === "/lykkecup26"
                     ? pathname === "/lykkecup26" || pathname === "/lykkecup26/"
                     : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const isMit = Boolean(mitHref && item.href === mitHref);
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
                       className={`block border-l-[3px] px-5 py-3.5 text-[0.9375rem] font-medium transition ${
-                        active
+                        isMit
+                          ? active
+                            ? "border-lc26-teal bg-lc26-teal text-white"
+                            : "border-lc26-teal bg-lc26-teal/[0.92] text-white hover:bg-lc26-teal"
+                          : active
                           ? "border-lc26-teal bg-lc26-teal/[0.06] text-lc26-navy"
                           : "border-transparent text-lc26-navy/80 hover:bg-stone-50 hover:text-lc26-navy"
                       }`}

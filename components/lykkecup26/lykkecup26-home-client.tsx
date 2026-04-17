@@ -119,14 +119,8 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
               onClick={() => router.push(getSavedProfileHref(savedProfile))}
               className="inline-flex w-full items-center justify-center rounded-xl bg-lc26-teal px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-lc26-teal/92 active:scale-[0.99] sm:w-auto"
             >
-              Åbn min side
+              Åbn Mit LykkeCup
             </button>
-            <Link
-              href="/lykkecup26/mit"
-              className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-lc26-navy/75 transition hover:bg-stone-50 sm:w-auto"
-            >
-              Gå til Mit LykkeCup
-            </Link>
           </div>
         </section>
       ) : null}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSavedProfile, saveSavedProfile, type Lc26SavedKind } from "@/lib/lc26-saved-player";
+import { clearSavedProfile, getSavedProfile, saveSavedProfile, type Lc26SavedKind } from "@/lib/lc26-saved-player";
 
 type Props = {
   kind: Lc26SavedKind;
@@ -33,6 +33,12 @@ export function Lc26SavedPlayerControls({ kind, entityId, entityName }: Props) {
     showToast("Gemt i Mit LykkeCup. Du kan åbne den hurtigt fra forsiden eller menuen.");
   }
 
+  function handleRemove() {
+    clearSavedProfile();
+    setIsSaved(false);
+    showToast("Profilen er fjernet fra Mit LykkeCup.");
+  }
+
   return (
     <div className="mb-10">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -43,6 +49,15 @@ export function Lc26SavedPlayerControls({ kind, entityId, entityName }: Props) {
         >
           {isSaved ? "Gemt i Mit LykkeCup" : "Gem i Mit LykkeCup"}
         </button>
+        {isSaved ? (
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-lc26-navy/70 transition hover:bg-stone-50 sm:w-auto"
+          >
+            Fjern fra Mit LykkeCup
+          </button>
+        ) : null}
       </div>
       {toast ? (
         <p className="mt-3 text-sm leading-relaxed text-lc26-navy/60" role="status" aria-live="polite">
