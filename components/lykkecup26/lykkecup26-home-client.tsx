@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, CircleUserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -111,7 +111,10 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
           <p id="lc26-saved-heading" className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">
             Mit LykkeCup
           </p>
-          <p className="mt-2 text-xl font-semibold tracking-tight text-lc26-navy">{savedProfile.name}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <CircleUserRound className="h-5 w-5 shrink-0 text-lc26-teal" strokeWidth={1.75} aria-hidden />
+            <p className="text-xl font-semibold tracking-tight text-lc26-navy">{savedProfile.name}</p>
+          </div>
           <p className="mt-1 text-xs text-lc26-navy/45">Vi husker kun på denne telefon eller browser — uden login.</p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button

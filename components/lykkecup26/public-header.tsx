@@ -1,6 +1,6 @@
 "use client";
 
-import { AlignJustify, Trophy, X } from "lucide-react";
+import { AlignJustify, CircleUserRound, Trophy, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -120,15 +120,27 @@ export function PublicHeader() {
                       className={`block border-l-[3px] px-5 py-3.5 text-[0.9375rem] font-medium transition ${
                         isMit
                           ? active
-                            ? "border-lc26-teal bg-lc26-teal text-white"
-                            : "border-lc26-teal bg-lc26-teal/[0.92] text-white hover:bg-lc26-teal"
+                            ? "border-lc26-teal bg-gradient-to-r from-lc26-teal to-lc26-teal/90 text-white shadow-[0_10px_24px_-14px_rgb(0_161_130/0.75)]"
+                            : "border-lc26-teal bg-gradient-to-r from-lc26-teal/[0.95] to-lc26-teal/[0.88] text-white shadow-[0_10px_24px_-14px_rgb(0_161_130/0.7)] hover:from-lc26-teal hover:to-lc26-teal/95"
                           : active
                           ? "border-lc26-teal bg-lc26-teal/[0.06] text-lc26-navy"
                           : "border-transparent text-lc26-navy/80 hover:bg-stone-50 hover:text-lc26-navy"
                       }`}
                       onClick={() => setOpen(false)}
                     >
-                      {item.label}
+                      {isMit ? (
+                        <span className="flex items-center justify-between gap-3">
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            <CircleUserRound className="h-[17px] w-[17px] shrink-0" strokeWidth={1.85} aria-hidden />
+                            <span className="truncate">{item.label}</span>
+                          </span>
+                          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]">
+                            Aktiv
+                          </span>
+                        </span>
+                      ) : (
+                        item.label
+                      )}
                     </Link>
                   </li>
                 );
