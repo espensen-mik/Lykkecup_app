@@ -105,22 +105,22 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
     <div className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:max-w-2xl sm:px-6 sm:py-14">
       {savedProfile ? (
         <section
-          className="mb-8 rounded-2xl border border-lc26-teal/35 bg-gradient-to-b from-lc26-teal/[0.08] to-white p-5 shadow-sm sm:mb-10 sm:p-6"
+          className="mb-8 rounded-2xl border border-lc26-teal/70 bg-lc26-teal p-5 shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)] sm:mb-10 sm:p-6"
           aria-labelledby="lc26-saved-heading"
         >
-          <p id="lc26-saved-heading" className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">
+          <p id="lc26-saved-heading" className="text-sm font-semibold uppercase tracking-[0.12em] text-white/90">
             Mit LykkeCup
           </p>
           <div className="mt-2 flex items-center gap-2">
-            <CircleUserRound className="h-5 w-5 shrink-0 text-lc26-teal" strokeWidth={1.75} aria-hidden />
-            <p className="text-xl font-semibold tracking-tight text-lc26-navy">{savedProfile.name}</p>
+            <CircleUserRound className="h-5 w-5 shrink-0 text-white/90" strokeWidth={1.75} aria-hidden />
+            <p className="text-xl font-semibold tracking-tight text-white">{savedProfile.name}</p>
           </div>
-          <p className="mt-1 text-xs text-lc26-navy/45">Vi husker kun på denne telefon eller browser — uden login.</p>
+          <p className="mt-1 text-xs text-white/80">Vi husker kun på denne telefon eller browser — uden login.</p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={() => router.push(getSavedProfileHref(savedProfile))}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-lc26-teal px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-lc26-teal/92 active:scale-[0.99] sm:w-auto"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-lc26-teal shadow-sm transition hover:bg-stone-50 active:scale-[0.99] sm:w-auto"
             >
               Åbn Mit LykkeCup
             </button>

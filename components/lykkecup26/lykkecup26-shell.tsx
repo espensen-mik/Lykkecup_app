@@ -10,7 +10,7 @@ export function Lykkecup26Shell({ children }: { children: React.ReactNode }) {
           <img
             src="/lykkeliga-logo.svg"
             alt="LykkeLiga"
-            className="h-5 w-auto opacity-70"
+            className="h-6 w-auto opacity-100"
             loading="lazy"
             decoding="async"
           />
