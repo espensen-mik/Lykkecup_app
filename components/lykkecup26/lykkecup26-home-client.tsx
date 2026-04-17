@@ -103,25 +103,25 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:max-w-2xl sm:px-6 sm:py-14">
-      <section className="relative -mx-4 mb-16 sm:-mx-6" aria-label="LykkeCup 26">
-        <div className="relative h-44 w-full overflow-hidden rounded-b-2xl sm:h-52 sm:rounded-b-3xl">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <section className="relative mb-16 w-full shrink-0" aria-label="LykkeCup 26">
+        <div className="relative h-44 w-full overflow-hidden sm:h-52">
           <Image
             src="/lykkecupheader.jpg"
             alt=""
             fill
             className="object-cover object-[center_25%]"
             priority
-            sizes="(max-width: 640px) 100vw, 42rem"
+            sizes="100vw"
           />
         </div>
         <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2">
-          <div className="flex h-[5.25rem] w-[5.25rem] items-center justify-center overflow-hidden rounded-full bg-lc26-teal p-0.5 ring-4 ring-white shadow-[0_14px_36px_-14px_rgb(22_51_88/0.45)] sm:h-28 sm:w-28">
+          <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-lc26-teal sm:h-32 sm:w-32">
             <Image
               src="/26profile.png"
               alt="LykkeCup 26"
-              width={112}
-              height={112}
+              width={128}
+              height={128}
               className="h-full w-full rounded-full object-cover"
               priority
             />
@@ -129,6 +129,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
         </div>
       </section>
 
+      <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 sm:max-w-2xl sm:px-6 sm:pb-14">
       {savedProfile ? (
         <section
           className={`mb-8 rounded-2xl p-5 sm:mb-10 sm:p-6 ${
@@ -283,6 +284,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
             Se mere her
           </Link>
         </p>
+      </div>
       </div>
     </div>
   );
