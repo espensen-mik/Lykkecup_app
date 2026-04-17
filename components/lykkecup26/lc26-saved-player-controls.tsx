@@ -42,13 +42,13 @@ export function Lc26SavedPlayerControls({ kind, entityId, entityName, tone = "de
 
   return (
     <div className={tone === "inverse" ? "" : "mb-10"}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className={`flex flex-col sm:flex-row sm:flex-wrap sm:items-center ${tone === "inverse" ? "gap-2" : "gap-3"}`}>
         <button
           type="button"
           onClick={handleSave}
-          className={`inline-flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium transition sm:w-auto ${
+          className={`inline-flex w-full items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition sm:w-auto ${
             tone === "inverse"
-              ? "border border-white/65 bg-white text-lc26-teal hover:bg-white/90"
+              ? "border border-white/55 bg-white/95 text-lc26-teal hover:bg-white"
               : "border border-lc26-teal/45 bg-lc26-teal/[0.06] text-lc26-teal hover:bg-lc26-teal/12"
           }`}
         >
@@ -58,9 +58,9 @@ export function Lc26SavedPlayerControls({ kind, entityId, entityName, tone = "de
           <button
             type="button"
             onClick={handleRemove}
-            className={`inline-flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium transition sm:w-auto ${
+            className={`inline-flex w-full items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition sm:w-auto ${
               tone === "inverse"
-                ? "border border-white/40 bg-transparent text-white hover:bg-white/10"
+                ? "border border-white/30 bg-transparent text-white/90 hover:bg-white/10"
                 : "border border-stone-200 bg-white text-lc26-navy/70 hover:bg-stone-50"
             }`}
           >
@@ -70,7 +70,7 @@ export function Lc26SavedPlayerControls({ kind, entityId, entityName, tone = "de
       </div>
       {toast ? (
         <p
-          className={`mt-3 text-sm leading-relaxed ${tone === "inverse" ? "text-white/85" : "text-lc26-navy/60"}`}
+          className={`mt-2 text-xs leading-relaxed ${tone === "inverse" ? "text-white/80" : "text-lc26-navy/60"}`}
           role="status"
           aria-live="polite"
         >

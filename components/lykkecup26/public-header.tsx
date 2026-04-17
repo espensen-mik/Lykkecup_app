@@ -132,7 +132,12 @@ export function PublicHeader() {
                         <span className="flex items-center justify-between gap-3">
                           <span className="flex min-w-0 items-center gap-2.5">
                             <CircleUserRound className="h-[17px] w-[17px] shrink-0" strokeWidth={1.85} aria-hidden />
-                            <span className="truncate">{item.label}</span>
+                            <span className="min-w-0">
+                              <span className="block truncate">{item.label}</span>
+                              {savedProfile?.name ? (
+                                <span className="block truncate text-[11px] font-normal text-white/82">{savedProfile.name}</span>
+                              ) : null}
+                            </span>
                           </span>
                           <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]">
                             Aktiv

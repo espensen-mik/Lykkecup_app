@@ -130,11 +130,10 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
       <div className="mb-10 text-center sm:mb-12">
         <h1 className="text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.75rem]">
-          Find din spiller
+          Dit LykkeCup
         </h1>
         <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-lc26-navy/55">
-          Søg efter spiller eller træner, eller vælg hjemmeklub og spiller — så ser du LykkeCup-hold, holdkammerater, trænere og
-          kampprogram.
+          Søg efter spiller eller træner og se LykkeCup hold, holdkammerater og kampprogram
         </p>
       </div>
 
