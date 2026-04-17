@@ -15,8 +15,8 @@ import {
 const NAV_BASE = [
   { href: "/lykkecup26", label: "Forside" },
   { href: "/lykkecup26/side-1", label: "Dagens program" },
-  { href: "/lykkecup26/side-2", label: "Side 2" },
-  { href: "/lykkecup26/side-3", label: "Side 3" },
+  { href: "/lykkecup26/side-2", label: "Find rundt i MCH" },
+  { href: "/lykkecup26/side-3", label: "Praktisk info" },
 ] as const;
 
 export function PublicHeader() {
