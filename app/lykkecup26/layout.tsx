@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Lc26PwaBootstrap } from "@/components/lykkecup26/lc26-pwa-bootstrap";
 import { Lykkecup26Shell } from "@/components/lykkecup26/lykkecup26-shell";
 
 const inter = Inter({
@@ -34,6 +35,7 @@ export const viewport: Viewport = {
 export default function Lykkecup26Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`${inter.className} lc26-app min-h-[100dvh]`}>
+      <Lc26PwaBootstrap />
       <Lykkecup26Shell>{children}</Lykkecup26Shell>
     </div>
   );
