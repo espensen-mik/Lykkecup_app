@@ -8,9 +8,16 @@ type Props = {
   entityId: string;
   entityName: string;
   tone?: "default" | "inverse";
+  accent?: "teal" | "navy";
 };
 
-export function Lc26SavedPlayerControls({ kind, entityId, entityName, tone = "default" }: Props) {
+export function Lc26SavedPlayerControls({
+  kind,
+  entityId,
+  entityName,
+  tone = "default",
+  accent = "teal",
+}: Props) {
   const [isSaved, setIsSaved] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -48,8 +55,12 @@ export function Lc26SavedPlayerControls({ kind, entityId, entityName, tone = "de
           onClick={handleSave}
           className={`inline-flex w-full items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition sm:w-auto ${
             tone === "inverse"
-              ? "border border-white/55 bg-white/95 text-lc26-teal hover:bg-white"
-              : "border border-lc26-teal/45 bg-lc26-teal/[0.06] text-lc26-teal hover:bg-lc26-teal/12"
+              ? accent === "navy"
+                ? "border border-white/55 bg-white/95 text-lc26-navy hover:bg-white"
+                : "border border-white/55 bg-white/95 text-lc26-teal hover:bg-white"
+              : accent === "navy"
+                ? "border border-lc26-navy/45 bg-lc26-navy/[0.06] text-lc26-navy hover:bg-lc26-navy/12"
+                : "border border-lc26-teal/45 bg-lc26-teal/[0.06] text-lc26-teal hover:bg-lc26-teal/12"
           }`}
         >
           {isSaved ? "Gemt i Mit LykkeCup" : "Gem i Mit LykkeCup"}

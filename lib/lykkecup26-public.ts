@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { formatLc26TeamName } from "@/lib/lc26-team-name";
 import type { TeamRow } from "@/types/teams";
 
 /** Offentlig LykkeCup 26-app — samme arrangement som KontrolCenter. */
@@ -75,7 +76,7 @@ export async function fetchLykkecup26HomeData(): Promise<Lc26HomeBundle> {
   const members = (membersRes.data ?? []) as Lc26TeamMemberLink[];
   const coachRows = (coachesRes.data ?? []) as { id: string; name: string; home_club: string | null }[];
   const tcRows = (teamCoachRes.data ?? []) as { coach_id: string; team_id: string }[];
-  const teamNameById = new Map(teams.map((t) => [t.id, t.name]));
+  const teamNameById = new Map(teams.map((t) => [t.id, formatLc26TeamName(t.name)]));
   const teamNamesByCoach = new Map<string, Set<string>>();
   for (const link of tcRows) {
     const teamName = teamNameById.get(link.team_id);
@@ -165,7 +166,11 @@ export async function fetchLykkecup26CoachPage(coachId: string): Promise<Lc26Coa
     .order("name", { ascending: true });
   if (tErr) return { coach, teams: [], error: tErr.message };
 
-  return { coach, teams: (teamRows ?? []) as TeamRow[], error: null };
+  return {
+    coach,
+    teams: ((teamRows ?? []) as TeamRow[]).map((t) => ({ ...t, name: formatLc26TeamName(t.name) })),
+    error: null,
+  };
 }
 
 export async function fetchLykkecup26PlayerPage(playerId: string): Promise<Lc26PlayerPageData> {
@@ -226,7 +231,7 @@ export async function fetchLykkecup26PlayerPage(playerId: string): Promise<Lc26P
     return { player, team: null, teammates: [], coaches: [], matches: [], error: tErr?.message ?? null };
   }
 
-  const team = teamRow as TeamRow;
+  const team = { ...(teamRow as TeamRow), name: formatLc26TeamName((teamRow as TeamRow).name) };
 
   const { data: allMembers, error: memErr } = await supabase
     .from("team_members")
@@ -291,7 +296,7 @@ export async function fetchLykkecup26PlayerPage(playerId: string): Promise<Lc26P
     const { data: allTeams } = await supabase.from("teams").select("id, name").eq("event_id", eventId);
     const nameById = new Map<string, string>();
     for (const t of (allTeams ?? []) as { id: string; name: string }[]) {
-      nameById.set(t.id, t.name);
+      nameById.set(t.id, formatLc26TeamName(t.name));
     }
 
     const courtIds = [...new Set(matchRows.map((m: { court_id: string | null }) => m.court_id).filter(Boolean))] as string[];

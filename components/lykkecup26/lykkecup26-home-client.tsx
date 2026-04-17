@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight, CircleUserRound } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -103,9 +104,38 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:max-w-2xl sm:px-6 sm:py-14">
+      <section className="relative -mx-4 mb-16 sm:-mx-6" aria-label="LykkeCup 26">
+        <div className="relative h-44 w-full overflow-hidden rounded-b-2xl sm:h-52 sm:rounded-b-3xl">
+          <Image
+            src="/lykkecupheader.jpg"
+            alt=""
+            fill
+            className="object-cover object-[center_25%]"
+            priority
+            sizes="(max-width: 640px) 100vw, 42rem"
+          />
+        </div>
+        <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2">
+          <div className="flex h-[5.25rem] w-[5.25rem] items-center justify-center overflow-hidden rounded-full bg-lc26-teal p-0.5 ring-4 ring-white shadow-[0_14px_36px_-14px_rgb(22_51_88/0.45)] sm:h-28 sm:w-28">
+            <Image
+              src="/26profile.png"
+              alt="LykkeCup 26"
+              width={112}
+              height={112}
+              className="h-full w-full rounded-full object-cover"
+              priority
+            />
+          </div>
+        </div>
+      </section>
+
       {savedProfile ? (
         <section
-          className="mb-8 rounded-2xl border border-lc26-teal/70 bg-lc26-teal p-5 shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)] sm:mb-10 sm:p-6"
+          className={`mb-8 rounded-2xl p-5 sm:mb-10 sm:p-6 ${
+            savedProfile.kind === "coach"
+              ? "border border-lc26-navy/80 bg-lc26-navy shadow-[0_14px_34px_-18px_rgb(22_51_88/0.9)]"
+              : "border border-lc26-teal/70 bg-lc26-teal shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)]"
+          }`}
           aria-labelledby="lc26-saved-heading"
         >
           <p id="lc26-saved-heading" className="text-sm font-semibold uppercase tracking-[0.12em] text-white/90">
@@ -115,12 +145,17 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
             <CircleUserRound className="h-5 w-5 shrink-0 text-white/90" strokeWidth={1.75} aria-hidden />
             <p className="text-xl font-semibold tracking-tight text-white">{savedProfile.name}</p>
           </div>
+          <p className="mt-1 text-sm font-semibold uppercase tracking-[0.08em] text-white/90">
+            {savedProfile.kind === "coach" ? "Cheftræner" : "Håndboldstjerne"}
+          </p>
           <p className="mt-1 text-xs text-white/80">Vi husker kun på denne telefon eller browser — uden login.</p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={() => router.push(getSavedProfileHref(savedProfile))}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-lc26-teal shadow-sm transition hover:bg-stone-50 active:scale-[0.99] sm:w-auto"
+              className={`inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold shadow-sm transition hover:bg-stone-50 active:scale-[0.99] sm:w-auto ${
+                savedProfile.kind === "coach" ? "text-lc26-navy" : "text-lc26-teal"
+              }`}
             >
               Åbn Mit LykkeCup
             </button>

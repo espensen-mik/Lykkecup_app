@@ -33,9 +33,16 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
       <div className="mb-10 rounded-2xl border border-lc26-teal/75 bg-lc26-teal p-5 shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)] sm:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90">LykkeCup 26</p>
         <h1 className="mt-2 text-balance text-3xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">{player.name}</h1>
-        {player.home_club?.trim() ? <p className="mt-2 text-base leading-snug text-white/85">{player.home_club.trim()}</p> : null}
+        <p className="mt-2 text-sm font-semibold uppercase tracking-[0.08em] text-white/90">Håndboldstjerne</p>
+        {player.home_club?.trim() ? <p className="mt-1 text-base leading-snug text-white/85">{player.home_club.trim()}</p> : null}
         <div className="mt-6">
-          <Lc26SavedPlayerControls kind="player" entityId={currentPlayerId} entityName={player.name} tone="inverse" />
+          <Lc26SavedPlayerControls
+            kind="player"
+            entityId={currentPlayerId}
+            entityName={player.name}
+            tone="inverse"
+            accent="teal"
+          />
         </div>
       </div>
 
