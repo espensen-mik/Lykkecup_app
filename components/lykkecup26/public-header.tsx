@@ -4,8 +4,9 @@ import { AlignJustify, Trophy, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getSavedProfile, LC26_SAVED_PLAYER_KEY, LC26_SAVED_PROFILE_EVENT } from "@/lib/lc26-saved-player";
 
-const NAV = [
+const NAV_BASE = [
   { href: "/lykkecup26", label: "Forside" },
   { href: "/lykkecup26/side-1", label: "Side 1" },
   { href: "/lykkecup26/side-2", label: "Side 2" },
@@ -15,6 +16,7 @@ const NAV = [
 export function PublicHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
 
   useEffect(() => {
     setOpen(false);
@@ -28,6 +30,28 @@ export function PublicHeader() {
       document.body.style.overflow = prev;
     };
   }, [open]);
+
+  useEffect(() => {
+    setHasSaved(Boolean(getSavedProfile()));
+    function updateSaved() {
+      setHasSaved(Boolean(getSavedProfile()));
+    }
+    function onStorage(e: StorageEvent) {
+      if (e.key === LC26_SAVED_PLAYER_KEY || e.key === null) {
+        updateSaved();
+      }
+    }
+    window.addEventListener(LC26_SAVED_PROFILE_EVENT, updateSaved);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(LC26_SAVED_PROFILE_EVENT, updateSaved);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [pathname]);
+
+  const nav = hasSaved
+    ? ([NAV_BASE[0], { href: "/lykkecup26/mit", label: "Mit LykkeCup" }, ...NAV_BASE.slice(1)] as const)
+    : NAV_BASE;
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200/90 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
@@ -78,7 +102,7 @@ export function PublicHeader() {
             className="fixed right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 flex max-h-[min(70vh,420px)] w-[min(100%,20rem)] flex-col overflow-y-auto rounded-bl-2xl border border-stone-200/90 border-r-0 border-t-0 bg-white shadow-lg sm:top-[calc(3.75rem+env(safe-area-inset-top))]"
           >
             <ul className="flex flex-col py-2">
-              {NAV.map((item) => {
+              {nav.map((item) => {
                 const active =
                   item.href === "/lykkecup26"
                     ? pathname === "/lykkecup26" || pathname === "/lykkecup26/"

@@ -40,7 +40,7 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
         ) : null}
       </div>
 
-      <Lc26SavedPlayerControls playerId={currentPlayerId} playerName={player.name} />
+      <Lc26SavedPlayerControls kind="player" entityId={currentPlayerId} entityName={player.name} />
 
       {!team ? (
         <div className="rounded-2xl border border-lc26-teal/20 bg-white px-6 py-8 text-center shadow-sm">

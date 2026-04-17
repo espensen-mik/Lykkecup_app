@@ -6,10 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Lc26HomeBundle } from "@/lib/lykkecup26-public";
 import {
-  clearSavedPlayer,
-  getSavedPlayer,
+  getSavedProfile,
+  getSavedProfileHref,
   LC26_SAVED_PLAYER_KEY,
-  type Lc26SavedPlayer,
+  type Lc26SavedProfile,
 } from "@/lib/lc26-saved-player";
 
 type Props = {
@@ -25,21 +25,21 @@ const fieldBase =
 export function Lykkecup26HomeClient({ bundle }: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const { players, error } = bundle;
+  const { players, coaches, error } = bundle;
 
-  const [savedPlayer, setSavedPlayer] = useState<Lc26SavedPlayer | null>(null);
+  const [savedProfile, setSavedProfile] = useState<Lc26SavedProfile | null>(null);
   const [nameQuery, setNameQuery] = useState("");
   const [homeClub, setHomeClub] = useState("");
   const [playerPickId, setPlayerPickId] = useState("");
 
   useEffect(() => {
-    setSavedPlayer(getSavedPlayer());
+    setSavedProfile(getSavedProfile());
   }, [pathname]);
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
       if (e.key === LC26_SAVED_PLAYER_KEY || e.key === null) {
-        setSavedPlayer(getSavedPlayer());
+        setSavedProfile(getSavedProfile());
       }
     }
     window.addEventListener("storage", onStorage);
@@ -58,8 +58,26 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
   const nameMatches = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
     if (q.length < 2) return [];
-    return players.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 12);
-  }, [players, nameQuery]);
+    const playerHits = players
+      .filter((p) => p.name.toLowerCase().includes(q))
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        subtitle: p.home_club?.trim() || "Spiller",
+        kind: "player" as const,
+      }));
+    const coachHits = coaches
+      .filter((c) => c.name.toLowerCase().includes(q))
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        subtitle: c.team_names[0] ?? c.home_club?.trim() ?? "Træner",
+        kind: "coach" as const,
+      }));
+    return [...playerHits, ...coachHits]
+      .sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }))
+      .slice(0, 12);
+  }, [players, coaches, nameQuery]);
 
   const playersInClub = useMemo(() => {
     if (!homeClub) return [];
@@ -68,9 +86,9 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
       .sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
   }, [players, homeClub]);
 
-  function goToPlayer(id: string) {
+  function goToEntity(kind: "player" | "coach", id: string) {
     if (!id) return;
-    router.push(`/lykkecup26/spiller/${id}`);
+    router.push(kind === "coach" ? `/lykkecup26/coach/${id}` : `/lykkecup26/spiller/${id}`);
   }
 
   if (error) {
@@ -85,47 +103,31 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:max-w-2xl sm:px-6 sm:py-14">
-      {savedPlayer ? (
+      {savedProfile ? (
         <section
-          className="mb-8 rounded-2xl border border-lc26-teal/20 bg-white p-5 shadow-sm sm:mb-10 sm:p-6"
+          className="mb-8 rounded-2xl border border-lc26-teal/35 bg-gradient-to-b from-lc26-teal/[0.08] to-white p-5 shadow-sm sm:mb-10 sm:p-6"
           aria-labelledby="lc26-saved-heading"
         >
           <p id="lc26-saved-heading" className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">
-            Din spiller
+            Mit LykkeCup
           </p>
-          <p className="mt-2 text-xl font-semibold tracking-tight text-lc26-navy">{savedPlayer.name}</p>
+          <p className="mt-2 text-xl font-semibold tracking-tight text-lc26-navy">{savedProfile.name}</p>
           <p className="mt-1 text-xs text-lc26-navy/45">Vi husker kun på denne telefon eller browser — uden login.</p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="button"
-              onClick={() => router.push(`/lykkecup26/spiller/${savedPlayer.id}`)}
+              onClick={() => router.push(getSavedProfileHref(savedProfile))}
               className="inline-flex w-full items-center justify-center rounded-xl bg-lc26-teal px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-lc26-teal/92 active:scale-[0.99] sm:w-auto"
             >
-              Se min side
+              Åbn min side
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                clearSavedPlayer();
-                setSavedPlayer(null);
-              }}
+            <Link
+              href="/lykkecup26/mit"
               className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-lc26-navy/75 transition hover:bg-stone-50 sm:w-auto"
             >
-              Skift spiller
-            </button>
+              Gå til Mit LykkeCup
+            </Link>
           </div>
-          <p className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                clearSavedPlayer();
-                setSavedPlayer(null);
-              }}
-              className="text-xs font-medium text-lc26-navy/38 underline-offset-2 hover:text-lc26-navy/55 hover:underline"
-            >
-              Fjern som min spiller
-            </button>
-          </p>
         </section>
       ) : null}
 
@@ -134,7 +136,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
           Find din spiller
         </h1>
         <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-lc26-navy/55">
-          Søg efter navn, eller vælg hjemmeklub og spiller — så ser du LykkeCup-hold, holdkammerater, trænere og
+          Søg efter spiller eller træner, eller vælg hjemmeklub og spiller — så ser du LykkeCup-hold, holdkammerater, trænere og
           kampprogram.
         </p>
       </div>
@@ -161,16 +163,19 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
                   <button
                     type="button"
                     className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-lc26-navy transition hover:bg-lc26-teal/[0.07]"
-                    onClick={() => goToPlayer(p.id)}
+                    onClick={() => goToEntity(p.kind, p.id)}
                   >
-                    <span>{p.name}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate">{p.name}</span>
+                      <span className="block truncate text-xs font-normal text-lc26-navy/45">{p.subtitle}</span>
+                    </span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-lc26-teal/50" strokeWidth={1.75} aria-hidden />
                   </button>
                 </li>
               ))}
             </ul>
           ) : nameQuery.trim().length >= 2 ? (
-            <p className="mt-3 text-sm text-lc26-navy/45">Ingen spillere matcher.</p>
+            <p className="mt-3 text-sm text-lc26-navy/45">Ingen spillere eller trænere matcher.</p>
           ) : null}
         </section>
 
@@ -227,7 +232,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
                 onChange={(e) => {
                   const id = e.target.value;
                   setPlayerPickId(id);
-                  if (id) goToPlayer(id);
+                  if (id) goToEntity("player", id);
                 }}
               >
                 <option value="">Vælg spiller …</option>
