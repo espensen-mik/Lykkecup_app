@@ -24,15 +24,14 @@ export function CoachPublicView({ data, currentCoachId }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
-      <div className="mb-10">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-lc26-teal">LykkeCup 26</p>
-        <h1 className="mt-2 text-balance text-3xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[2rem]">
-          {coach.name}
-        </h1>
-        <p className="mt-2 text-base leading-snug text-lc26-navy/55">{coach.home_club?.trim() || "Træner"}</p>
+      <div className="mb-10 rounded-2xl border border-lc26-teal/75 bg-lc26-teal p-5 shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)] sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90">LykkeCup 26</p>
+        <h1 className="mt-2 text-balance text-3xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">{coach.name}</h1>
+        <p className="mt-2 text-base leading-snug text-white/85">{coach.home_club?.trim() || "Træner"}</p>
+        <div className="mt-6">
+          <Lc26SavedPlayerControls kind="coach" entityId={currentCoachId} entityName={coach.name} tone="inverse" />
+        </div>
       </div>
-
-      <Lc26SavedPlayerControls kind="coach" entityId={currentCoachId} entityName={coach.name} />
 
       <section className="mb-8">
         <h2 className="text-lg font-semibold tracking-[-0.02em] text-lc26-navy">Dine hold i LykkeCup 26</h2>
