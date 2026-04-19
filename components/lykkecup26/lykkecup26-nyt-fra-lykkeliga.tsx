@@ -89,7 +89,7 @@ export function Lykkecup26NytFraLykkeliga() {
         {ARTICLES.map((article) => (
           <article
             key={article.title}
-            className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_16px_48px_-28px_rgb(22_51_88/0.22)]"
+            className="overflow-hidden border border-stone-200/90 bg-white shadow-[0_16px_48px_-28px_rgb(22_51_88/0.22)]"
           >
             <figure className="m-0">
               <div className="relative aspect-[16/10] w-full sm:aspect-[2/1]">
