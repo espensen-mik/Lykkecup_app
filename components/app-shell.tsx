@@ -1,6 +1,18 @@
 "use client";
 
-import { Building2, CalendarDays, ChevronDown, LayoutDashboard, LogOut, Menu, MessageSquareText, Users, UsersRound, type LucideIcon } from "lucide-react";
+import {
+  Building2,
+  CalendarDays,
+  ChevronDown,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  MessageSquare,
+  MessageSquareText,
+  Users,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import type { AuthAppUser } from "@/lib/auth-server";
 import { usePathname } from "next/navigation";
@@ -133,6 +145,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       return pathname === "/turnering/puljer" || pathname.startsWith("/turnering/puljer/");
     if (href === "/turnering/plan")
       return pathname === "/turnering/plan" || pathname.startsWith("/turnering/plan/");
+    if (href === "/beskeder") return pathname === "/beskeder";
     return pathname === href;
   }
 
@@ -498,6 +511,19 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
         <p className="mt-1.5 px-1 text-xs leading-relaxed text-lc-muted dark:text-gray-500">
           Arrangement og deltagere.
         </p>
+        <Link
+          href="/beskeder"
+          onClick={() => setMobileOpen(false)}
+          className={`mt-4 flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[0.9375rem] font-semibold transition-colors ${
+            isActive("/beskeder")
+              ? "bg-[rgb(223_103_99/0.14)] ring-1 ring-[#df6763]/35"
+              : "hover:bg-[rgb(223_103_99/0.08)]"
+          }`}
+          style={{ color: "#df6763" }}
+        >
+          <MessageSquare className="h-4 w-4 shrink-0" strokeWidth={2} style={{ color: "#df6763" }} aria-hidden />
+          Beskeder
+        </Link>
       </div>
     </>
   );

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Lc26HomeBundle } from "@/lib/lykkecup26-public";
-import { Lc26FunInboxTeaser } from "@/components/lykkecup26/lc26-fun-inbox";
+import { Lc26InboxToast } from "@/components/lykkecup26/lc26-inbox-toast";
 import {
   getSavedProfile,
   getSavedProfileHref,
@@ -301,7 +301,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
       </div>
       </div>
 
-      <Lc26FunInboxTeaser />
+      <Lc26InboxToast />
     </div>
   );
 }

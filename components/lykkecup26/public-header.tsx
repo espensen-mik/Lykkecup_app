@@ -7,6 +7,7 @@ import {
   Home,
   Info,
   LayoutGrid,
+  Mail,
   MapPinned,
   Newspaper,
   Trophy,
@@ -15,6 +16,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useLc26Inbox } from "@/components/lykkecup26/use-lc26-inbox";
 import {
   getSavedProfile,
   getSavedProfileHref,
@@ -23,8 +25,12 @@ import {
   type Lc26SavedProfile,
 } from "@/lib/lc26-saved-player";
 
+const INBOX_HREF = "/lykkecup26/beskeder" as const;
+const INBOX_BRAND = "#df6763";
+
 const NAV_BASE = [
   { href: "/lykkecup26", label: "Forside" },
+  { href: INBOX_HREF, label: "Beskeder" },
   { href: "/lykkecup26/side-1", label: "Dagens program" },
   { href: "/lykkecup26/side-2", label: "Find rundt i MCH" },
   { href: "/lykkecup26/side-3", label: "Praktisk info" },
@@ -33,6 +39,7 @@ const NAV_BASE = [
 
 const NAV_ICON: Partial<Record<(typeof NAV_BASE)[number]["href"], typeof Home>> = {
   "/lykkecup26": Home,
+  [INBOX_HREF]: Mail,
   "/lykkecup26/side-1": CalendarDays,
   "/lykkecup26/side-2": MapPinned,
   "/lykkecup26/side-3": Info,
@@ -56,6 +63,7 @@ export function PublicHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [savedProfile, setSavedProfile] = useState<Lc26SavedProfile | null>(null);
+  const { unreadCount: inboxUnread } = useLc26Inbox();
 
   useEffect(() => {
     setOpen(false);
@@ -177,9 +185,20 @@ export function PublicHeader() {
                           </span>
                         </span>
                       ) : (
-                        <span className="flex min-w-0 items-center gap-2.5">
-                          <NavMenuIcon href={item.href} active={active} />
-                          <span className="truncate">{item.label}</span>
+                        <span className="flex w-full min-w-0 items-center justify-between gap-2">
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            <NavMenuIcon href={item.href} active={active} />
+                            <span className="truncate">{item.label}</span>
+                          </span>
+                          {item.href === INBOX_HREF && inboxUnread > 0 ? (
+                            <span
+                              className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white"
+                              style={{ backgroundColor: INBOX_BRAND }}
+                              aria-label={`${inboxUnread} ulæste beskeder`}
+                            >
+                              {inboxUnread > 9 ? "9+" : inboxUnread}
+                            </span>
+                          ) : null}
                         </span>
                       )}
                     </Link>
