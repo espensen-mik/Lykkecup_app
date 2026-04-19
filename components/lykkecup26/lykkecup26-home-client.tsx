@@ -31,7 +31,8 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
   const [savedProfile, setSavedProfile] = useState<Lc26SavedProfile | null>(null);
   const [nameQuery, setNameQuery] = useState("");
   const [homeClub, setHomeClub] = useState("");
-  const [playerPickId, setPlayerPickId] = useState("");
+  /** Format `player:id` eller `coach:id` når valgt fra klublisten. */
+  const [clubEntityPick, setClubEntityPick] = useState("");
 
   useEffect(() => {
     setSavedProfile(getSavedProfile());
@@ -53,8 +54,12 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
       const c = p.home_club?.trim();
       if (c) s.add(c);
     }
+    for (const co of coaches) {
+      const c = co.home_club?.trim();
+      if (c) s.add(c);
+    }
     return [...s].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" }));
-  }, [players]);
+  }, [players, coaches]);
 
   const nameMatches = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
@@ -80,12 +85,18 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
       .slice(0, 12);
   }, [players, coaches, nameQuery]);
 
-  const playersInClub = useMemo(() => {
+  const peopleInClub = useMemo(() => {
     if (!homeClub) return [];
-    return players
-      .filter((p) => (p.home_club?.trim() ?? "") === homeClub)
-      .sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
-  }, [players, homeClub]);
+    const rows: { kind: "player" | "coach"; id: string; name: string }[] = [
+      ...players
+        .filter((p) => (p.home_club?.trim() ?? "") === homeClub)
+        .map((p) => ({ kind: "player" as const, id: p.id, name: p.name })),
+      ...coaches
+        .filter((c) => (c.home_club?.trim() ?? "") === homeClub)
+        .map((c) => ({ kind: "coach" as const, id: c.id, name: c.name })),
+    ];
+    return rows.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
+  }, [players, coaches, homeClub]);
 
   function goToEntity(kind: "player" | "coach", id: string) {
     if (!id) return;
@@ -208,7 +219,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
         <section className={card}>
           <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">Vælg hold</h2>
-          <p className="mt-1 text-xs text-lc26-navy/45">Baseret på spillerens hjemmeklub</p>
+          <p className="mt-1 text-xs text-lc26-navy/45">Find din hjemmeklub på listen</p>
           <label htmlFor="lc26-club" className="sr-only">
             Vælg hold ud fra hjemmeklub
           </label>
@@ -218,7 +229,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
             value={homeClub}
             onChange={(e) => {
               setHomeClub(e.target.value);
-              setPlayerPickId("");
+              setClubEntityPick("");
             }}
           >
             <option value="">Vælg klub …</option>
@@ -232,7 +243,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
             <div className="mt-4 rounded-xl border border-dashed border-lc26-teal/30 bg-stone-50/80 px-4 py-4 text-center">
               <p className="text-sm font-medium text-lc26-navy/75">Ingen klubber endnu</p>
               <p className="mt-1.5 text-xs leading-relaxed text-lc26-navy/45">
-                Når spillere er tilmeldt med hjemmeklub, kan du vælge klub her.
+                Når spillere eller trænere er tilmeldt med hjemmeklub, kan du vælge klub her.
               </p>
             </div>
           ) : null}
@@ -240,32 +251,39 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
         {homeClub ? (
           <section className={card}>
-            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">Vælg spiller</h2>
-            <label htmlFor="lc26-player" className="sr-only">
-              Vælg spiller
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">Vælg navn</h2>
+            <p className="mt-1 text-xs text-lc26-navy/45">Find dit navn på listen</p>
+            <label htmlFor="lc26-club-name" className="sr-only">
+              Vælg navn på listen for den valgte klub
             </label>
-            {playersInClub.length === 0 ? (
+            {peopleInClub.length === 0 ? (
               <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-5 text-center">
-                <p className="text-sm font-medium text-lc26-navy/75">Ingen spillere fra denne klub</p>
+                <p className="text-sm font-medium text-lc26-navy/75">Ingen spillere eller trænere fra denne klub</p>
                 <p className="mt-1.5 text-xs leading-relaxed text-lc26-navy/45">
                   Tjek at klubnavnet matcher, eller søg på navn øverst.
                 </p>
               </div>
             ) : (
               <select
-                id="lc26-player"
+                id="lc26-club-name"
                 className={`${fieldBase} cursor-pointer`}
-                value={playerPickId}
+                value={clubEntityPick}
                 onChange={(e) => {
-                  const id = e.target.value;
-                  setPlayerPickId(id);
-                  if (id) goToEntity("player", id);
+                  const v = e.target.value;
+                  setClubEntityPick(v);
+                  if (!v) return;
+                  const colon = v.indexOf(":");
+                  if (colon < 1) return;
+                  const kind = v.slice(0, colon) as "player" | "coach";
+                  const id = v.slice(colon + 1);
+                  if (id && (kind === "player" || kind === "coach")) goToEntity(kind, id);
                 }}
               >
-                <option value="">Vælg spiller …</option>
-                {playersInClub.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
+                <option value="">Vælg navn …</option>
+                {peopleInClub.map((e) => (
+                  <option key={`${e.kind}-${e.id}`} value={`${e.kind}:${e.id}`}>
+                    {e.name}
+                    {e.kind === "coach" ? " · træner" : ""}
                   </option>
                 ))}
               </select>

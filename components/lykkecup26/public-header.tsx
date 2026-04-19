@@ -1,6 +1,17 @@
 "use client";
 
-import { AlignJustify, CircleUserRound, Trophy, X } from "lucide-react";
+import {
+  AlignJustify,
+  CalendarDays,
+  CircleUserRound,
+  Home,
+  Info,
+  LayoutGrid,
+  MapPinned,
+  Newspaper,
+  Trophy,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -19,6 +30,27 @@ const NAV_BASE = [
   { href: "/lykkecup26/side-3", label: "Praktisk info" },
   { href: "/lykkecup26/nyt-fra-lykkeliga", label: "Nyt fra LykkeLiga" },
 ] as const;
+
+const NAV_ICON: Partial<Record<(typeof NAV_BASE)[number]["href"], typeof Home>> = {
+  "/lykkecup26": Home,
+  "/lykkecup26/side-1": CalendarDays,
+  "/lykkecup26/side-2": MapPinned,
+  "/lykkecup26/side-3": Info,
+  "/lykkecup26/nyt-fra-lykkeliga": Newspaper,
+};
+
+function NavMenuIcon({ href, active }: { href: string; active: boolean }) {
+  const Icon = NAV_ICON[href as keyof typeof NAV_ICON] ?? LayoutGrid;
+  return (
+    <Icon
+      className={`h-[17px] w-[17px] shrink-0 transition-colors ${
+        active ? "text-lc26-teal" : "text-lc26-navy/45 group-hover:text-lc26-navy/70"
+      }`}
+      strokeWidth={1.85}
+      aria-hidden
+    />
+  );
+}
 
 export function PublicHeader() {
   const pathname = usePathname();
@@ -73,7 +105,7 @@ export function PublicHeader() {
               LykkeCup 26
             </p>
             <p className="truncate text-[11px] font-medium leading-tight text-lc26-navy/45">
-              Spillere & familier
+              Danmarks lykkeligste sæsonfinale.
             </p>
           </div>
         </Link>
@@ -118,7 +150,7 @@ export function PublicHeader() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className={`block border-l-[3px] px-5 py-3.5 text-[0.9375rem] font-medium transition ${
+                      className={`group block border-l-[3px] px-5 py-3.5 text-[0.9375rem] font-medium transition ${
                         isMit
                           ? active
                             ? "border-lc26-teal bg-gradient-to-r from-lc26-teal to-lc26-teal/90 text-white shadow-[0_10px_24px_-14px_rgb(0_161_130/0.75)]"
@@ -145,7 +177,10 @@ export function PublicHeader() {
                           </span>
                         </span>
                       ) : (
-                        item.label
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <NavMenuIcon href={item.href} active={active} />
+                          <span className="truncate">{item.label}</span>
+                        </span>
                       )}
                     </Link>
                   </li>
