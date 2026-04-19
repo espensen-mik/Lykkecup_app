@@ -533,17 +533,10 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     </>
   );
 
-  const quickNav = [
-    { href: "/dashboard", label: "Overblik" },
-    { href: "/", label: "Spillere" },
-    { href: "/analyse", label: "Analyse" },
-  ] as const;
-
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <AnalyticsTracker />
-      <div className="sticky top-0 z-50 shrink-0 shadow-[0_4px_18px_rgba(15,118,110,0.24)] dark:shadow-[0_4px_18px_rgba(15,118,110,0.2)]">
-      <header className="flex h-14 items-center gap-3 border-b border-teal-500/40 bg-[#14b8a6] px-4 text-white dark:border-teal-400/30 dark:bg-teal-600">
+      <header className="sticky top-0 z-50 flex h-14 items-center gap-3 border-b border-teal-500/40 bg-[#14b8a6] px-4 text-white shadow-[0_4px_18px_rgba(15,118,110,0.24)] dark:border-teal-400/30 dark:bg-teal-600 dark:shadow-[0_4px_18px_rgba(15,118,110,0.2)]">
         <button
           type="button"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
@@ -561,6 +554,18 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           </span>
         </Link>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <Link
+            href="/analyse"
+            onClick={() => setMobileOpen(false)}
+            className={`inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${
+              isActive("/analyse") ? "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
+            }`}
+            aria-current={isActive("/analyse") ? "page" : undefined}
+            title="Brugsstatistik for app og KontrolCenter"
+          >
+            <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            Analyse
+          </Link>
           <KontrolcenterHelp />
           <button
             type="button"
@@ -591,35 +596,12 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           </div>
         </div>
       </header>
-      <nav
-        aria-label="Hurtige genveje"
-        className="flex flex-wrap items-center gap-2 border-b border-teal-600/35 bg-[#12a899] px-3 py-2 dark:border-teal-500/30 dark:bg-teal-700"
-      >
-        {quickNav.map((item) => {
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
-                active
-                  ? "bg-white text-[#0f766e] shadow-sm dark:bg-teal-950 dark:text-teal-100"
-                  : "bg-white/15 text-white hover:bg-white/25"
-              }`}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-      </div>
 
       <div className="flex min-h-0 flex-1">
       {mobileOpen ? (
         <button
           type="button"
-          className="fixed inset-x-0 bottom-0 top-24 z-40 bg-gray-900/25 backdrop-blur-[1px] lg:hidden"
+          className="fixed inset-x-0 bottom-0 top-14 z-40 bg-gray-900/25 backdrop-blur-[1px] lg:hidden"
           aria-label="Luk menu"
           onClick={() => setMobileOpen(false)}
         />
@@ -627,7 +609,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
 
       <aside
         id="app-sidebar"
-        className={`z-50 flex min-h-0 w-[16.5rem] flex-col border-r border-lc-border bg-white dark:border-gray-700 dark:bg-gray-900 max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:top-24 max-lg:transition-transform max-lg:duration-200 max-lg:ease-out lg:sticky lg:top-24 lg:h-[calc(100svh-6rem)] lg:max-h-[calc(100svh-6rem)] lg:shrink-0 lg:self-start ${
+        className={`z-50 flex min-h-0 w-[16.5rem] flex-col border-r border-lc-border bg-white dark:border-gray-700 dark:bg-gray-900 max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:top-14 max-lg:transition-transform max-lg:duration-200 max-lg:ease-out lg:sticky lg:top-14 lg:h-[calc(100svh-3.5rem)] lg:max-h-[calc(100svh-3.5rem)] lg:shrink-0 lg:self-start ${
           mobileOpen ? "max-lg:translate-x-0 max-lg:shadow-lc-card" : "max-lg:-translate-x-full"
         } `}
       >

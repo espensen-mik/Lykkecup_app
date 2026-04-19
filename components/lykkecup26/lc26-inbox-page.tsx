@@ -4,7 +4,8 @@ import { ChevronRight, Lock, MessageSquare, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
-import { lc26InboxUnlockDate, type Lc26InboxMessageDef } from "@/lib/lc26-public-messages";
+import { formatDaDateTime } from "@/lib/datetime";
+import { lc26InboxUnlockDate } from "@/lib/lc26-public-messages";
 import { Lc26GuestMessageForm } from "@/components/lykkecup26/lc26-guest-message-form";
 import { type Lc26InboxRow, useLc26Inbox } from "@/components/lykkecup26/use-lc26-inbox";
 
@@ -26,27 +27,7 @@ function unlockPreviewLabel(d: Date): string {
   });
 }
 
-function formatDaDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("da-DK", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-/** Én linje under emnet: oprettet (hvis kendt) + hvornår beskeden er aktiv. */
-function inboxRowTimeLine(def: Lc26InboxMessageDef): string {
-  const active = formatDaDateTime(def.availableAt);
-  if (def.createdAt) {
-    const created = formatDaDateTime(def.createdAt);
-    return `Oprettet ${created} · Aktiv ${active}`;
-  }
-  return `Aktiv ${active}`;
-}
-
-function Avatar({ def, size }: { def: Lc26InboxMessageDef; size: "sm" | "md" }) {
+function Avatar({ def, size }: { def: Lc26InboxRow; size: "sm" | "md" }) {
   const cls = size === "sm" ? "h-11 w-11" : "h-12 w-12";
   if (def.avatarSrc) {
     return (
@@ -186,7 +167,7 @@ export function Lc26InboxPage() {
                     {row.subject}
                   </p>
                   <p className="mt-1 text-[11px] font-medium leading-snug text-lc26-navy/42 dark:text-gray-500">
-                    {inboxRowTimeLine(row)}
+                    <time dateTime={row.availableAt}>{formatDaDateTime(row.availableAt)}</time>
                   </p>
                 </div>
                 {row.unlocked ? (
@@ -227,7 +208,9 @@ export function Lc26InboxPage() {
                       {open.fromName}
                     </p>
                     <p className="truncate text-xs text-lc26-navy/50 dark:text-gray-400">{open.subject}</p>
-                    <p className="mt-1 text-[11px] font-medium text-lc26-navy/45 dark:text-gray-500">{inboxRowTimeLine(open)}</p>
+                    <p className="mt-1 text-[11px] font-medium text-lc26-navy/45 dark:text-gray-500">
+                      <time dateTime={open.availableAt}>{formatDaDateTime(open.availableAt)}</time>
+                    </p>
                   </div>
                 </div>
                 <button
