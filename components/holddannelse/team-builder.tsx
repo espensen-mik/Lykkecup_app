@@ -26,6 +26,7 @@ const BADGE_CLASS: Record<PreferenceBadgeLabel, string> = {
   "Egen klub": "bg-sky-100 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200",
   "Nye venner": "bg-violet-100 text-violet-900 dark:bg-violet-950/60 dark:text-violet-200",
   "Alt ok": "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200",
+  "Klar på alt": "bg-amber-100 text-amber-950 dark:bg-amber-950/55 dark:text-amber-100",
 };
 
 function teamIsCompleted(t: TeamRow): boolean {
@@ -513,6 +514,7 @@ export function TeamBuilder({
                       <option value="Egen klub">Egen klub</option>
                       <option value="Nye venner">Nye venner</option>
                       <option value="Alt ok">Alt ok</option>
+                      <option value="Klar på alt">Klar på alt</option>
                       <option value="uden">Uden badge</option>
                     </StyledSelect>
                   </div>
