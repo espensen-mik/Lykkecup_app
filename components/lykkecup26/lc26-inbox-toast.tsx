@@ -37,8 +37,8 @@ export function Lc26InboxToast() {
         /* ignore */
       }
       setToastHidden(false);
-      setModalOpen(false);
-      setModalMessage(null);
+      // Luk ikke modal her: markRead() sætter ulæste til 0 med det samme, når brugeren åbner beskeden —
+      // så ville effekten ellers fjerne modalen i samme tick.
       return;
     }
     try {
