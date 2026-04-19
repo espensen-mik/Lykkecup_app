@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Calendar } from "lucide-react";
 import Link from "next/link";
 import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-player-controls";
 import { formatDaDateTime } from "@/lib/datetime";
@@ -57,7 +57,7 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
         <>
           <section className="mb-10">
             <h2 className={sectionTitle}>Dit hold til LykkeCup 26</h2>
-            <div className="mt-4 rounded-2xl border border-stone-200/90 bg-white p-6 shadow-sm">
+            <div className="mt-4 rounded-2xl border border-lc26-teal/20 border-l-[5px] border-l-lc26-teal bg-gradient-to-br from-lc26-teal/[0.06] via-white to-white p-6 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lc26-teal">Hold</p>
               <p className="mt-2 text-xl font-semibold tracking-tight text-lc26-teal">{team.name}</p>
               {team.level?.trim() ? (
@@ -112,22 +112,23 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
           <section className="mb-10">
             <h3 className="text-base font-semibold tracking-[-0.02em] text-lc26-navy">Trænere</h3>
             {coaches.length === 0 ? (
-              <div className="mt-4 rounded-xl border border-dashed border-stone-300 bg-stone-50/80 px-5 py-8 text-center">
-                <p className="text-sm font-medium text-lc26-navy/65">Ingen trænere registreret endnu</p>
-                <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-lc26-navy/42">
+              <div className="mt-4 rounded-xl border border-dashed border-lc26-navy/25 bg-lc26-navy/[0.04] px-5 py-8 text-center">
+                <p className="text-sm font-medium text-lc26-navy/70">Ingen trænere registreret endnu</p>
+                <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-lc26-navy/45">
                   Navne på trænere vises her, når de er tilføjet til holdet.
                 </p>
               </div>
             ) : (
-              <ul className="mt-4 space-y-2">
+              <ul className="mt-4 space-y-2.5">
                 {coaches.map((c) => (
                   <li
                     key={c.id}
-                    className="rounded-xl border border-stone-200/90 bg-white px-4 py-3 text-lc26-navy shadow-sm"
+                    className="rounded-xl border border-lc26-navy/15 bg-lc26-navy/[0.055] px-4 py-3.5 text-lc26-navy shadow-[inset_0_1px_0_0_rgb(255_255_255/0.35)]"
                   >
-                    <span className="font-medium">{c.name}</span>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-lc26-navy/40">Træner</p>
+                    <span className="mt-0.5 block font-medium">{c.name}</span>
                     {c.home_club?.trim() ? (
-                      <span className="mt-0.5 block text-sm text-lc26-navy/50">{c.home_club.trim()}</span>
+                      <span className="mt-1 block text-sm text-lc26-navy/52">{c.home_club.trim()}</span>
                     ) : null}
                   </li>
                 ))}
@@ -158,24 +159,33 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
             {matches.map((m) => (
               <li
                 key={m.id}
-                className="rounded-xl border border-stone-200/90 bg-white p-4 shadow-sm sm:p-5"
+                className="flex gap-3.5 rounded-xl border border-stone-200/70 bg-gradient-to-br from-stone-50/90 via-white to-lc26-teal/[0.05] p-4 shadow-[0_4px_20px_-12px_rgb(22_51_88/0.18)] sm:gap-4 sm:p-5"
               >
-                <p className="font-semibold text-lc26-navy">mod {m.opponentTeamName}</p>
-                <div className="mt-2 space-y-1 text-sm text-lc26-navy/55">
-                  {m.startTime ? (
-                    <p>
-                      <span className="text-lc26-navy/38">Tid: </span>
-                      {formatDaDateTime(m.startTime)}
-                    </p>
-                  ) : (
-                    <p className="text-lc26-navy/45">Tid kommer senere</p>
-                  )}
-                  {(m.venueName || m.courtName) && (
-                    <p>
-                      <span className="text-lc26-navy/38">Sted: </span>
-                      {[m.venueName, m.courtName].filter(Boolean).join(" · ")}
-                    </p>
-                  )}
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-lc26-teal/12 text-lc26-teal sm:h-12 sm:w-12"
+                  aria-hidden
+                >
+                  <Calendar className="h-5 w-5" strokeWidth={1.75} />
+                </div>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-lc26-teal/85">Kamp</p>
+                  <p className="mt-0.5 font-semibold leading-snug text-lc26-navy">mod {m.opponentTeamName}</p>
+                  <div className="mt-2 space-y-1 border-t border-stone-200/60 pt-2 text-sm text-lc26-navy/58">
+                    {m.startTime ? (
+                      <p>
+                        <span className="text-lc26-navy/38">Tid: </span>
+                        {formatDaDateTime(m.startTime)}
+                      </p>
+                    ) : (
+                      <p className="text-lc26-navy/48">Tid kommer senere</p>
+                    )}
+                    {(m.venueName || m.courtName) && (
+                      <p>
+                        <span className="text-lc26-navy/38">Sted: </span>
+                        {[m.venueName, m.courtName].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </li>
             ))}
