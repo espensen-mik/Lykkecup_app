@@ -8,7 +8,6 @@ import { lc26InboxUnlockDate, type Lc26InboxMessageDef } from "@/lib/lc26-public
 import { type Lc26InboxRow, useLc26Inbox } from "@/components/lykkecup26/use-lc26-inbox";
 
 const BRAND = "#df6763";
-const BRAND_SOFT = "rgb(223 103 99 / 0.12)";
 
 function initials(name: string): string {
   const p = name.trim().split(/\s+/).filter(Boolean);
@@ -58,6 +57,7 @@ export function Lc26InboxPage() {
   const titleId = useId();
   const { rows, unreadCount, markRead, fetchError, messagesLoading } = useLc26Inbox();
   const [open, setOpen] = useState<Lc26InboxRow | null>(null);
+  const totalCount = rows.length;
 
   useEffect(() => {
     if (!open) return;
@@ -78,129 +78,121 @@ export function Lc26InboxPage() {
   );
 
   return (
-    <div className="relative mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col px-3 pb-12 pt-5 sm:max-w-2xl sm:px-5 sm:pb-16 sm:pt-8">
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-56 rounded-b-[2rem] bg-gradient-to-b from-[rgb(223_103_99/0.18)] via-[rgb(223_103_99/0.06)] to-transparent sm:h-64"
-        aria-hidden
-      />
-
-      <div
-        className="relative overflow-hidden rounded-2xl border-2 bg-white shadow-[0_28px_56px_-32px_rgb(15_30_60/0.35),0_0_0_1px_rgb(223_103_99/0.06)_inset] dark:border-[#df6763]/35 dark:bg-gray-950"
-        style={{ borderColor: "rgb(223 103 99 / 0.42)" }}
+    <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col pb-12 pt-0 sm:max-w-2xl sm:pb-16">
+      <header
+        className="relative overflow-hidden px-4 pb-6 pt-6 text-white shadow-[0_12px_32px_-16px_rgb(0_0_0/0.35)] sm:px-6 sm:pb-7 sm:pt-7"
+        style={{ backgroundColor: BRAND }}
       >
-        <div
-          className="h-1.5 w-full bg-gradient-to-r from-[#ea908b] via-[#df6763] to-[#c24e4a]"
-          aria-hidden
-        />
+        <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10 blur-2xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-12 left-1/4 h-28 w-48 rounded-full bg-black/10 blur-2xl" aria-hidden />
 
-        <header className="border-b px-4 pb-5 pt-5 sm:px-6" style={{ borderColor: BRAND_SOFT, background: `linear-gradient(180deg, ${BRAND_SOFT} 0%, transparent 100%)` }}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg sm:h-14 sm:w-14"
-                style={{ backgroundColor: BRAND, boxShadow: "0 10px 28px -8px rgb(223 103 99 / 0.55)" }}
-              >
-                <Inbox className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2} aria-hidden />
-              </div>
-              <div className="min-w-0 pt-0.5">
-                <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#c45450] dark:text-[#e89590]">
-                  LykkeCup 26 · indbakke
-                </p>
-                <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-lc26-navy sm:text-[1.65rem] dark:text-white">
-                  Beskeder
-                </h1>
-                <p className="mt-2 flex items-start gap-2 text-sm leading-snug text-lc26-navy/55 dark:text-gray-400">
-                  <Mail className="mt-0.5 h-4 w-4 shrink-0 text-[#df6763]/70" strokeWidth={2} aria-hidden />
-                  <span>
-                    Hver besked kan åbnes fra det tidspunkt, den er planlagt til — indtil da vises den som låst.
-                  </span>
-                </p>
-              </div>
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25 backdrop-blur-sm sm:h-14 sm:w-14">
+              <Inbox className="h-6 w-6 text-white sm:h-7 sm:w-7" strokeWidth={2} aria-hidden />
             </div>
+            <div className="min-w-0 pt-0.5">
+              <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-white/80">LykkeCup 26</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white sm:text-[1.75rem]">Beskeder</h1>
+              <p className="mt-2 flex items-start gap-2 text-sm leading-snug text-white/88">
+                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-white/75" strokeWidth={2} aria-hidden />
+                <span>
+                  Hver besked kan åbnes fra det tidspunkt, den er planlagt til — indtil da vises den som låst.
+                </span>
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {!messagesLoading ? (
+              <span
+                className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white ring-1 ring-white/30"
+                aria-label={`${totalCount} beskeder i alt`}
+              >
+                {totalCount} {totalCount === 1 ? "besked" : "beskeder"}
+              </span>
+            ) : null}
             {unreadCount > 0 ? (
               <span
-                className="shrink-0 rounded-full px-2.5 py-1.5 text-xs font-bold text-white shadow-md"
-                style={{ backgroundColor: BRAND, boxShadow: "0 4px 14px -4px rgb(223 103 99 / 0.65)" }}
+                className="rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums shadow-sm"
+                style={{ color: BRAND }}
                 aria-label={`${unreadCount} ulæste`}
               >
-                {unreadCount > 9 ? "9+" : unreadCount}
+                {unreadCount} ulæst{unreadCount !== 1 ? "e" : ""}
               </span>
             ) : null}
           </div>
-        </header>
+        </div>
+      </header>
 
-        <div className="bg-gradient-to-b from-stone-50/90 to-stone-100/80 px-2 py-3 dark:from-gray-900/80 dark:to-gray-950/90 sm:px-3 sm:py-4">
-          {fetchError ? (
-            <p
-              className="mx-1 mb-3 rounded-xl border border-red-200 bg-red-50/95 px-4 py-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/50 dark:text-red-200"
-              role="alert"
-            >
-              Kunne ikke hente beskeder: {fetchError}
-            </p>
-          ) : null}
-          {messagesLoading && !fetchError ? (
-            <p className="mb-3 px-3 text-sm text-lc26-navy/50 dark:text-gray-400">Indlæser beskeder…</p>
-          ) : null}
-
-          <div className="overflow-hidden rounded-xl border border-stone-200/90 bg-white shadow-[0_1px_0_rgb(255_255_255/0.8)_inset,0_8px_24px_-16px_rgb(15_30_60/0.12)] dark:border-gray-700 dark:bg-gray-900 dark:shadow-none">
-            <ul className="divide-y divide-stone-100 dark:divide-gray-800">
-              {rows.map((row) => (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    disabled={!row.unlocked}
-                    onClick={() => openRow(row)}
-                    className={`flex w-full items-center gap-3 px-3 py-3.5 text-left transition sm:gap-4 sm:px-4 sm:py-4 ${
-                      row.unlocked ? "hover:bg-[rgb(223_103_99/0.04)] active:bg-[rgb(223_103_99/0.07)] dark:hover:bg-white/[0.04]" : "cursor-default opacity-[0.58]"
-                    } ${row.status === "unread" ? "bg-[rgb(223_103_99/0.07)] dark:bg-[rgb(223_103_99/0.1)]" : ""}`}
-                  >
-                    <Avatar def={row} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p
-                          className={`truncate text-[0.9375rem] ${row.status === "unread" ? "font-bold text-lc26-navy dark:text-white" : "font-medium text-lc26-navy/90 dark:text-gray-200"}`}
-                        >
-                          {row.fromName}
-                        </p>
-                        {!row.unlocked ? (
-                          <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium tabular-nums text-lc26-navy/45 dark:text-gray-500">
-                            <Lock className="h-3 w-3" strokeWidth={2} aria-hidden />
-                            {unlockPreviewLabel(lc26InboxUnlockDate(row))}
-                          </span>
-                        ) : row.status === "read" ? (
-                          <span className="shrink-0 text-[11px] text-lc26-navy/38 dark:text-gray-500">Læst</span>
-                        ) : (
-                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: BRAND }} aria-hidden />
-                        )}
-                      </div>
-                      <p
-                        className={`mt-0.5 truncate text-sm ${row.status === "unread" ? "font-semibold text-lc26-navy/78 dark:text-gray-300" : "text-lc26-navy/55 dark:text-gray-500"}`}
-                      >
-                        {row.subject}
-                      </p>
-                    </div>
-                    {row.unlocked ? (
-                      <ChevronRight className="h-5 w-5 shrink-0 text-[#df6763]/35 dark:text-[#df6763]/50" strokeWidth={2} aria-hidden />
-                    ) : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <p className="mx-1 mt-4 rounded-lg border border-[#df6763]/15 bg-[rgb(223_103_99/0.05)] px-3 py-2.5 text-center text-[0.8125rem] leading-relaxed text-lc26-navy/48 dark:border-[#df6763]/20 dark:bg-[rgb(223_103_99/0.08)] dark:text-gray-400">
-            Dette er en leg i appen — der sendes ingen rigtige beskeder. Arrangøren planlægger små hilsner, der dukker op
-            her på de valgte tidspunkter.
+      <div className="px-3 pt-4 sm:px-5 sm:pt-5">
+        {fetchError ? (
+          <p
+            className="mb-4 rounded-xl border border-red-200 bg-red-50/95 px-4 py-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/50 dark:text-red-200"
+            role="alert"
+          >
+            Kunne ikke hente beskeder: {fetchError}
           </p>
+        ) : null}
+        {messagesLoading && !fetchError ? (
+          <p className="mb-4 text-sm text-lc26-navy/50 dark:text-gray-400">Indlæser beskeder…</p>
+        ) : null}
 
-          <div className="mt-4 text-center">
-            <Link
-              href="/lykkecup26"
-              className="inline-flex items-center justify-center rounded-full border-2 border-[#df6763]/35 bg-white px-4 py-2 text-sm font-semibold text-[#c45450] shadow-sm transition hover:border-[#df6763]/55 hover:bg-[rgb(223_103_99/0.06)] dark:border-[#df6763]/40 dark:bg-gray-900 dark:text-[#e8a09c] dark:hover:bg-[rgb(223_103_99/0.1)]"
-            >
-              Tilbage til forsiden
-            </Link>
-          </div>
+        <ul className="divide-y divide-stone-200 border-y border-stone-200/90 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-950">
+          {rows.map((row) => (
+            <li key={row.id}>
+              <button
+                type="button"
+                disabled={!row.unlocked}
+                onClick={() => openRow(row)}
+                className={`flex w-full items-center gap-3 px-3 py-3.5 text-left transition sm:gap-4 sm:px-4 sm:py-4 ${
+                  row.unlocked ? "hover:bg-stone-50 active:bg-stone-100/90 dark:hover:bg-white/[0.04]" : "cursor-default opacity-[0.58]"
+                } ${row.status === "unread" ? "bg-[rgb(223_103_99/0.06)] dark:bg-[rgb(223_103_99/0.1)]" : ""}`}
+              >
+                <Avatar def={row} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p
+                      className={`truncate text-[0.9375rem] ${row.status === "unread" ? "font-bold text-lc26-navy dark:text-white" : "font-medium text-lc26-navy/90 dark:text-gray-200"}`}
+                    >
+                      {row.fromName}
+                    </p>
+                    {!row.unlocked ? (
+                      <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium tabular-nums text-lc26-navy/45 dark:text-gray-500">
+                        <Lock className="h-3 w-3" strokeWidth={2} aria-hidden />
+                        {unlockPreviewLabel(lc26InboxUnlockDate(row))}
+                      </span>
+                    ) : row.status === "read" ? (
+                      <span className="shrink-0 text-[11px] text-lc26-navy/38 dark:text-gray-500">Læst</span>
+                    ) : (
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: BRAND }} aria-hidden />
+                    )}
+                  </div>
+                  <p
+                    className={`mt-0.5 truncate text-sm ${row.status === "unread" ? "font-semibold text-lc26-navy/78 dark:text-gray-300" : "text-lc26-navy/55 dark:text-gray-500"}`}
+                  >
+                    {row.subject}
+                  </p>
+                </div>
+                {row.unlocked ? (
+                  <ChevronRight className="h-5 w-5 shrink-0 text-[#df6763]/35 dark:text-[#df6763]/50" strokeWidth={2} aria-hidden />
+                ) : null}
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <p className="mt-5 text-center text-[0.8125rem] leading-relaxed text-lc26-navy/45 dark:text-gray-500">
+          Dette er en leg i appen — der sendes ingen rigtige beskeder. Arrangøren planlægger små hilsner, der dukker op
+          her på de valgte tidspunkter.
+        </p>
+
+        <div className="mt-6 text-center">
+          <Link
+            href="/lykkecup26"
+            className="inline-flex items-center justify-center rounded-full border-2 border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-lc26-navy shadow-sm transition hover:border-[#df6763]/40 hover:text-[#c45450] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:border-[#df6763]/50"
+          >
+            Tilbage til forsiden
+          </Link>
         </div>
       </div>
 
@@ -214,25 +206,26 @@ export function Lc26InboxPage() {
             className="relative z-10 flex max-h-[min(85dvh,32rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border-2 bg-white shadow-2xl dark:border-[#df6763]/45 dark:bg-gray-950"
             style={{ borderColor: BRAND }}
           >
-            <div className="h-1 w-full bg-gradient-to-r from-[#ea908b] via-[#df6763] to-[#c24e4a]" aria-hidden />
-            <div className="flex items-start justify-between gap-3 border-b border-stone-100 bg-gradient-to-b from-[rgb(223_103_99/0.12)] to-[rgb(223_103_99/0.04)] px-4 py-3 dark:border-gray-800 dark:from-[rgb(223_103_99/0.15)] dark:to-transparent sm:px-5">
-              <div className="flex min-w-0 items-center gap-3">
-                <Avatar def={open} size="md" />
-                <div className="min-w-0">
-                  <p id={titleId} className="truncate text-sm font-semibold text-lc26-navy dark:text-white">
-                    {open.fromName}
-                  </p>
-                  <p className="truncate text-xs text-lc26-navy/50 dark:text-gray-400">{open.subject}</p>
+            <div className="px-4 pb-3 pt-4 text-white sm:px-5 sm:pb-4 sm:pt-5" style={{ backgroundColor: BRAND }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar def={open} size="md" />
+                  <div className="min-w-0">
+                    <p id={titleId} className="truncate text-sm font-semibold text-white">
+                      {open.fromName}
+                    </p>
+                    <p className="truncate text-xs text-white/80">{open.subject}</p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setOpen(null)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/85 transition hover:bg-white/15"
+                  aria-label="Luk"
+                >
+                  <X className="h-5 w-5" strokeWidth={2} aria-hidden />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(null)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lc26-navy/50 transition hover:bg-white/80 hover:text-lc26-navy dark:text-gray-400 dark:hover:bg-gray-800"
-                aria-label="Luk"
-              >
-                <X className="h-5 w-5" strokeWidth={2} aria-hidden />
-              </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto bg-[rgb(252_252_251)] px-4 py-4 text-sm leading-relaxed text-lc26-navy/88 dark:bg-gray-900/50 dark:text-gray-200 sm:px-5 sm:py-5">
               {open.body.split("\n\n").map((para, i) => (

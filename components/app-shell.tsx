@@ -24,7 +24,6 @@ import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
 
-const APP_SIDEBAR_TITLE = "LykkeCup KontrolCenter 2026";
 const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
 
 const nav: { href: string; label: string; icon: LucideIcon }[] = [
@@ -504,43 +503,26 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           ) : null}
         </div>
       </nav>
-      <div className="shrink-0 border-t border-lc-border bg-white p-4 dark:border-gray-700 dark:bg-gray-900 lg:p-5">
-        <p className="px-1 text-[0.8125rem] font-semibold leading-snug text-gray-900 dark:text-gray-100">
-          {APP_SIDEBAR_TITLE}
-        </p>
-        <p className="mt-1.5 px-1 text-xs leading-relaxed text-lc-muted dark:text-gray-500">
-          Arrangement og deltagere.
-        </p>
-
-        <div className="mt-4 rounded-xl border border-[#df6763]/35 bg-gradient-to-br from-[rgb(223_103_99/0.16)] via-[rgb(223_103_99/0.06)] to-[rgb(223_103_99/0.02)] p-2.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.5)] dark:border-[#df6763]/30 dark:from-[rgb(223_103_99/0.14)] dark:via-[rgb(223_103_99/0.06)] dark:to-transparent dark:shadow-none">
-          <p className="mb-1.5 px-1 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-[#b84e4a] dark:text-[#e89590]">
-            Indhold til appen
-          </p>
-          <Link
-            href="/beskeder"
-            onClick={() => setMobileOpen(false)}
-            className={`flex items-center gap-3 rounded-lg px-2.5 py-2.5 transition-all ${
-              isActive("/beskeder")
-                ? "bg-white/95 shadow-md ring-2 ring-[#df6763]/50 dark:bg-gray-950/90 dark:ring-[#df6763]/45"
-                : "hover:bg-white/70 dark:hover:bg-gray-950/50"
-            }`}
-          >
-            <span
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white shadow-md shadow-[#df6763]/25"
-              style={{ backgroundColor: "#df6763" }}
-            >
-              <MessageSquare className="h-5 w-5" strokeWidth={2} aria-hidden />
+      <div className="shrink-0 border-t border-[#b84e4a]/40 bg-[#df6763] p-3 dark:border-[#df6763]/30 dark:bg-[#c95450] lg:p-4">
+        <Link
+          href="/beskeder"
+          onClick={() => setMobileOpen(false)}
+          className={`flex items-center gap-3 rounded-xl px-3 py-3 transition-all ${
+            isActive("/beskeder")
+              ? "bg-white/20 ring-2 ring-white/50 shadow-inner"
+              : "hover:bg-white/10"
+          }`}
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white ring-1 ring-white/25">
+            <MessageSquare className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1 text-white">
+            <span className="block text-[0.9375rem] font-bold leading-tight">Beskeder</span>
+            <span className="mt-0.5 block text-[0.6875rem] font-medium leading-snug text-white/85">
+              Planlæg indbakken i LykkeCup-appen
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[0.9375rem] font-bold leading-tight" style={{ color: "#c45450" }}>
-                Beskeder
-              </span>
-              <span className="mt-0.5 block text-[0.6875rem] font-medium leading-snug text-[#df6763]/85 dark:text-[#e8a09c]">
-                Planlæg indbakken i LykkeCup-appen
-              </span>
-            </span>
-          </Link>
-        </div>
+          </span>
+        </Link>
       </div>
     </>
   );

@@ -63,7 +63,8 @@ export function PublicHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [savedProfile, setSavedProfile] = useState<Lc26SavedProfile | null>(null);
-  const { unreadCount: inboxUnread } = useLc26Inbox();
+  const { unreadCount: inboxUnread, rows: inboxRows, messagesLoading: inboxLoading } = useLc26Inbox();
+  const inboxTotal = inboxRows.length;
 
   useEffect(() => {
     setOpen(false);
@@ -154,6 +155,7 @@ export function PublicHeader() {
                     ? pathname === "/lykkecup26" || pathname === "/lykkecup26/"
                     : pathname === item.href || pathname.startsWith(`${item.href}/`);
                 const isMit = Boolean(mitHref && item.href === mitHref);
+                const isInbox = item.href === INBOX_HREF;
                 return (
                   <li key={item.href}>
                     <Link
@@ -163,9 +165,13 @@ export function PublicHeader() {
                           ? active
                             ? "border-lc26-teal bg-gradient-to-r from-lc26-teal to-lc26-teal/90 text-white shadow-[0_10px_24px_-14px_rgb(0_161_130/0.75)]"
                             : "border-lc26-teal bg-gradient-to-r from-lc26-teal/[0.95] to-lc26-teal/[0.88] text-white shadow-[0_10px_24px_-14px_rgb(0_161_130/0.7)] hover:from-lc26-teal hover:to-lc26-teal/95"
-                          : active
-                          ? "border-lc26-teal bg-lc26-teal/[0.06] text-lc26-navy"
-                          : "border-transparent text-lc26-navy/80 hover:bg-stone-50 hover:text-lc26-navy"
+                          : isInbox
+                            ? active
+                              ? "border-white bg-[#c95450] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]"
+                              : "border-[#df6763] bg-[#df6763] text-white shadow-[0_10px_28px_-14px_rgb(223_103_99/0.55)] hover:bg-[#d75a56]"
+                            : active
+                              ? "border-lc26-teal bg-lc26-teal/[0.06] text-lc26-navy"
+                              : "border-transparent text-lc26-navy/80 hover:bg-stone-50 hover:text-lc26-navy"
                       }`}
                       onClick={() => setOpen(false)}
                     >
@@ -184,21 +190,29 @@ export function PublicHeader() {
                             Aktiv
                           </span>
                         </span>
+                      ) : isInbox ? (
+                        <span className="flex w-full min-w-0 items-center justify-between gap-3">
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            <Mail className="h-[17px] w-[17px] shrink-0 text-white" strokeWidth={1.85} aria-hidden />
+                            <span className="truncate font-semibold">{item.label}</span>
+                          </span>
+                          {!inboxLoading ? (
+                            <span
+                              className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-white/25 px-1.5 text-[11px] font-bold tabular-nums text-white ring-1 ring-white/35"
+                              aria-label={`${inboxTotal} beskeder i indbakken`}
+                            >
+                              {inboxTotal > 99 ? "99+" : inboxTotal}
+                            </span>
+                          ) : (
+                            <span className="h-6 w-8 shrink-0 rounded-full bg-white/20" aria-hidden />
+                          )}
+                        </span>
                       ) : (
                         <span className="flex w-full min-w-0 items-center justify-between gap-2">
                           <span className="flex min-w-0 items-center gap-2.5">
                             <NavMenuIcon href={item.href} active={active} />
                             <span className="truncate">{item.label}</span>
                           </span>
-                          {item.href === INBOX_HREF && inboxUnread > 0 ? (
-                            <span
-                              className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white"
-                              style={{ backgroundColor: INBOX_BRAND }}
-                              aria-label={`${inboxUnread} ulæste beskeder`}
-                            >
-                              {inboxUnread > 9 ? "9+" : inboxUnread}
-                            </span>
-                          ) : null}
                         </span>
                       )}
                     </Link>
