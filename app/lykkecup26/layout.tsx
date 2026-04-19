@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { Lc26PwaBootstrap } from "@/components/lykkecup26/lc26-pwa-bootstrap";
 import { Lykkecup26Shell } from "@/components/lykkecup26/lykkecup26-shell";
 
@@ -36,6 +37,7 @@ export default function Lykkecup26Layout({ children }: { children: React.ReactNo
   return (
     <div className={`${inter.className} lc26-app min-h-[100dvh]`}>
       <Lc26PwaBootstrap />
+      <AnalyticsTracker />
       <Lykkecup26Shell>{children}</Lykkecup26Shell>
     </div>
   );

@@ -146,9 +146,9 @@ export function PublicHeader() {
           />
           <nav
             id="lc26-nav-drawer"
-            className="fixed right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 flex max-h-[min(70vh,420px)] w-[min(100%,20rem)] flex-col overflow-y-auto rounded-bl-2xl border border-stone-200/90 border-r-0 border-t-0 bg-white shadow-lg sm:top-[calc(3.75rem+env(safe-area-inset-top))]"
+            className="fixed right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 flex max-h-[min(70vh,420px)] w-[min(100%,20rem)] flex-col overflow-x-hidden overflow-y-auto rounded-bl-2xl border border-stone-200/90 border-r-0 border-t-0 bg-white shadow-lg sm:top-[calc(3.75rem+env(safe-area-inset-top))]"
           >
-            <ul className="flex flex-col py-2">
+            <ul className="flex flex-col pt-2 pb-0">
               {nav.map((item) => {
                 const active =
                   item.href === "/lykkecup26"
