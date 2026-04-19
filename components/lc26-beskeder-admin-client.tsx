@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquare, Pencil, Plus, Trash2 } from "lucide-react";
+import { HeartHandshake, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
@@ -9,6 +9,7 @@ import {
   type Lc26PublicMessageRow,
   toDatetimeLocalValue,
 } from "@/lib/lc26-public-messages";
+import { fetchLc26GuestMessagesAdmin, type Lc26GuestMessageRow } from "@/lib/lc26-guest-messages";
 import { LYKKECUP26_EVENT_ID } from "@/lib/lykkecup26-public";
 
 const BRAND = "#df6763";
@@ -23,7 +24,9 @@ function safeFileName(name: string): string {
 export function Lc26BeskederAdminClient() {
   const supabase = useMemo(() => getAuthBrowserClient(), []);
   const [rows, setRows] = useState<Lc26PublicMessageRow[]>([]);
+  const [guestRows, setGuestRows] = useState<Lc26GuestMessageRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [guestLoadError, setGuestLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -39,17 +42,29 @@ export function Lc26BeskederAdminClient() {
 
   const load = useCallback(async () => {
     setLoadError(null);
-    const { data, error } = await supabase
-      .from("lc26_public_messages")
-      .select(SELECT)
-      .eq("event_id", LYKKECUP26_EVENT_ID)
-      .order("available_at", { ascending: true })
-      .order("sort_order", { ascending: true });
-    if (error) {
-      setLoadError(error.message);
+    setGuestLoadError(null);
+    const [pmRes, guestPack] = await Promise.all([
+      supabase
+        .from("lc26_public_messages")
+        .select(SELECT)
+        .eq("event_id", LYKKECUP26_EVENT_ID)
+        .order("available_at", { ascending: true })
+        .order("sort_order", { ascending: true }),
+      fetchLc26GuestMessagesAdmin(supabase),
+    ]);
+
+    if (pmRes.error) {
+      setLoadError(pmRes.error.message);
       setRows([]);
     } else {
-      setRows((data ?? []) as Lc26PublicMessageRow[]);
+      setRows((pmRes.data ?? []) as Lc26PublicMessageRow[]);
+    }
+
+    if (guestPack.error) {
+      setGuestLoadError(guestPack.error);
+      setGuestRows([]);
+    } else {
+      setGuestRows(guestPack.data);
     }
     setLoading(false);
   }, [supabase]);
@@ -207,7 +222,22 @@ export function Lc26BeskederAdminClient() {
     [supabase, load, editingId, resetForm],
   );
 
+  const removeGuest = useCallback(
+    async (id: string) => {
+      if (!window.confirm("Slette denne deltagerbesked?")) return;
+      setFormError(null);
+      const { error } = await supabase.from("lc26_guest_messages").delete().eq("id", id);
+      if (error) {
+        setFormError(error.message);
+        return;
+      }
+      await load();
+    },
+    [supabase, load],
+  );
+
   return (
+    <>
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
       <section className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -413,5 +443,70 @@ export function Lc26BeskederAdminClient() {
         </div>
       </section>
     </div>
+
+    <section className="mt-12 border-t border-gray-200 pt-10 dark:border-gray-700">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
+          style={{ backgroundColor: BRAND }}
+        >
+          <HeartHandshake className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Beskeder fra deltagere</h2>
+          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+            Hilsner sendt fra LykkeCup-appen under «Send en besked til LykkeLiga».
+          </p>
+        </div>
+      </div>
+
+      {guestLoadError ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          Kunne ikke hente deltagerbeskeder (kør database-migration for <code className="rounded bg-black/5 px-1">lc26_guest_messages</code> hvis tabellen mangler):{" "}
+          {guestLoadError}
+        </div>
+      ) : loading ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Indlæser…</p>
+      ) : guestRows.length === 0 ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Ingen deltagerbeskeder endnu.</p>
+      ) : (
+        <ul className="space-y-3">
+          {guestRows.map((g) => (
+            <li
+              key={g.id}
+              className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900 dark:text-white">{g.display_name}</p>
+                  {g.role_hint ? (
+                    <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{g.role_hint}</p>
+                  ) : null}
+                  <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                    {new Date(g.created_at).toLocaleString("da-DK", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void removeGuest(g.id)}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
+                  aria-label="Slet deltagerbesked"
+                >
+                  <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+                </button>
+              </div>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-gray-800 dark:text-gray-200">{g.body}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+    </>
   );
 }

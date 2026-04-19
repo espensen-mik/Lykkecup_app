@@ -1,10 +1,11 @@
 "use client";
 
-import { ChevronRight, Inbox, Lock, Mail, X } from "lucide-react";
+import { ChevronRight, Lock, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
 import { lc26InboxUnlockDate, type Lc26InboxMessageDef } from "@/lib/lc26-public-messages";
+import { Lc26GuestMessageForm } from "@/components/lykkecup26/lc26-guest-message-form";
 import { type Lc26InboxRow, useLc26Inbox } from "@/components/lykkecup26/use-lc26-inbox";
 
 const BRAND = "#df6763";
@@ -80,32 +81,22 @@ export function Lc26InboxPage() {
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col pb-12 pt-0 sm:max-w-2xl sm:pb-16">
       <header
-        className="relative overflow-hidden px-4 pb-6 pt-6 text-white shadow-[0_12px_32px_-16px_rgb(0_0_0/0.35)] sm:px-6 sm:pb-7 sm:pt-7"
+        className="relative overflow-hidden px-4 pb-6 pt-6 text-white shadow-[0_8px_28px_-12px_rgb(0_0_0/0.28)] sm:px-6 sm:pb-7 sm:pt-7"
         style={{ backgroundColor: BRAND }}
       >
-        <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10 blur-2xl" aria-hidden />
-        <div className="pointer-events-none absolute -bottom-12 left-1/4 h-28 w-48 rounded-full bg-black/10 blur-2xl" aria-hidden />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.07] to-transparent" aria-hidden />
 
-        <div className="relative flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25 backdrop-blur-sm sm:h-14 sm:w-14">
-              <Inbox className="h-6 w-6 text-white sm:h-7 sm:w-7" strokeWidth={2} aria-hidden />
-            </div>
-            <div className="min-w-0 pt-0.5">
-              <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-white/80">LykkeCup 26</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white sm:text-[1.75rem]">Beskeder</h1>
-              <p className="mt-2 flex items-start gap-2 text-sm leading-snug text-white/88">
-                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-white/75" strokeWidth={2} aria-hidden />
-                <span>
-                  Hver besked kan åbnes fra det tidspunkt, den er planlagt til — indtil da vises den som låst.
-                </span>
-              </p>
-            </div>
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-[-0.03em] text-white sm:text-[1.75rem]">Beskeder</h1>
+            <p className="mt-2 max-w-prose text-[0.9375rem] leading-relaxed text-white/92 sm:text-base">
+              Dette er din LykkeCup 26 indbakke, hvor du modtager beskeder på dagen.
+            </p>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="flex shrink-0 flex-row flex-wrap items-center gap-2 sm:flex-col sm:items-end">
             {!messagesLoading ? (
               <span
-                className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white ring-1 ring-white/30"
+                className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white ring-1 ring-white/25"
                 aria-label={`${totalCount} beskeder i alt`}
               >
                 {totalCount} {totalCount === 1 ? "besked" : "beskeder"}
@@ -186,7 +177,9 @@ export function Lc26InboxPage() {
           her på de valgte tidspunkter.
         </p>
 
-        <div className="mt-6 text-center">
+        <Lc26GuestMessageForm />
+
+        <div className="mt-8 text-center">
           <Link
             href="/lykkecup26"
             className="inline-flex items-center justify-center rounded-full border-2 border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-lc26-navy shadow-sm transition hover:border-[#df6763]/40 hover:text-[#c45450] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:border-[#df6763]/50"

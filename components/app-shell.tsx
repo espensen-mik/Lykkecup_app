@@ -503,22 +503,24 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           ) : null}
         </div>
       </nav>
-      <div className="shrink-0 border-t border-[#b84e4a]/40 bg-[#df6763] p-3 dark:border-[#df6763]/30 dark:bg-[#c95450] lg:p-4">
+      <div className="shrink-0 border-t border-lc-border bg-white p-3 dark:border-gray-700 dark:bg-gray-900 lg:p-4">
         <Link
           href="/beskeder"
           onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-3 rounded-xl px-3 py-3 transition-all ${
+          className={`flex items-center gap-3 rounded-md py-2.5 pr-3 text-[0.9375rem] font-medium transition-colors border-l-2 ${
             isActive("/beskeder")
-              ? "bg-white/20 ring-2 ring-white/50 shadow-inner"
-              : "hover:bg-white/10"
+              ? "border-[#df6763] bg-[rgb(223_103_99/0.08)] pl-[10px] text-[#b84e4a] dark:border-[#e89590] dark:bg-[rgb(223_103_99/0.12)] dark:text-[#e8a09c]"
+              : "border-transparent pl-3 text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-white"
           }`}
         >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white ring-1 ring-white/25">
-            <MessageSquare className="h-5 w-5" strokeWidth={2} aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1 text-white">
-            <span className="block text-[0.9375rem] font-bold leading-tight">Beskeder</span>
-            <span className="mt-0.5 block text-[0.6875rem] font-medium leading-snug text-white/85">
+          <MessageSquare
+            className={`h-4 w-4 shrink-0 ${isActive("/beskeder") ? "text-[#df6763] dark:text-[#e89590]" : "text-[#df6763]/55 dark:text-[#df6763]/45"}`}
+            strokeWidth={2}
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">Beskeder</span>
+            <span className="mt-0.5 block truncate text-[0.6875rem] font-normal leading-snug text-gray-500 dark:text-gray-500">
               Planlæg indbakken i LykkeCup-appen
             </span>
           </span>
