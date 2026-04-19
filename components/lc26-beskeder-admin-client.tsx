@@ -15,7 +15,7 @@ import { LYKKECUP26_EVENT_ID } from "@/lib/lykkecup26-public";
 const BRAND = "#df6763";
 
 const SELECT =
-  "id, event_id, sender_name, subject, body, avatar_url, available_at, sort_order" as const;
+  "id, event_id, sender_name, subject, body, avatar_url, available_at, sort_order, created_at" as const;
 
 function safeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "avatar";

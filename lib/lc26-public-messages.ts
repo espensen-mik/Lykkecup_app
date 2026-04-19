@@ -28,6 +28,8 @@ export type Lc26InboxMessageDef = {
   avatarSrc?: string | null;
   /** ISO timestamptz — hvornår beskeden «låses op». */
   availableAt: string;
+  /** Oprettet i KontrolCenter (til tidsstempel i indbakken). */
+  createdAt?: string | null;
 };
 
 export function mapDbRowToInboxDef(row: Lc26PublicMessageRow): Lc26InboxMessageDef {
@@ -38,6 +40,7 @@ export function mapDbRowToInboxDef(row: Lc26PublicMessageRow): Lc26InboxMessageD
     body: row.body,
     avatarSrc: row.avatar_url ?? undefined,
     availableAt: row.available_at,
+    createdAt: row.created_at ?? null,
   };
 }
 
@@ -51,7 +54,7 @@ export function lc26InboxIsUnlocked(def: Lc26InboxMessageDef, now: Date): boolea
 }
 
 const SELECT_PUBLIC =
-  "id, event_id, sender_name, subject, body, avatar_url, available_at, sort_order" as const;
+  "id, event_id, sender_name, subject, body, avatar_url, available_at, sort_order, created_at" as const;
 
 export async function fetchLc26PublicMessages(
   eventId: string = LYKKECUP26_EVENT_ID,
@@ -60,8 +63,8 @@ export async function fetchLc26PublicMessages(
     .from("lc26_public_messages")
     .select(SELECT_PUBLIC)
     .eq("event_id", eventId)
-    .order("available_at", { ascending: true })
-    .order("sort_order", { ascending: true });
+    .order("available_at", { ascending: false })
+    .order("sort_order", { ascending: false });
 
   if (error) return { data: [], error: error.message };
   const rows = (data ?? []) as Lc26PublicMessageRow[];

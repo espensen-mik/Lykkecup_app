@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Lock, X } from "lucide-react";
+import { ChevronRight, Heart, Lock, MessageSquare, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
@@ -26,12 +26,32 @@ function unlockPreviewLabel(d: Date): string {
   });
 }
 
+function formatDaDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("da-DK", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Én linje under emnet: oprettet (hvis kendt) + hvornår beskeden er aktiv. */
+function inboxRowTimeLine(def: Lc26InboxMessageDef): string {
+  const active = formatDaDateTime(def.availableAt);
+  if (def.createdAt) {
+    const created = formatDaDateTime(def.createdAt);
+    return `Oprettet ${created} · Aktiv ${active}`;
+  }
+  return `Aktiv ${active}`;
+}
+
 function Avatar({ def, size }: { def: Lc26InboxMessageDef; size: "sm" | "md" }) {
   const cls = size === "sm" ? "h-11 w-11" : "h-12 w-12";
   if (def.avatarSrc) {
     return (
       <div
-        className={`relative shrink-0 overflow-hidden rounded-full border-2 border-white bg-stone-100 shadow-sm ring-1 ring-stone-200/80 ${cls}`}
+        className={`relative shrink-0 overflow-hidden rounded-full border border-stone-200 bg-stone-100 shadow-sm ring-1 ring-stone-200/60 ${cls}`}
       >
         <Image
           src={def.avatarSrc}
@@ -46,7 +66,7 @@ function Avatar({ def, size }: { def: Lc26InboxMessageDef; size: "sm" | "md" }) 
   }
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-full border-2 border-white bg-stone-100 text-xs font-bold text-lc26-navy/70 shadow-sm ring-1 ring-stone-200/80 ${cls}`}
+      className={`flex shrink-0 items-center justify-center rounded-full border border-stone-200 bg-stone-100 text-xs font-bold text-lc26-navy/70 shadow-sm ring-1 ring-stone-200/60 ${cls}`}
       aria-hidden
     >
       {initials(def.fromName)}
@@ -80,23 +100,29 @@ export function Lc26InboxPage() {
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col pb-12 pt-0 sm:max-w-2xl sm:pb-16">
-      <header
-        className="relative overflow-hidden px-4 pb-6 pt-6 text-white shadow-[0_8px_28px_-12px_rgb(0_0_0/0.28)] sm:px-6 sm:pb-7 sm:pt-7"
-        style={{ backgroundColor: BRAND }}
-      >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.07] to-transparent" aria-hidden />
-
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-[-0.03em] text-white sm:text-[1.75rem]">Beskeder</h1>
-            <p className="mt-2 max-w-prose text-[0.9375rem] leading-relaxed text-white/92 sm:text-base">
+      <header className="border-b border-stone-200/95 bg-gradient-to-b from-white via-white to-stone-50/90 px-4 pb-5 pt-5 shadow-[0_1px_0_rgb(255_255_255/0.8)_inset] sm:px-6 sm:pb-6 sm:pt-6 dark:border-gray-800 dark:from-gray-950 dark:via-gray-950 dark:to-gray-900/95">
+        <div className="flex items-start gap-4 sm:gap-5">
+          <MessageSquare
+            className="mt-0.5 h-9 w-9 shrink-0 text-lc26-teal sm:h-10 sm:w-10"
+            strokeWidth={2}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold tracking-[-0.03em] text-lc26-navy dark:text-white sm:text-[1.75rem]">
+              Beskeder
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-lc26-navy/60 dark:text-gray-400 sm:text-[0.9375rem]">
               Dette er din LykkeCup 26 indbakke, hvor du modtager beskeder på dagen.
             </p>
+            <div
+              className="mt-4 h-1 w-16 rounded-full bg-gradient-to-r from-lc26-teal to-[#df6763] sm:w-20"
+              aria-hidden
+            />
           </div>
-          <div className="flex shrink-0 flex-row flex-wrap items-center gap-2 sm:flex-col sm:items-end">
+          <div className="flex shrink-0 flex-col items-end gap-2">
             {!messagesLoading ? (
               <span
-                className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white ring-1 ring-white/25"
+                className="rounded-full border border-stone-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold tabular-nums text-lc26-navy/75 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                 aria-label={`${totalCount} beskeder i alt`}
               >
                 {totalCount} {totalCount === 1 ? "besked" : "beskeder"}
@@ -104,8 +130,8 @@ export function Lc26InboxPage() {
             ) : null}
             {unreadCount > 0 ? (
               <span
-                className="rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums shadow-sm"
-                style={{ color: BRAND }}
+                className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums text-white shadow-sm"
+                style={{ backgroundColor: BRAND }}
                 aria-label={`${unreadCount} ulæste`}
               >
                 {unreadCount} ulæst{unreadCount !== 1 ? "e" : ""}
@@ -148,9 +174,9 @@ export function Lc26InboxPage() {
                       {row.fromName}
                     </p>
                     {!row.unlocked ? (
-                      <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium tabular-nums text-lc26-navy/45 dark:text-gray-500">
-                        <Lock className="h-3 w-3" strokeWidth={2} aria-hidden />
-                        {unlockPreviewLabel(lc26InboxUnlockDate(row))}
+                      <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium tabular-nums text-lc26-navy/45 dark:text-gray-500" title="Låses op på dette tidspunkt">
+                        <Lock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                        <span className="hidden min-[380px]:inline">{unlockPreviewLabel(lc26InboxUnlockDate(row))}</span>
                       </span>
                     ) : row.status === "read" ? (
                       <span className="shrink-0 text-[11px] text-lc26-navy/38 dark:text-gray-500">Læst</span>
@@ -163,6 +189,9 @@ export function Lc26InboxPage() {
                   >
                     {row.subject}
                   </p>
+                  <p className="mt-1 text-[11px] font-medium leading-snug text-lc26-navy/42 dark:text-gray-500">
+                    {inboxRowTimeLine(row)}
+                  </p>
                 </div>
                 {row.unlocked ? (
                   <ChevronRight className="h-5 w-5 shrink-0 text-[#df6763]/35 dark:text-[#df6763]/50" strokeWidth={2} aria-hidden />
@@ -172,10 +201,27 @@ export function Lc26InboxPage() {
           ))}
         </ul>
 
-        <p className="mt-5 text-center text-[0.8125rem] leading-relaxed text-lc26-navy/45 dark:text-gray-500">
-          Dette er en leg i appen — der sendes ingen rigtige beskeder. Arrangøren planlægger små hilsner, der dukker op
-          her på de valgte tidspunkter.
-        </p>
+        <a
+          href="#lc26-guest-book"
+          className="group mt-6 flex w-full items-start gap-4 rounded-2xl border-2 border-[#df6763]/45 bg-gradient-to-br from-[rgb(223_103_99/0.12)] via-white to-white px-4 py-4 text-left shadow-[0_12px_36px_-20px_rgb(223_103_99/0.45)] transition hover:border-[#df6763]/65 hover:shadow-[0_16px_40px_-18px_rgb(223_103_99/0.5)] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#df6763]/40 sm:gap-5 sm:px-5 sm:py-5 dark:border-[#df6763]/35 dark:from-[rgb(223_103_99/0.14)] dark:via-gray-950 dark:to-gray-950"
+        >
+          <Heart
+            className="mt-0.5 h-9 w-9 shrink-0 fill-[#df6763] text-[#df6763] drop-shadow-sm sm:h-10 sm:w-10"
+            strokeWidth={1.75}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold tracking-tight text-lc26-navy dark:text-white sm:text-[1.05rem]">
+              Har du lyst til at dele din oplevelse?
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed text-lc26-navy/65 dark:text-gray-400">
+              Send LykkeLiga en lille hilsen — vi bliver så glade for at høre, hvordan du har haft det til LykkeCup 2026.
+            </p>
+            <p className="mt-3 text-sm font-semibold text-[#c45450] underline-offset-2 group-hover:underline dark:text-[#e89590]">
+              Skriv til os her
+            </p>
+          </div>
+        </a>
 
         <Lc26GuestMessageForm />
 
@@ -196,24 +242,24 @@ export function Lc26InboxPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="relative z-10 flex max-h-[min(85dvh,32rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border-2 bg-white shadow-2xl dark:border-[#df6763]/45 dark:bg-gray-950"
-            style={{ borderColor: BRAND }}
+            className="relative z-10 flex max-h-[min(85dvh,32rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border-2 border-stone-200/90 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-950"
           >
-            <div className="px-4 pb-3 pt-4 text-white sm:px-5 sm:pb-4 sm:pt-5" style={{ backgroundColor: BRAND }}>
+            <div className="border-b border-stone-100 bg-gradient-to-b from-stone-50 to-white px-4 pb-3 pt-4 dark:border-gray-800 dark:from-gray-900 dark:to-gray-950 sm:px-5 sm:pb-4 sm:pt-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <Avatar def={open} size="md" />
                   <div className="min-w-0">
-                    <p id={titleId} className="truncate text-sm font-semibold text-white">
+                    <p id={titleId} className="truncate text-sm font-semibold text-lc26-navy dark:text-white">
                       {open.fromName}
                     </p>
-                    <p className="truncate text-xs text-white/80">{open.subject}</p>
+                    <p className="truncate text-xs text-lc26-navy/50 dark:text-gray-400">{open.subject}</p>
+                    <p className="mt-1 text-[11px] font-medium text-lc26-navy/45 dark:text-gray-500">{inboxRowTimeLine(open)}</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setOpen(null)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/85 transition hover:bg-white/15"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lc26-navy/50 transition hover:bg-stone-100 hover:text-lc26-navy dark:text-gray-400 dark:hover:bg-gray-800"
                   aria-label="Luk"
                 >
                   <X className="h-5 w-5" strokeWidth={2} aria-hidden />

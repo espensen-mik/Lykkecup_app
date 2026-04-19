@@ -40,7 +40,8 @@ export function Lc26GuestMessageForm() {
 
   return (
     <section
-      className="mt-8 border-t border-stone-200 pt-8 dark:border-gray-800"
+      id="lc26-guest-book"
+      className="mt-8 scroll-mt-24 border-t border-stone-200 pt-8 dark:border-gray-800"
       aria-labelledby="lc26-guest-form-title"
     >
       <h2 id="lc26-guest-form-title" className="text-lg font-bold tracking-tight text-lc26-navy dark:text-white">
