@@ -17,6 +17,7 @@ const NAV_BASE = [
   { href: "/lykkecup26/side-1", label: "Dagens program" },
   { href: "/lykkecup26/side-2", label: "Find rundt i MCH" },
   { href: "/lykkecup26/side-3", label: "Praktisk info" },
+  { href: "/lykkecup26/nyt-fra-lykkeliga", label: "Nyt fra LykkeLiga" },
 ] as const;
 
 export function PublicHeader() {
