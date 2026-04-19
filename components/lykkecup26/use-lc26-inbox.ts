@@ -4,8 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LC26_INBOX_CHANGED,
   fetchLc26PublicMessages,
-  lc26InboxCupDayPhase,
-  lc26InboxCupDayStart,
   lc26InboxIsUnlocked,
   type Lc26InboxMessageDef,
 } from "@/lib/lc26-public-messages";
@@ -102,11 +100,5 @@ export function useLc26Inbox() {
     setReadIds(next);
   }, []);
 
-  const cupPhase = useMemo(() => lc26InboxCupDayPhase(now), [now]);
-  const cupDayLabel = useMemo(() => {
-    const s = lc26InboxCupDayStart();
-    return s.toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  }, []);
-
-  return { rows, unreadCount, markRead, now, cupPhase, cupDayLabel, fetchError, messagesLoading, reloadMessages };
+  return { rows, unreadCount, markRead, now, fetchError, messagesLoading, reloadMessages };
 }

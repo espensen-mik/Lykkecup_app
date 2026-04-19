@@ -53,7 +53,7 @@ function Avatar({ def, size }: { def: Lc26InboxMessageDef; size: "sm" | "md" }) 
 
 export function Lc26InboxPage() {
   const titleId = useId();
-  const { rows, unreadCount, markRead, cupPhase, cupDayLabel, fetchError, messagesLoading } = useLc26Inbox();
+  const { rows, unreadCount, markRead, fetchError, messagesLoading } = useLc26Inbox();
   const [open, setOpen] = useState<Lc26InboxRow | null>(null);
 
   useEffect(() => {
@@ -88,11 +88,7 @@ export function Lc26InboxPage() {
             <div>
               <h1 className="text-2xl font-semibold tracking-[-0.03em] text-lc26-navy">Beskeder</h1>
               <p className="mt-1 text-sm leading-snug text-lc26-navy/50">
-                {cupPhase < 0
-                  ? `Dine beskeder åbner på LykkeCup-dagen (${cupDayLabel}).`
-                  : cupPhase > 0
-                    ? "Her er alle hilsner fra dagen — du kan stadig læse dem."
-                    : "Beskederne låses op løbende i løbet af dagen."}
+                Hver besked kan åbnes fra det tidspunkt, den er planlagt til — indtil da vises den som låst.
               </p>
             </div>
           </div>
@@ -162,8 +158,8 @@ export function Lc26InboxPage() {
       </ul>
 
       <p className="mt-6 text-center text-xs leading-relaxed text-lc26-navy/42">
-        Dette er en leg i appen — der sendes ingen rigtige beskeder. På LykkeCup-dagen dukker op til syv små hilsner op
-        her.
+        Dette er en leg i appen — der sendes ingen rigtige beskeder. Arrangøren planlægger små hilsner, der dukker op her
+        på de valgte tidspunkter.
       </p>
 
       <div className="mt-8 text-center">

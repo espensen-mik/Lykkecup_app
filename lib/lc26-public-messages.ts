@@ -6,9 +6,6 @@ export const LC26_INBOX_CHANGED = "lc26-inbox-changed";
 
 export const LC26_MESSAGE_AVATAR_BUCKET = "lc26_message_avatars";
 
-/** År, måned (1–12), dag — bruges til indbakke-tekster (før/på/efter cup-dag). */
-export const LC26_INBOX_CUP = { year: 2026, month: 6, day: 14 } as const;
-
 export type Lc26PublicMessageRow = {
   id: string;
   event_id: string;
@@ -48,34 +45,8 @@ export function lc26InboxUnlockDate(def: Lc26InboxMessageDef): Date {
   return new Date(def.availableAt);
 }
 
-export function lc26InboxCupDayStart(): Date {
-  const { year, month, day } = LC26_INBOX_CUP;
-  return new Date(year, month - 1, day, 0, 0, 0, 0);
-}
-
-export function lc26InboxCupDayEnd(): Date {
-  const { year, month, day } = LC26_INBOX_CUP;
-  return new Date(year, month - 1, day, 23, 59, 59, 999);
-}
-
-function stripClock(d: Date): number {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-/** -1 før cup-dag, 0 på cup-dag, 1 efter cup-dag (kun dato, ikke klokkeslæt). */
-export function lc26InboxCupDayPhase(now: Date): -1 | 0 | 1 {
-  const cup = stripClock(lc26InboxCupDayStart());
-  const n = stripClock(now);
-  if (n < cup) return -1;
-  if (n > cup) return 1;
-  return 0;
-}
-
-/** Om beskeden er synlig (læsbar) givet nuværende tidspunkt. */
+/** Om beskeden er synlig (læsbar): kun ud fra planlagt tidspunkt — uafhængigt af cup-dato. */
 export function lc26InboxIsUnlocked(def: Lc26InboxMessageDef, now: Date): boolean {
-  const phase = lc26InboxCupDayPhase(now);
-  if (phase < 0) return false;
-  if (phase > 0) return true;
   return now.getTime() >= lc26InboxUnlockDate(def).getTime();
 }
 
