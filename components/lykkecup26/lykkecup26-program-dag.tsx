@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Lc26GuestExperienceCta } from "@/components/lykkecup26/lc26-guest-experience-cta";
 
 const CAPTION =
   "Glæd dig til at Mumle spiller medaljekoncert kl. 16.30 i Boxen";
@@ -88,6 +89,10 @@ export function Lykkecup26ProgramDag() {
               </li>
             ))}
           </ol>
+        </div>
+
+        <div className="mt-10 border-t border-stone-200/90 pt-10 dark:border-gray-800">
+          <Lc26GuestExperienceCta />
         </div>
       </div>
     </div>

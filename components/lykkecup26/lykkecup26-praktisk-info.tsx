@@ -1,4 +1,5 @@
 import { ChevronDown } from "lucide-react";
+import { Lc26GuestExperienceCta } from "@/components/lykkecup26/lc26-guest-experience-cta";
 import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero";
 
 const SECTIONS: { title: string; body: string }[] = [
@@ -78,6 +79,10 @@ export function Lykkecup26PraktiskInfo() {
               <p className="mt-2 text-sm leading-snug text-lc26-navy/60">{s.body}</p>
             </section>
           ))}
+        </div>
+
+        <div className="mt-12 border-t border-stone-200/90 pt-12 dark:border-gray-800">
+          <Lc26GuestExperienceCta />
         </div>
 
         <section className="mt-14 border-t border-stone-200/90 pt-12" aria-labelledby="lc26-faq-heading">
