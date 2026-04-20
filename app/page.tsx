@@ -2,7 +2,7 @@ export default function TemporaryFrontpage() {
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-black">
       <img
-        src="/frontpage.jpg"
+        src="/Frontpage.jpg"
         alt=""
         aria-hidden
         className="absolute inset-0 h-full w-full object-cover"
@@ -11,7 +11,7 @@ export default function TemporaryFrontpage() {
 
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
         <img
-          src="/lykkecup26_blue.svg"
+          src="/LykkeCUP26_blue.svg"
           alt="LykkeCup 26"
           className="h-auto w-full max-w-[18rem] brightness-0 invert sm:max-w-[22rem] md:max-w-[26rem]"
         />
