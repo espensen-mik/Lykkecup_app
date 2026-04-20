@@ -4,6 +4,7 @@ import { Pause, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 const SONG_URL = "https://lykkeliga.dk/wp-content/uploads/2026/03/Vi-vinder-LykkeCup.mp3";
+const ART_URL = "https://lykkeliga.dk/wp-content/uploads/2026/03/Vi-vinder-LykkeCup-mp3-image.png";
 const SONG_TITLE = "Vi vinder LykkeCup";
 
 function formatClock(sec: number): string {
@@ -59,41 +60,53 @@ export function TemporaryFrontpageSongPlayer() {
       </p>
 
       <div
-        className="mt-3 rounded-2xl border border-white/18 bg-gradient-to-b from-white/[0.14] to-white/[0.06] p-4 shadow-[0_12px_48px_rgba(0,0,0,0.45)] ring-1 ring-white/10 backdrop-blur-md sm:p-5"
+        className="mt-3 rounded-2xl border border-white/25 bg-white/[0.06] p-3.5 shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-1 ring-white/10 backdrop-blur-2xl sm:p-4"
         role="region"
         aria-label={`Afspiller: ${SONG_TITLE}`}
       >
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex gap-3">
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/20 bg-white/5 shadow-inner ring-1 ring-white/10">
+            {/* eslint-disable-next-line @next/next/no-img-element -- ekstern LykkeLiga-asset */}
+            <img src={ART_URL} alt="" className="h-full w-full object-cover" width={56} height={56} />
+          </div>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white drop-shadow-sm">
+              {SONG_TITLE}
+            </h2>
+          </div>
+        </div>
+
+        <div className="mt-3.5 flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => void toggle()}
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-teal-300 to-teal-600 text-teal-950 shadow-[0_6px_20px_rgba(20,184,166,0.45),inset_0_1px_0_rgba(255,255,255,0.35)] transition hover:from-teal-200 hover:to-teal-500 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:h-[4.5rem] sm:w-[4.5rem]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md transition hover:bg-white/[0.22] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
             aria-label={playing ? `Pause ${SONG_TITLE}` : `Afspil ${SONG_TITLE}`}
           >
             {playing ? (
-              <Pause className="h-8 w-8" strokeWidth={2.2} aria-hidden />
+              <Pause className="h-5 w-5" strokeWidth={2} aria-hidden />
             ) : (
-              <Play className="ml-1 h-8 w-8" strokeWidth={2.2} aria-hidden />
+              <Play className="ml-0.5 h-5 w-5" strokeWidth={2} aria-hidden />
             )}
           </button>
 
-          <div className="min-w-0 flex-1 space-y-2">
+          <div className="min-w-0 flex-1 space-y-1.5">
             <div
               ref={trackRef}
               role="presentation"
-              className="group relative h-3 cursor-pointer rounded-full bg-black/35 ring-1 ring-white/15"
+              className="group relative h-2 cursor-pointer rounded-full bg-white/12 ring-1 ring-white/15"
               onClick={seek}
             >
               <div
-                className="pointer-events-none h-full rounded-full bg-gradient-to-r from-teal-400 via-teal-300 to-teal-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
+                className="pointer-events-none h-full rounded-full bg-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
                 style={{ width: `${pct}%` }}
               />
               <div
-                className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-teal-100 shadow-md transition group-active:scale-110"
+                className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60 bg-white/95 shadow-md transition group-active:scale-110"
                 style={{ left: `${pct}%` }}
               />
             </div>
-            <div className="flex justify-between gap-2 text-[11px] tabular-nums text-white/65 sm:text-xs">
+            <div className="flex justify-between gap-2 text-[11px] tabular-nums text-white/55 sm:text-xs">
               <span>{formatClock(current)}</span>
               <span>{duration > 0 ? formatClock(duration) : "—:—"}</span>
             </div>
