@@ -31,7 +31,6 @@ const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
 const nav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard", label: "Overblik", icon: LayoutDashboard },
   { href: "/", label: "Spillere", icon: Users },
-  { href: "/analyse", label: "Analyse", icon: BarChart3 },
   { href: "/traenere", label: "Trænere", icon: UsersRound },
   { href: "/klubber", label: "Klubber", icon: Building2 },
   { href: "/kommentarer", label: "Kommentarer", icon: MessageSquareText },
