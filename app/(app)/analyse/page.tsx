@@ -83,7 +83,7 @@ export default async function AnalysePage({ searchParams }: PageProps) {
         </div>
         <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
           <Link
-            href="/dashboard"
+            href="/admin"
             className="text-sm font-medium text-[#0f766e] underline-offset-2 hover:underline dark:text-teal-300"
           >
             Tilbage til Overblik

@@ -22,7 +22,7 @@ export default async function TurneringLayout({ children }: { children: React.Re
             Kontakt en administrator, hvis du mener, at du mangler de rette rettigheder.
           </p>
           <Link
-            href="/dashboard"
+            href="/admin"
             className="mt-5 inline-flex rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-900/40"
           >
             Tilbage til overblik

@@ -59,7 +59,7 @@ export async function proxy(request: NextRequest) {
 
   if (user && AUTH_ENTRY_PAGES.has(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/admin";
     url.search = "";
     console.info("[auth-proxy] redirect authenticated public path -> /", { pathname, userId: user.id });
     return NextResponse.redirect(url);

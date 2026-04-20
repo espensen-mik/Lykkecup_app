@@ -29,7 +29,7 @@ import { supabase } from "@/lib/supabase";
 const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
 
 const nav: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/dashboard", label: "Overblik", icon: LayoutDashboard },
+  { href: "/admin", label: "Overblik", icon: LayoutDashboard },
   { href: "/spillere", label: "Spillere", icon: Users },
   { href: "/traenere", label: "Trænere", icon: UsersRound },
   { href: "/klubber", label: "Klubber", icon: Building2 },
@@ -146,6 +146,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       return pathname === "/turnering/puljer" || pathname.startsWith("/turnering/puljer/");
     if (href === "/turnering/plan")
       return pathname === "/turnering/plan" || pathname.startsWith("/turnering/plan/");
+    if (href === "/admin") return pathname === "/admin" || pathname === "/dashboard";
     if (href === "/beskeder") return pathname === "/beskeder";
     if (href === "/analyse") return pathname === "/analyse";
     return pathname === href;
@@ -546,7 +547,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           <span className="sr-only">Menu</span>
           <Menu className="h-5 w-5" strokeWidth={1.5} aria-hidden />
         </button>
-        <Link href="/dashboard" className="flex min-w-0 flex-1 items-center gap-3">
+        <Link href="/admin" className="flex min-w-0 flex-1 items-center gap-3">
           <BrandLogo compact />
           <span className="min-w-0 truncate text-sm font-semibold tracking-tight text-white sm:text-[0.9375rem]">
             {HEADER_TITLE}

@@ -1,6 +1,6 @@
 export default function TemporaryFrontpage() {
   return (
-    <main className="relative min-h-screen w-full overflow-hidden bg-black">
+    <main className="relative h-[100dvh] w-full overflow-hidden bg-black">
       <img
         src="/Frontpage.jpg"
         alt=""
@@ -9,7 +9,7 @@ export default function TemporaryFrontpage() {
       />
       <div className="absolute inset-0 bg-black/70" aria-hidden />
 
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <div className="absolute inset-0 z-10 grid place-items-center px-6 text-center">
         <img
           src="/LykkeCUP26_blue.svg"
           alt="LykkeCup 26"
