@@ -20,7 +20,9 @@ type CoachRow = {
 };
 
 const INTRO_TEXT =
-  "Her kan du se hvilke spillere og trænere, der er tilmeldt fra dit LykkeLigahold. Data er udtrukket den 16. april kl 15.00";
+  "Her kan du se hvilke spillere og trænere, der er tilmeldt fra dit LykkeLigahold.";
+const SNAPSHOT_LABEL = "Data er udtrukket:";
+const SNAPSHOT_TIME = "20. April - 16.00";
 
 const FREDE_MESSAGE =
   "Hej alle. Vi glæder os helt vildt til at se jer til LykkeCup. Her kan I se, hvem der er tilmeldt fra jeres hold. Når tilmeldingen er lukket får trænerne på det enkelte hold mulighed for at kommentere på niveauer og holdsammensætning. Hvis I har spørgsmål her og nu så skriv til mig på frederikke@lykkeliga.dk.\n\nOg hvis I kan se, at der er spillere og trænere på jeres hold der mangler at melde sig til - så prik lige til dem. Sidste frist for tilmelding er 1. maj";
@@ -133,7 +135,15 @@ export default function StatusPage() {
           />
         </div>
 
-        <p className="mx-auto max-w-xl text-[15px] leading-relaxed text-gray-600 lg:mx-0">{INTRO_TEXT}</p>
+        <div className="mx-auto max-w-xl text-[15px] leading-relaxed text-gray-600 lg:mx-0">
+          <p>{INTRO_TEXT}</p>
+          <p className="mt-3">
+            <span>{SNAPSHOT_LABEL} </span>
+            <span className="inline-flex rounded-full bg-[#14b8a6] px-3 py-1 text-xs font-semibold tracking-wide text-white shadow-sm">
+              {SNAPSHOT_TIME}
+            </span>
+          </p>
+        </div>
       </header>
 
       {loadError ? (
