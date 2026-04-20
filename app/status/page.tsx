@@ -29,10 +29,20 @@ const FREDE_MESSAGE =
 
 const FREDE_TITLE = "Lykkelig medarbejder hos LykkeLiga";
 
+/** Samme normalisering til liste, dropdown og filter — undgår mismatch pga. ekstra mellemrum / NBSP. */
+function normalizeClubLabel(value: string | null | undefined): string {
+  if (value == null) return "";
+  return value
+    .replace(/\u00a0/g, " ")
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function uniqueClubs(rows: { home_club: string | null }[]): string[] {
   const set = new Set<string>();
   for (const r of rows) {
-    const c = r.home_club?.trim();
+    const c = normalizeClubLabel(r.home_club);
     if (c) set.add(c);
   }
   return [...set].sort((a, b) => a.localeCompare(b, "da"));
@@ -104,12 +114,14 @@ export default function StatusPage() {
 
   const filteredPlayers = useMemo(() => {
     if (!selectedClub) return [];
-    return players.filter((p) => (p.home_club ?? "") === selectedClub);
+    const key = normalizeClubLabel(selectedClub);
+    return players.filter((p) => normalizeClubLabel(p.home_club) === key);
   }, [players, selectedClub]);
 
   const filteredCoaches = useMemo(() => {
     if (!selectedClub) return [];
-    return coaches.filter((c) => (c.home_club ?? "") === selectedClub);
+    const key = normalizeClubLabel(selectedClub);
+    return coaches.filter((c) => normalizeClubLabel(c.home_club) === key);
   }, [coaches, selectedClub]);
 
   return (
