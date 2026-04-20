@@ -139,7 +139,7 @@ export default function StatusPage() {
           <p>{INTRO_TEXT}</p>
           <p className="mt-3">
             <span>{SNAPSHOT_LABEL} </span>
-            <span className="inline-flex rounded-full bg-[#14b8a6] px-3 py-1 text-xs font-semibold tracking-wide text-white shadow-sm">
+            <span className="inline-flex rounded-md border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-sm font-semibold text-teal-800">
               {SNAPSHOT_TIME}
             </span>
           </p>
