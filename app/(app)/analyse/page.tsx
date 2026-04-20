@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { LcAnalysePathInsights } from "@/components/analytics/lc-analyse-path-insights";
 import { LcHourlyViewsLine } from "@/components/analytics/lc-hourly-views-line";
 import { createServerSupabase, getCurrentAuthAppUser } from "@/lib/auth-server";
 import {
@@ -10,6 +11,12 @@ import {
   parseHourlyViewsPayload,
   todayIsoInCopenhagen,
 } from "@/lib/lc-analytics-display";
+import type { AnalyticsPathKind } from "@/lib/lc-analytics-enrich";
+import {
+  aggregatePathKindViews,
+  buildPathKindPieData,
+  enrichLc26AnalyticsPaths,
+} from "@/lib/lc-analytics-enrich";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +57,19 @@ type PageProps = {
   searchParams: Promise<{ dag?: string }>;
 };
 
+function kindBadgeLabel(kind: AnalyticsPathKind): string {
+  switch (kind) {
+    case "player":
+      return "Spiller";
+    case "coach":
+      return "Træner";
+    case "app":
+      return "App";
+    default:
+      return "Andet";
+  }
+}
+
 export default async function AnalysePage({ searchParams }: PageProps) {
   const user = await getCurrentAuthAppUser();
   if (!user) redirect("/login");
@@ -71,6 +91,19 @@ export default async function AnalysePage({ searchParams }: PageProps) {
 
   const summary = summaryError ? null : parseSummary(summaryData);
   const hourlyPoints = hourlyError ? [] : parseHourlyViewsPayload(hourlyData);
+
+  const enrichedPaths = summary?.paths?.length
+    ? await enrichLc26AnalyticsPaths(summary.paths, supabase)
+    : [];
+  const pathKindPieData = enrichedPaths.length
+    ? buildPathKindPieData(aggregatePathKindViews(enrichedPaths))
+    : [];
+  const topPathBarRows = enrichedPaths.slice(0, 15).map((r, i) => ({
+    key: r.path,
+    label: r.title,
+    views: r.views,
+    rank: i + 1,
+  }));
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -171,6 +204,10 @@ export default async function AnalysePage({ searchParams }: PageProps) {
             )}
           </section>
 
+          {summary.paths.length > 0 && enrichedPaths.length > 0 ? (
+            <LcAnalysePathInsights pieData={pathKindPieData} topBarRows={topPathBarRows} />
+          ) : null}
+
           <section className="mt-12">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Hits pr. side (top 100)</h2>
             {summary.paths.length === 0 ? (
@@ -180,17 +217,30 @@ export default async function AnalysePage({ searchParams }: PageProps) {
                 <table className="w-full min-w-0 text-left text-sm">
                   <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-400">
                     <tr>
-                      <th className="px-4 py-3">Sti</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Side</th>
+                      <th className="hidden px-4 py-3 md:table-cell">Sti</th>
                       <th className="px-4 py-3 text-right">Visninger</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {summary.paths.map((row) => (
+                    {enrichedPaths.map((row) => (
                       <tr key={row.path} className="text-gray-800 dark:text-gray-200">
-                        <td className="max-w-[min(100%,36rem)] truncate px-4 py-2.5 font-mono text-xs sm:text-sm" title={row.path}>
+                        <td className="whitespace-nowrap px-4 py-2.5 align-top">
+                          <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                            {kindBadgeLabel(row.kind)}
+                          </span>
+                        </td>
+                        <td className="max-w-[min(100%,20rem)] px-4 py-2.5 align-top font-medium leading-snug sm:max-w-none">
+                          <span title={row.title}>{row.title}</span>
+                        </td>
+                        <td
+                          className="hidden max-w-[min(100%,36rem)] truncate px-4 py-2.5 align-top font-mono text-xs text-gray-500 md:table-cell dark:text-gray-400"
+                          title={row.path}
+                        >
                           {row.path}
                         </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{row.views}</td>
+                        <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums font-medium">{row.views}</td>
                       </tr>
                     ))}
                   </tbody>

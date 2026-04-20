@@ -16,6 +16,8 @@ type Props = {
   leadBarColor?: string;
   /** Aria / screen reader */
   chartLabel: string;
+  /** Tekst efter tallet (fx «visninger» på analysesiden) */
+  countSuffix?: string;
 };
 
 /**
@@ -26,6 +28,7 @@ export function SlimHorizontalBarChart({
   barColor,
   leadBarColor,
   chartLabel,
+  countSuffix = "spillere",
 }: Props) {
   const max = Math.max(1, ...rows.map((r) => r.count));
 
@@ -38,7 +41,7 @@ export function SlimHorizontalBarChart({
       {rows.map((row, i) => {
         const pct = (row.count / max) * 100;
         const fill = leadBarColor && i === 0 ? leadBarColor : barColor;
-        const fullTitle = `${row.label}: ${row.count} spillere`;
+        const fullTitle = `${row.label}: ${row.count} ${countSuffix}`;
         return (
           <div
             key={row.key}
@@ -74,7 +77,7 @@ export function SlimHorizontalBarChart({
                 <span className="font-semibold text-gray-800 dark:text-gray-200">
                   {row.count}
                 </span>
-                <span className="font-normal"> spillere</span>
+                <span className="font-normal"> {countSuffix}</span>
               </p>
             </div>
           </div>
