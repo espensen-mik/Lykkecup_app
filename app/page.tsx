@@ -11,16 +11,18 @@ export default function TemporaryFrontpage() {
       />
       <div className="absolute inset-0 bg-black/70" aria-hidden />
 
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center overflow-y-auto px-6 py-10 text-center">
+      <div className="absolute inset-0 z-10 flex h-[100dvh] max-h-[100dvh] flex-col items-center justify-center overflow-hidden px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] text-center sm:px-6">
         <img
           src="/LykkeCUP26_blue.svg"
           alt="LykkeCup 26"
-          className="h-auto w-full max-w-[18rem] brightness-0 invert sm:max-w-[22rem] md:max-w-[26rem]"
+          className="h-auto w-full max-w-[13rem] shrink-0 brightness-0 invert sm:max-w-[18rem] md:max-w-[22rem]"
         />
-        <p className="mt-8 text-lg font-medium tracking-tight text-white sm:text-xl">
+        <p className="mt-3 text-base font-medium tracking-tight text-white sm:mt-5 sm:text-lg md:text-xl">
           LykkeCup App åbner snart.
         </p>
-        <TemporaryFrontpageSongPlayer />
+        <div className="mt-3 flex w-full max-w-md shrink-0 justify-center sm:mt-4">
+          <TemporaryFrontpageSongPlayer />
+        </div>
       </div>
     </main>
   );
