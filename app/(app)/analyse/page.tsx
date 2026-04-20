@@ -78,8 +78,7 @@ export default async function AnalysePage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">Analyse</h1>
           <p className="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-400">
-            Unikke enheder (anonym id i browser), sidevisninger og aktivitet fordelt på døgnets timer
-            (Europe/Copenhagen).
+            Her kan du se statistik for brugen af LykkeCup26 App
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">

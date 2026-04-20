@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = new Set([
+  "/",
   "/login",
   "/glemt-kode",
   "/nulstil-kode",
@@ -58,7 +59,7 @@ export async function proxy(request: NextRequest) {
 
   if (user && AUTH_ENTRY_PAGES.has(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     url.search = "";
     console.info("[auth-proxy] redirect authenticated public path -> /", { pathname, userId: user.id });
     return NextResponse.redirect(url);

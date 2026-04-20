@@ -3,7 +3,7 @@ import { fetchPlayersForEvent } from "@/lib/players";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function SpillerePage() {
   const { players, error } = await fetchPlayersForEvent();
 
   return (
