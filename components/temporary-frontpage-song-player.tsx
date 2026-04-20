@@ -1,17 +1,23 @@
 "use client";
 
 import { Pause, Play } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const SONG_URL = "https://lykkeliga.dk/wp-content/uploads/2026/03/Vi-vinder-LykkeCup.mp3";
 const ART_URL = "https://lykkeliga.dk/wp-content/uploads/2026/03/Vi-vinder-LykkeCup-mp3-image.png";
 const SONG_TITLE = "Vi vinder LykkeCup";
+const ARTIST_CREDIT = "Sang af: Guldgåsen Vordingborg";
 
 function formatClock(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return "0:00";
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function safeDuration(el: HTMLAudioElement): number {
+  const d = el.duration;
+  return Number.isFinite(d) && d > 0 && d !== Number.POSITIVE_INFINITY ? d : 0;
 }
 
 export function TemporaryFrontpageSongPlayer() {
@@ -22,7 +28,32 @@ export function TemporaryFrontpageSongPlayer() {
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  const pct = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
+  const pct =
+    duration > 0 && Number.isFinite(current) ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+
+  /** Nogle browsere (især mobil) sender sjældent `timeupdate` — vi synker med rAF under afspilning. */
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el || !playing) return;
+    let id = 0;
+    const tick = () => {
+      const a = audioRef.current;
+      if (!a) return;
+      setCurrent(a.currentTime);
+      const d = safeDuration(a);
+      if (d > 0) setDuration(d);
+      id = requestAnimationFrame(tick);
+    };
+    id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(id);
+  }, [playing]);
+
+  const syncDurationFromElement = useCallback(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const d = safeDuration(a);
+    if (d > 0) setDuration(d);
+  }, []);
 
   const toggle = useCallback(async () => {
     const a = audioRef.current;
@@ -30,25 +61,30 @@ export function TemporaryFrontpageSongPlayer() {
     if (playing) {
       a.pause();
       setPlaying(false);
+      setCurrent(a.currentTime);
     } else {
       try {
         await a.play();
         setPlaying(true);
+        syncDurationFromElement();
       } catch {
         setPlaying(false);
       }
     }
-  }, [playing]);
+  }, [playing, syncDurationFromElement]);
 
   const seek = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const track = trackRef.current;
       const a = audioRef.current;
-      if (!track || !a || !duration) return;
+      if (!track || !a) return;
+      const d = duration > 0 ? duration : safeDuration(a);
+      if (!d) return;
       const rect = track.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const p = Math.min(1, Math.max(0, x / rect.width));
-      a.currentTime = p * duration;
+      a.currentTime = p * d;
+      setCurrent(a.currentTime);
     },
     [duration],
   );
@@ -73,43 +109,44 @@ export function TemporaryFrontpageSongPlayer() {
             <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-white drop-shadow-sm">
               {SONG_TITLE}
             </h2>
+            <p className="mt-1 text-[12px] leading-snug text-white/50">{ARTIST_CREDIT}</p>
           </div>
         </div>
 
-        <div className="mt-3.5 flex items-center gap-2.5">
+        {/* Knap kun på samme række som selve baren — tid under baren */}
+        <div className="mt-3.5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 gap-y-1.5">
           <button
             type="button"
             onClick={() => void toggle()}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md transition hover:bg-white/[0.22] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            className="col-start-1 row-start-1 flex h-9 w-9 shrink-0 items-center justify-center self-center rounded-full border border-white/40 bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md transition hover:bg-white/[0.22] active:scale-[0.96] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
             aria-label={playing ? `Pause ${SONG_TITLE}` : `Afspil ${SONG_TITLE}`}
           >
             {playing ? (
-              <Pause className="h-5 w-5" strokeWidth={2} aria-hidden />
+              <Pause className="h-4 w-4" strokeWidth={2} aria-hidden />
             ) : (
-              <Play className="ml-0.5 h-5 w-5" strokeWidth={2} aria-hidden />
+              <Play className="ml-px h-4 w-4" strokeWidth={2} aria-hidden />
             )}
           </button>
 
-          <div className="min-w-0 flex-1 space-y-1.5">
+          <div
+            ref={trackRef}
+            role="presentation"
+            className="col-start-2 row-start-1 group relative h-2 min-w-0 cursor-pointer self-center rounded-full bg-white/12 ring-1 ring-white/15"
+            onClick={seek}
+          >
             <div
-              ref={trackRef}
-              role="presentation"
-              className="group relative h-2 cursor-pointer rounded-full bg-white/12 ring-1 ring-white/15"
-              onClick={seek}
-            >
-              <div
-                className="pointer-events-none h-full rounded-full bg-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
-                style={{ width: `${pct}%` }}
-              />
-              <div
-                className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60 bg-white/95 shadow-md transition group-active:scale-110"
-                style={{ left: `${pct}%` }}
-              />
-            </div>
-            <div className="flex justify-between gap-2 text-[11px] tabular-nums text-white/55 sm:text-xs">
-              <span>{formatClock(current)}</span>
-              <span>{duration > 0 ? formatClock(duration) : "—:—"}</span>
-            </div>
+              className="pointer-events-none h-full rounded-full bg-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+              style={{ width: `${pct}%` }}
+            />
+            <div
+              className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60 bg-white/95 shadow-md transition group-active:scale-110"
+              style={{ left: `${pct}%` }}
+            />
+          </div>
+
+          <div className="col-start-2 row-start-2 flex min-w-0 justify-between gap-2 text-[11px] tabular-nums text-white/55 sm:text-xs">
+            <span>{formatClock(current)}</span>
+            <span>{duration > 0 ? formatClock(duration) : "—:—"}</span>
           </div>
         </div>
       </div>
@@ -118,10 +155,21 @@ export function TemporaryFrontpageSongPlayer() {
         ref={audioRef}
         preload="metadata"
         className="hidden"
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-        onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
-        onEnded={() => setPlaying(false)}
-        onPause={() => setPlaying(false)}
+        onLoadedMetadata={syncDurationFromElement}
+        onDurationChange={syncDurationFromElement}
+        onLoadedData={syncDurationFromElement}
+        onTimeUpdate={(e) => {
+          if (!playing) setCurrent(e.currentTarget.currentTime);
+        }}
+        onEnded={() => {
+          setPlaying(false);
+          const a = audioRef.current;
+          if (a) setCurrent(a.currentTime);
+        }}
+        onPause={(e) => {
+          setPlaying(false);
+          setCurrent(e.currentTarget.currentTime);
+        }}
         onPlay={() => setPlaying(true)}
       >
         <source src={SONG_URL} type="audio/mpeg" />
