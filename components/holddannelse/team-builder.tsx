@@ -710,8 +710,11 @@ export function TeamBuilder({
                               </span>
                             ) : null}
                           </div>
-                          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-gray-500 dark:text-gray-400">
                             <span>{c.home_club?.trim() || "—"}</span>
+                            <span className="tabular-nums">
+                              {c.age != null && !Number.isNaN(c.age) ? `${c.age} år` : "Alder —"}
+                            </span>
                           </div>
                         </button>
                       </li>
@@ -1013,9 +1016,12 @@ export function TeamBuilder({
                                               {c?.name ?? tc.coach_id}
                                             </p>
                                             {c ? (
-                                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                {c.home_club?.trim() || "—"}
-                                              </p>
+                                              <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-gray-500 dark:text-gray-400">
+                                                <span>{c.home_club?.trim() || "—"}</span>
+                                                <span className="tabular-nums">
+                                                  {c.age != null && !Number.isNaN(c.age) ? `${c.age} år` : "Alder —"}
+                                                </span>
+                                              </div>
                                             ) : null}
                                           </div>
                                           <button

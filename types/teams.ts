@@ -29,6 +29,7 @@ export type HoldCoachRow = {
   id: string;
   name: string;
   home_club: string | null;
+  age: number | null;
 };
 
 /** Spiller til holddannelse (felt udvidet ift. listevisning) */

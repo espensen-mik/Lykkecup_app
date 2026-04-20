@@ -322,7 +322,7 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
   const members = allMemberRows.filter((m) => teamIds.has(m.team_id));
 
   const [{ data: coachesData, error: cErr }, { data: teamCoachesData, error: tcErr }] = await Promise.all([
-    supabase.from("coaches").select("id, name, home_club").eq("event_id", eventId),
+    supabase.from("coaches").select("id, name, home_club, age").eq("event_id", eventId),
     supabase.from("team_coaches").select("id, event_id, team_id, coach_id").eq("event_id", eventId),
   ]);
 
