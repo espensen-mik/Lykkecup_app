@@ -13,19 +13,6 @@ type Props = {
   onClose: () => void;
 };
 
-export function PlayerDetailModal({ playerId, onClose }: Props) {
-  const [player, setPlayer] = useState<PlayerDetail | null>(null);
-  const [assignedTeamName, setAssignedTeamName] = useState<string | null>(null);
-  const [logs, setLogs] = useState<PlayerChangeLogRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveNotice, setSaveNotice] = useState<string | null>(null);
-  const [draft, setDraft] = useState<PlayerDraft>(emptyDraft);
-  const closeBtnRef = useRef<HTMLButtonElement>(null);
-
 type PlayerDraft = {
   name: string;
   homeClub: string;
@@ -106,6 +93,19 @@ function parsePreferencesInput(value: string): unknown {
   }
   return trimmed;
 }
+
+export function PlayerDetailModal({ playerId, onClose }: Props) {
+  const [player, setPlayer] = useState<PlayerDetail | null>(null);
+  const [assignedTeamName, setAssignedTeamName] = useState<string | null>(null);
+  const [logs, setLogs] = useState<PlayerChangeLogRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [draft, setDraft] = useState<PlayerDraft>(emptyDraft);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!playerId) {
