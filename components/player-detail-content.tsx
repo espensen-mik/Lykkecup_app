@@ -5,7 +5,7 @@ import { formatBirthdate, formatPreferences } from "@/lib/format";
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-xl border border-gray-200/85 bg-white/85 px-3 py-2.5 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+    <div className="border border-gray-200 bg-white px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900">
       <dt className="text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
         {label}
       </dt>
@@ -35,23 +35,16 @@ export function PlayerDetailContent({ player, assignedTeamName }: Props) {
 
   return (
     <>
-      <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
-        {player.name}
-      </h1>
-      <p className="mt-1 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Spillerdetaljer</p>
+      <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Spillerdetaljer</p>
 
       {teamName ? (
         <div
-          className="relative mt-4 overflow-hidden rounded-xl border border-[#14b8a6]/45 bg-gradient-to-br from-teal-50 via-white to-cyan-50/90 p-3.5 shadow-[0_10px_30px_-14px_rgba(13,148,136,0.45)] ring-1 ring-[#14b8a6]/15 dark:border-teal-500/40 dark:from-teal-950/70 dark:via-gray-950/40 dark:to-teal-950/30 dark:ring-teal-400/10"
+          className="mt-4 border border-teal-200 bg-teal-50 px-3.5 py-3 dark:border-teal-800/70 dark:bg-teal-950/30"
           role="status"
           aria-label={`Tildelt hold: ${teamName}`}
         >
-          <div
-            className="pointer-events-none absolute -right-6 -top-10 h-28 w-28 rounded-full bg-[#14b8a6]/20 blur-2xl dark:bg-teal-400/15"
-            aria-hidden
-          />
-          <div className="relative flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#14b8a6] text-white shadow-md shadow-teal-600/25 dark:bg-teal-500 dark:shadow-teal-900/40">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-[#14b8a6] text-white dark:bg-teal-500">
               <UsersRound className="h-4.5 w-4.5" strokeWidth={2} aria-hidden />
             </span>
             <div className="min-w-0 flex-1 pt-0.5 leading-tight">
@@ -76,7 +69,7 @@ export function PlayerDetailContent({ player, assignedTeamName }: Props) {
           label="Præferencer"
           value={
             prefsIsMultiline ? (
-              <pre className="mt-1 max-h-48 overflow-auto rounded-md border border-gray-100 bg-gray-50 p-3 font-mono text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200">
+              <pre className="mt-1 max-h-48 overflow-auto border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200">
                 {prefsText}
               </pre>
             ) : (

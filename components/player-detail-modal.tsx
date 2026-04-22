@@ -296,37 +296,33 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-gradient-to-b from-slate-950/55 via-slate-900/50 to-teal-950/35 px-4 py-8 backdrop-blur-md dark:from-black/70 dark:via-slate-950/60 dark:to-teal-950/25"
+      className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/45 px-4 py-8"
       role="presentation"
       onClick={handleBackdropClick}
     >
       <div
-        className="relative mt-0 w-full max-w-md overflow-hidden rounded-2xl border border-white/40 bg-white/74 shadow-[0_40px_80px_-28px_rgba(15,23,42,0.55),inset_0_0_0_1px_rgba(255,255,255,0.62)] backdrop-blur-2xl dark:border-white/15 dark:bg-gray-950/62 dark:shadow-[0_36px_70px_-24px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.07)]"
+        className="relative mt-0 w-full max-w-2xl overflow-hidden rounded-none border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
         role="dialog"
         aria-modal="true"
         aria-label="Spillerdetaljer"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/70 to-transparent dark:via-teal-400/40"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -top-24 left-1/2 h-48 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-teal-400/15 blur-3xl dark:bg-teal-500/10"
-          aria-hidden
-        />
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+          <h2 className="truncate pr-4 text-xl font-semibold text-gray-900 dark:text-white">
+            {player?.name ?? "Spillerdetaljer"}
+          </h2>
+          <button
+            ref={closeBtnRef}
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center border border-gray-200 bg-white text-gray-500 transition hover:border-gray-300 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b8a6]/35 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:text-white"
+            aria-label="Luk"
+          >
+            <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+          </button>
+        </div>
 
-        <button
-          ref={closeBtnRef}
-          type="button"
-          onClick={onClose}
-          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-gray-200/90 bg-white/90 text-gray-500 shadow-sm backdrop-blur-sm transition hover:border-gray-300 hover:bg-white hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b8a6]/35 dark:border-white/12 dark:bg-gray-900/75 dark:text-gray-300 dark:hover:border-white/22 dark:hover:bg-gray-800 dark:hover:text-white"
-          aria-label="Luk"
-        >
-          <X className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-        </button>
-
-        <div className="relative max-h-[min(85vh,760px)] overflow-y-auto p-4 pt-12 sm:p-5 sm:pt-14">
+        <div className="relative max-h-[min(85vh,780px)] overflow-y-auto p-5">
           {loading ? (
             <p className="text-sm text-gray-600/90 dark:text-gray-400">Indlæser …</p>
           ) : error ? (
