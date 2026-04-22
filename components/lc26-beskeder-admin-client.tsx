@@ -236,12 +236,78 @@ export function Lc26BeskederAdminClient() {
     [supabase, load],
   );
 
+  const nowMs = Date.now();
+  const plannedRows = rows.filter((r) => new Date(r.available_at).getTime() > nowMs);
+  const sentRows = rows
+    .filter((r) => new Date(r.available_at).getTime() <= nowMs)
+    .sort((a, b) => new Date(b.available_at).getTime() - new Date(a.available_at).getTime());
+
+  function renderMessageRow(r: Lc26PublicMessageRow) {
+    return (
+      <li
+        key={r.id}
+        className={`flex flex-wrap items-center gap-3 bg-white px-4 py-3 dark:bg-gray-900 ${
+          editingId === r.id ? "bg-[rgb(223_103_99/0.06)] dark:bg-[rgb(223_103_99/0.08)]" : ""
+        }`}
+      >
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-gray-100 dark:border-gray-600 dark:bg-gray-800">
+          {r.avatar_url ? (
+            <Image src={r.avatar_url} alt="" fill className="object-cover" sizes="40px" unoptimized />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-gray-500">
+              {r.sender_name
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((w) => w[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2)}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{r.sender_name}</p>
+          <p className="truncate text-xs text-gray-500 dark:text-gray-400">{r.subject}</p>
+          <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
+            Aktiveres{" "}
+            {new Date(r.available_at).toLocaleString("da-DK", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-1">
+          <button
+            type="button"
+            onClick={() => fillFromRow(r)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+            aria-label="Rediger"
+          >
+            <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => void remove(r.id)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
+            aria-label="Slet"
+          >
+            <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </button>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <>
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
-      <section className="min-w-0 space-y-4">
+      <section className="min-w-0 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Planlagte beskeder</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Beskeder</h2>
           <button
             type="button"
             onClick={() => resetForm()}
@@ -261,65 +327,36 @@ export function Lc26BeskederAdminClient() {
         ) : rows.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">Ingen beskeder endnu — opret den første i formularen.</p>
         ) : (
-          <ul className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
-            {rows.map((r) => (
-              <li
-                key={r.id}
-                className={`flex flex-wrap items-center gap-3 bg-white px-4 py-3 dark:bg-gray-900 ${
-                  editingId === r.id ? "bg-[rgb(223_103_99/0.06)] dark:bg-[rgb(223_103_99/0.08)]" : ""
-                }`}
-              >
-                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-gray-100 dark:border-gray-600 dark:bg-gray-800">
-                  {r.avatar_url ? (
-                    <Image src={r.avatar_url} alt="" fill className="object-cover" sizes="40px" unoptimized />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-gray-500">
-                      {r.sender_name
-                        .split(/\s+/)
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .map((w) => w[0])
-                        .join("")
-                        .toUpperCase()
-                        .slice(0, 2)}
-                    </span>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{r.sender_name}</p>
-                  <p className="truncate text-xs text-gray-500 dark:text-gray-400">{r.subject}</p>
-                  <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
-                    Aktiveres{" "}
-                    {new Date(r.available_at).toLocaleString("da-DK", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => fillFromRow(r)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                    aria-label="Rediger"
-                  >
-                    <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void remove(r.id)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
-                    aria-label="Slet"
-                  >
-                    <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                Planlagte beskeder ({plannedRows.length})
+              </h3>
+              {plannedRows.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  Ingen planlagte beskeder.
+                </p>
+              ) : (
+                <ul className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
+                  {plannedRows.map((r) => renderMessageRow(r))}
+                </ul>
+              )}
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                Sendte beskeder ({sentRows.length})
+              </h3>
+              {sentRows.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  Ingen sendte beskeder endnu.
+                </p>
+              ) : (
+                <ul className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
+                  {sentRows.map((r) => renderMessageRow(r))}
+                </ul>
+              )}
+            </div>
+          </div>
         )}
       </section>
 
