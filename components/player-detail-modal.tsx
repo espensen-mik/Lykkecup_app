@@ -446,7 +446,8 @@ function parsePreferencesInput(value: string): unknown {
                     {logs.map((log) => (
                       <li key={log.id} className="rounded-md border border-gray-200/80 bg-gray-50/80 px-3 py-2 dark:border-gray-700 dark:bg-gray-800/45">
                         <p>
-                          <span className="font-semibold">{fieldLabel(log.field_name)}:</span> {printValue(log.old_value)} ->{" "}
+                          <span className="font-semibold">{fieldLabel(log.field_name)}:</span> {printValue(log.old_value)}
+                          {" -> "}
                           {printValue(log.new_value)}
                         </p>
                         <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
