@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { formatLc26TeamName } from "@/lib/lc26-team-name";
+import { publicTeamDisplayName } from "@/lib/team-public-display-name";
 import type { TeamRow } from "@/types/teams";
 
 /** Offentlig LykkeCup 26-app — samme arrangement som KontrolCenter. */
@@ -15,9 +15,11 @@ export type Lc26PlayerListRow = {
 
 export type Lc26TeamOption = {
   id: string;
+  /** Vist navn i LykkeCup 26 (kaldenavn eller forkortet officielt navn). */
   name: string;
   level: string | null;
   sort_order: number;
+  nickname?: string | null;
 };
 
 export type Lc26TeamMemberLink = {
@@ -51,7 +53,7 @@ export async function fetchLykkecup26HomeData(): Promise<Lc26HomeBundle> {
       .order("name", { ascending: true }),
     supabase
       .from("teams")
-      .select("id, name, level, sort_order")
+      .select("id, name, nickname, level, sort_order")
       .eq("event_id", eventId)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
@@ -72,11 +74,24 @@ export async function fetchLykkecup26HomeData(): Promise<Lc26HomeBundle> {
   }
 
   const players = (playersRes.data ?? []) as Lc26PlayerListRow[];
-  const teams = (teamsRes.data ?? []) as Lc26TeamOption[];
+  const rawTeams = (teamsRes.data ?? []) as {
+    id: string;
+    name: string;
+    nickname?: string | null;
+    level: string | null;
+    sort_order: number;
+  }[];
+  const teams: Lc26TeamOption[] = rawTeams.map((t) => ({
+    id: t.id,
+    name: publicTeamDisplayName(t),
+    nickname: t.nickname ?? null,
+    level: t.level,
+    sort_order: t.sort_order,
+  }));
   const members = (membersRes.data ?? []) as Lc26TeamMemberLink[];
   const coachRows = (coachesRes.data ?? []) as { id: string; name: string; home_club: string | null }[];
   const tcRows = (teamCoachRes.data ?? []) as { coach_id: string; team_id: string }[];
-  const teamNameById = new Map(teams.map((t) => [t.id, formatLc26TeamName(t.name)]));
+  const teamNameById = new Map(rawTeams.map((t) => [t.id, publicTeamDisplayName(t)]));
   const teamNamesByCoach = new Map<string, Set<string>>();
   for (const link of tcRows) {
     const teamName = teamNameById.get(link.team_id);
@@ -159,7 +174,7 @@ export async function fetchLykkecup26CoachPage(coachId: string): Promise<Lc26Coa
 
   const { data: teamRows, error: tErr } = await supabase
     .from("teams")
-    .select("id, event_id, pool_id, name, level, sort_order, is_completed")
+    .select("id, event_id, pool_id, name, nickname, level, sort_order, is_completed")
     .eq("event_id", eventId)
     .in("id", teamIds)
     .order("sort_order", { ascending: true })
@@ -168,7 +183,7 @@ export async function fetchLykkecup26CoachPage(coachId: string): Promise<Lc26Coa
 
   return {
     coach,
-    teams: ((teamRows ?? []) as TeamRow[]).map((t) => ({ ...t, name: formatLc26TeamName(t.name) })),
+    teams: ((teamRows ?? []) as TeamRow[]).map((t) => ({ ...t, name: publicTeamDisplayName(t) })),
     error: null,
   };
 }
@@ -222,7 +237,7 @@ export async function fetchLykkecup26PlayerPage(playerId: string): Promise<Lc26P
 
   const { data: teamRow, error: tErr } = await supabase
     .from("teams")
-    .select("id, event_id, pool_id, name, level, sort_order, is_completed")
+    .select("id, event_id, pool_id, name, nickname, level, sort_order, is_completed")
     .eq("id", teamId)
     .eq("event_id", eventId)
     .maybeSingle();
@@ -231,7 +246,7 @@ export async function fetchLykkecup26PlayerPage(playerId: string): Promise<Lc26P
     return { player, team: null, teammates: [], coaches: [], matches: [], error: tErr?.message ?? null };
   }
 
-  const team = { ...(teamRow as TeamRow), name: formatLc26TeamName((teamRow as TeamRow).name) };
+  const team = { ...(teamRow as TeamRow), name: publicTeamDisplayName(teamRow as TeamRow) };
 
   const { data: allMembers, error: memErr } = await supabase
     .from("team_members")
@@ -293,10 +308,13 @@ export async function fetchLykkecup26PlayerPage(playerId: string): Promise<Lc26P
 
   let matches: Lc26PublicMatch[] = [];
   if (!matchErr && matchRows?.length) {
-    const { data: allTeams } = await supabase.from("teams").select("id, name").eq("event_id", eventId);
+    const { data: allTeams } = await supabase
+      .from("teams")
+      .select("id, name, nickname")
+      .eq("event_id", eventId);
     const nameById = new Map<string, string>();
-    for (const t of (allTeams ?? []) as { id: string; name: string }[]) {
-      nameById.set(t.id, formatLc26TeamName(t.name));
+    for (const t of (allTeams ?? []) as { id: string; name: string; nickname?: string | null }[]) {
+      nameById.set(t.id, publicTeamDisplayName(t));
     }
 
     const courtIds = [...new Set(matchRows.map((m: { court_id: string | null }) => m.court_id).filter(Boolean))] as string[];

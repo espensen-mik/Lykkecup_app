@@ -276,7 +276,7 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
 
   const { data: teamsData, error: tErr } = await supabase
     .from("teams")
-    .select("id, event_id, pool_id, name, level, sort_order, is_completed")
+    .select("id, event_id, pool_id, name, nickname, level, sort_order, is_completed")
     .eq("event_id", eventId)
     .eq("level", normalized)
     .order("sort_order", { ascending: true })

@@ -87,6 +87,8 @@ export function TeamBuilder({
   const [collapsedTeamIds, setCollapsedTeamIds] = useState<Set<string>>(() => new Set());
   /** Lukkede hold: false/undefined = kompakt grøn bjælke (som håndterede kommentarer); true = udvidet kort. */
   const [closedTeamDetailOpen, setClosedTeamDetailOpen] = useState<Record<string, boolean>>({});
+  /** Kladder til «Holdets kaldenavn» (nickname); nøgle = team id. */
+  const [nicknameDrafts, setNicknameDrafts] = useState<Record<string, string>>({});
 
   const playerById = useMemo(() => {
     const m = new Map<string, HoldPlayerRow>();
@@ -335,6 +337,38 @@ export function TeamBuilder({
     });
   }, []);
 
+  const saveTeamNickname = useCallback(
+    async (teamId: string) => {
+      const t = teams.find((x) => x.id === teamId);
+      if (!t) return;
+      const rawDraft = nicknameDrafts[teamId];
+      const draftTrim = rawDraft !== undefined ? rawDraft.trim() : (t.nickname ?? "").trim();
+      const normalizedNext = draftTrim === "" ? null : draftTrim;
+      const normalizedCurrent = (t.nickname ?? "").trim() || null;
+      if (normalizedCurrent === normalizedNext) return;
+
+      setActionError(null);
+      setBusy(true);
+      const { error } = await supabase.from("teams").update({ nickname: normalizedNext }).eq("id", teamId);
+      setBusy(false);
+      if (error) {
+        setActionError(
+          error.message.includes("column")
+            ? "Database mangler kolonnen «nickname» — kør migration i Supabase."
+            : error.message,
+        );
+        return;
+      }
+      setTeams((prev) => prev.map((x) => (x.id === teamId ? { ...x, nickname: normalizedNext } : x)));
+      setNicknameDrafts((prev) => {
+        const copy = { ...prev };
+        delete copy[teamId];
+        return copy;
+      });
+    },
+    [teams, nicknameDrafts],
+  );
+
   const toggleTeamCompleted = useCallback(async (team: TeamRow) => {
     setActionError(null);
     const next = !teamIsCompleted(team);
@@ -375,7 +409,7 @@ export function TeamBuilder({
         level: canonical,
         sort_order: maxSort + 1,
       })
-      .select("id, event_id, pool_id, name, level, sort_order, is_completed")
+      .select("id, event_id, pool_id, name, nickname, level, sort_order, is_completed")
       .single();
     setBusy(false);
     if (error) {
@@ -928,6 +962,40 @@ export function TeamBuilder({
 
                           {!collapsed ? (
                             <>
+                              <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50/90 px-3 py-2.5 dark:border-gray-600 dark:bg-gray-800/40">
+                                <label
+                                  htmlFor={`hold-kaldenavn-${t.id}`}
+                                  className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                                >
+                                  Holdets kaldenavn
+                                </label>
+                                <p className="mt-1 text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                                  Vises i LykkeCup 26-appen. Oversigten her bruger stadig det automatisk genererede
+                                  holdnavn ovenfor.
+                                </p>
+                                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                                  <input
+                                    id={`hold-kaldenavn-${t.id}`}
+                                    type="text"
+                                    value={nicknameDrafts[t.id] ?? t.nickname ?? ""}
+                                    onChange={(e) =>
+                                      setNicknameDrafts((d) => ({ ...d, [t.id]: e.target.value }))
+                                    }
+                                    placeholder="Valgfrit — fx holdets eget navn"
+                                    disabled={busy}
+                                    autoComplete="off"
+                                    className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                                  />
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void saveTeamNickname(t.id)}
+                                    className="shrink-0 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900 transition hover:bg-teal-100 disabled:opacity-50 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-100 dark:hover:bg-teal-900/40"
+                                  >
+                                    Gem kaldenavn
+                                  </button>
+                                </div>
+                              </div>
                               {tMembers.length === 0 ? (
                                 <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                                   Ingen spillere på holdet endnu.

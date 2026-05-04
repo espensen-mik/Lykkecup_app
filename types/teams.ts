@@ -3,6 +3,8 @@ export type TeamRow = {
   event_id: string;
   pool_id: string | null;
   name: string;
+  /** Holdets kaldenavn — vises på LykkeCup 26; `name` bruges i KontrolCenter-oversigt. */
+  nickname?: string | null;
   level: string | null;
   sort_order: number;
   /** Når true: holdet er lukket (grønt kort + “Luk hold”). Kræver kolonnen `is_completed` i `teams`. */
