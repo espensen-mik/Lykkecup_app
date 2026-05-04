@@ -220,12 +220,7 @@ export function ListerExportClient({ players, coaches, fetchError }: Props) {
 
         <ul className="space-y-4">
           <li className="flex flex-col gap-3 rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <span className="text-sm font-medium text-gray-900 dark:text-white">Alle klubnavne</span>
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                {`Unikke hjemmeklubber fra spillere og trænere, alfabetisk. Uden udfyldt hjemmeklub samles under "${INGEN_KLUB}" til sidst, hvis der findes nogen.`}
-              </p>
-            </div>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">Alle klubnavne</span>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
