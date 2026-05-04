@@ -25,6 +25,10 @@ type CoachRow = {
 const INTRO_MESSAGE =
   "Hej trænere. Vi glæder os helt vildt til at se jer til LykkeCup. Herunder kan I skrive kommentarer til jeres hold og spillere. Vi kan desværre ikke imødekomme alle ønsker og forholder os primært til kommentarer, der vedrører spillerens niveau, ønsker til holdsammensætning og træner/spiller kombination. Vi kommer ikke til at kommentere herunder, men du kan se, når vi har set og forholdt os til kommentaren";
 
+/** Kolonner der må hentes/vises på den offentlige side (ingen telefon i svaret). */
+const PUBLIC_CLUB_FEEDBACK_SELECT =
+  "id, event_id, home_club, author_name, comment_text, created_at, handled_at, handled_by" as const;
+
 function uniqueClubsFromPlayersAndCoaches(players: PlayerRow[], coaches: CoachRow[]): string[] {
   const seen = new Set<string>();
   for (const p of players) {
@@ -65,6 +69,7 @@ export default function CoachFeedbackPage() {
 
   const [selectedClub, setSelectedClub] = useState<string>("");
   const [authorName, setAuthorName] = useState("");
+  const [authorPhone, setAuthorPhone] = useState("");
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -87,7 +92,7 @@ export default function CoachFeedbackPage() {
   const loadFeedbackForEvent = useCallback(async () => {
     const { data, error } = await supabase
       .from("club_feedback")
-      .select("id, event_id, home_club, author_name, comment_text, created_at, handled_at, handled_by")
+      .select(PUBLIC_CLUB_FEEDBACK_SELECT)
       .eq("event_id", LYKKECUP_EVENT_ID)
       .order("created_at", { ascending: false });
 
@@ -149,6 +154,7 @@ export default function CoachFeedbackPage() {
 
     const club = selectedClub.trim();
     const name = authorName.trim();
+    const phone = authorPhone.trim();
     const text = commentText.trim();
 
     if (!club) {
@@ -171,9 +177,10 @@ export default function CoachFeedbackPage() {
         event_id: LYKKECUP_EVENT_ID,
         home_club: club,
         author_name: name,
+        author_phone: phone || null,
         comment_text: text,
       })
-      .select("id, event_id, home_club, author_name, comment_text, created_at, handled_at, handled_by")
+      .select(PUBLIC_CLUB_FEEDBACK_SELECT)
       .single();
 
     setSubmitting(false);
@@ -184,6 +191,7 @@ export default function CoachFeedbackPage() {
     }
 
     setCommentText("");
+    setAuthorPhone("");
     setSuccessMsg("Tak — din kommentar er gemt.");
     window.setTimeout(() => setSuccessMsg(null), 5000);
 
@@ -401,6 +409,25 @@ export default function CoachFeedbackPage() {
                   onChange={(e) => setAuthorName(e.target.value)}
                   disabled={submitting}
                 />
+              </div>
+              <div>
+                <label htmlFor="author-phone" className="block text-sm font-medium text-gray-800">
+                  Telefonnummer <span className="font-normal text-gray-500">(valgfrit)</span>
+                </label>
+                <input
+                  id="author-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="fx 12 34 56 78"
+                  className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-[15px] shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4"
+                  value={authorPhone}
+                  onChange={(e) => setAuthorPhone(e.target.value)}
+                  disabled={submitting}
+                />
+                <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
+                  Vises ikke her på siden — kun internt i LykkeLigas KontrolCenter, så vi kan kontakte dig ved behov.
+                </p>
               </div>
               <div>
                 <label htmlFor="comment" className="block text-sm font-medium text-gray-800">

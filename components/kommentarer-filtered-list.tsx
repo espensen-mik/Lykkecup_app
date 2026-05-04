@@ -72,6 +72,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       const blob = [
         c.comment_text,
         c.author_name,
+        c.author_phone,
         club,
         c.created_at,
         c.ll_status_text,
@@ -299,6 +300,12 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     {c.author_name}
                   </p>
+                  {c.author_phone?.trim() ? (
+                    <p className="mt-1 text-xs tabular-nums text-gray-600 dark:text-gray-400">
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Telefon:</span>{" "}
+                      {c.author_phone.trim()}
+                    </p>
+                  ) : null}
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
                     {c.comment_text}
                   </p>

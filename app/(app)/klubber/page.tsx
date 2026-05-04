@@ -143,6 +143,11 @@ export default async function KlubberPage() {
                               {formatDaDateTime(c.created_at)}
                             </time>
                           </div>
+                          {c.author_phone?.trim() ? (
+                            <p className="mt-1 text-[0.6875rem] tabular-nums text-gray-600 dark:text-gray-400">
+                              Tel. {c.author_phone.trim()}
+                            </p>
+                          ) : null}
                           <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-gray-600 dark:text-gray-400">
                             {c.comment_text}
                           </p>

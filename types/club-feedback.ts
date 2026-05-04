@@ -3,6 +3,8 @@ export type ClubFeedbackRow = {
   event_id: string;
   home_club: string;
   author_name: string;
+  /** Valgfrit; gemmes men vises ikke på den offentlige coach-feedback-side. */
+  author_phone?: string | null;
   comment_text: string;
   created_at: string;
   /** Intern status fra LykkeLiga-admin (efter migration) */
