@@ -2,7 +2,7 @@
 
 import { CheckCircle2, ChevronDown, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { formatDaDateTime } from "@/lib/datetime";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
@@ -39,20 +39,10 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
   const router = useRouter();
   const [clubKey, setClubKey] = useState<string>(ALL_CLUBS);
   const [query, setQuery] = useState("");
-  const [statusDraft, setStatusDraft] = useState<Record<string, string>>({});
+  const [messageDraft, setMessageDraft] = useState<Record<string, string>>({});
   const [expandedHandled, setExpandedHandled] = useState<Record<string, boolean>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorById, setErrorById] = useState<Record<string, string | null>>({});
-
-  useEffect(() => {
-    setStatusDraft((prev) => {
-      const next = { ...prev };
-      for (const c of comments) {
-        if (next[c.id] === undefined) next[c.id] = c.ll_status_text ?? "";
-      }
-      return next;
-    });
-  }, [comments]);
 
   const clubs = useMemo(() => {
     const set = new Set<string>();
@@ -69,6 +59,9 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       const club = c.home_club?.trim() ?? "";
       if (clubKey !== ALL_CLUBS && club !== clubKey) return false;
       if (!needle) return true;
+      const threadBlob = (c.internal_thread ?? [])
+        .map((m) => [m.body, m.author_name].join("\n"))
+        .join("\n");
       const blob = [
         c.comment_text,
         c.author_name,
@@ -77,6 +70,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
         c.created_at,
         c.ll_status_text,
         c.ll_status_author_name,
+        threadBlob,
       ]
         .join("\n")
         .toLowerCase();
@@ -87,10 +81,10 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
   const filterActive =
     clubKey !== ALL_CLUBS || query.trim().length > 0 || filtered.length !== totalCount;
 
-  async function saveStatus(commentId: string) {
-    const text = (statusDraft[commentId] ?? "").trim();
+  async function postInternalMessage(commentId: string) {
+    const text = (messageDraft[commentId] ?? "").trim();
     if (!text) {
-      setErrorById((e) => ({ ...e, [commentId]: "Skriv en kort status før du gemmer." }));
+      setErrorById((e) => ({ ...e, [commentId]: "Skriv en besked før du sender." }));
       return;
     }
     if (!currentUser) {
@@ -100,27 +94,25 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
     setErrorById((e) => ({ ...e, [commentId]: null }));
     setBusyId(commentId);
     const supabase = getAuthBrowserClient();
-    const now = new Date().toISOString();
-    const { error } = await supabase
-      .from("club_feedback")
-      .update({
-        ll_status_text: text,
-        ll_status_created_at: now,
-        ll_status_author_id: currentUser.id,
-        ll_status_author_name: currentUser.fullName,
-        ll_status_author_avatar_url: currentUser.avatarUrl,
-      })
-      .eq("id", commentId)
-      .eq("event_id", LYKKECUP_EVENT_ID);
+    const { error } = await supabase.from("club_feedback_internal_messages").insert({
+      club_feedback_id: commentId,
+      event_id: LYKKECUP_EVENT_ID,
+      body: text,
+      author_id: currentUser.id,
+      author_name: currentUser.fullName,
+      author_avatar_url: currentUser.avatarUrl,
+    });
 
     setBusyId(null);
     if (error) {
-      setErrorById((e) => ({
-        ...e,
-        [commentId]: error.message.includes("column") ? "Database mangler kolonner — kør migration i Supabase." : error.message,
-      }));
+      const hint =
+        error.message.includes("relation") || error.message.includes("does not exist")
+          ? "Kør migration club_feedback_internal_thread i Supabase."
+          : error.message;
+      setErrorById((e) => ({ ...e, [commentId]: hint }));
       return;
     }
+    setMessageDraft((d) => ({ ...d, [commentId]: "" }));
     router.refresh();
   }
 
@@ -214,7 +206,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       delete next[commentId];
       return next;
     });
-    setStatusDraft((d) => {
+    setMessageDraft((d) => {
       const next = { ...d };
       delete next[commentId];
       return next;
@@ -381,50 +373,85 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
 
                 <div className="border-t border-gray-100 bg-gray-50/50 px-5 py-4 dark:border-gray-700 dark:bg-gray-800/30">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#0d9488] dark:text-teal-400">
-                    Status fra LykkeLiga
+                    Intern diskussion
                   </p>
-                  {c.ll_status_text ? (
-                    <div className="mt-3 flex gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-900/80">
-                      {c.ll_status_author_avatar_url ? (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Kun synlig her i KontrolCenter. Flere admins kan skrive flere gange hver.
+                  </p>
+
+                  {c.ll_status_text?.trim() ? (
+                    <div className="mt-3">
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        Historisk (før tråd)
+                      </p>
+                      <div className="mt-1.5 flex gap-3 rounded-lg border border-dashed border-gray-300 bg-white/90 p-3 dark:border-gray-600 dark:bg-gray-900/80">
+                        {c.ll_status_author_avatar_url ? (
+                          <img
+                            src={c.ll_status_author_avatar_url}
+                            alt=""
+                            className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-600"
+                          />
+                        ) : (
+                          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-800 dark:bg-teal-900/50 dark:text-teal-200">
+                            {initialsFromName(c.ll_status_author_name ?? "?")}
+                          </span>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {c.ll_status_author_name ?? "Admin"}
+                          </p>
+                          {c.ll_status_created_at ? (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatDaDateTime(c.ll_status_created_at)}
+                            </p>
+                          ) : null}
+                          <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
+                            {c.ll_status_text}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {(c.internal_thread ?? []).map((m) => (
+                    <div
+                      key={m.id}
+                      className="mt-3 flex gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-900/80"
+                    >
+                      {m.author_avatar_url ? (
                         <img
-                          src={c.ll_status_author_avatar_url}
+                          src={m.author_avatar_url}
                           alt=""
                           className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-600"
                         />
                       ) : (
                         <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-800 dark:bg-teal-900/50 dark:text-teal-200">
-                          {initialsFromName(c.ll_status_author_name ?? "?")}
+                          {initialsFromName(m.author_name ?? "?")}
                         </span>
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {c.ll_status_author_name ?? "Admin"}
+                          {m.author_name ?? "Admin"}
                         </p>
-                        {c.ll_status_created_at ? (
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatDaDateTime(c.ll_status_created_at)}
-                          </p>
-                        ) : null}
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
-                          {c.ll_status_text}
-                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDaDateTime(m.created_at)}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{m.body}</p>
                       </div>
                     </div>
-                  ) : (
-                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Ingen intern status endnu.</p>
-                  )}
+                  ))}
+
+                  {!c.ll_status_text?.trim() && (c.internal_thread ?? []).length === 0 ? (
+                    <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">Ingen beskeder endnu.</p>
+                  ) : null}
 
                   {currentUser ? (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-4 space-y-2 border-t border-gray-200 pt-4 dark:border-gray-600">
                       <label className="block">
-                        <span className="sr-only">Ny eller opdateret status</span>
+                        <span className="sr-only">Ny besked i tråden</span>
                         <textarea
-                          value={statusDraft[c.id] ?? ""}
-                          onChange={(e) =>
-                            setStatusDraft((d) => ({ ...d, [c.id]: e.target.value }))
-                          }
+                          value={messageDraft[c.id] ?? ""}
+                          onChange={(e) => setMessageDraft((d) => ({ ...d, [c.id]: e.target.value }))}
                           rows={3}
-                          placeholder="Skriv en kort intern status til andre admins …"
+                          placeholder="Skriv til de andre admins om denne kommentar …"
                           className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                         />
                       </label>
@@ -432,10 +459,10 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                         <button
                           type="button"
                           disabled={busyId === c.id}
-                          onClick={() => void saveStatus(c.id)}
+                          onClick={() => void postInternalMessage(c.id)}
                           className="rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-200"
                         >
-                          {busyId === c.id ? "Gemmer…" : "Gem status"}
+                          {busyId === c.id ? "Sender…" : "Send besked"}
                         </button>
                         {!handled ? (
                           <button
@@ -469,7 +496,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                       </div>
                     </div>
                   ) : (
-                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">Log ind for at skrive intern status.</p>
+                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">Log ind for at skrive i tråden.</p>
                   )}
 
                   {errorById[c.id] ? (

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { KommentarerFilteredList } from "@/components/kommentarer-filtered-list";
-import { fetchClubFeedbackForEvent } from "@/lib/club-feedback";
-import { getCurrentAuthAppUser } from "@/lib/auth-server";
+import { createServerSupabase, getCurrentAuthAppUser } from "@/lib/auth-server";
+import { fetchClubFeedbackForKontrolcenter } from "@/lib/club-feedback";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 };
 
 export default async function KommentarerPage() {
-  const [feedbackRes, currentUser] = await Promise.all([fetchClubFeedbackForEvent(), getCurrentAuthAppUser()]);
+  const [supabase, currentUser] = await Promise.all([createServerSupabase(), getCurrentAuthAppUser()]);
+  const feedbackRes = await fetchClubFeedbackForKontrolcenter(supabase);
   const { comments, error } = feedbackRes;
 
   if (error) {
@@ -37,8 +38,8 @@ export default async function KommentarerPage() {
           Kommentarer
         </h1>
         <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
-          Samlet oversigt over kommentarer om niveauer og holdinddeling. Filtrer efter klub og søg i
-          tekst.
+          Samlet oversigt over kommentarer om niveauer og holdinddeling. Under hver kommentar kan I føre en intern
+          diskussionstråd (flere beskeder fra flere admins). Filtrer efter klub og søg i tekst.
         </p>
       </header>
 
