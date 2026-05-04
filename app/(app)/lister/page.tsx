@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ListerPage() {
-  const { players, coaches, teams, error } = await fetchListerExportData();
+  const { players, coaches, error } = await fetchListerExportData();
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-8">
@@ -22,11 +22,11 @@ export default async function ListerPage() {
           Lister
         </h1>
         <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
-          Hent CSV eller udskriv lister. Navne vises ikke her — kun i fil eller udskriftsforhåndsvisning.
+          Her på siden kan du få stillet din hedeste liste-drøm. Gå liste-amok med enten print eller csv (til fx excel). Siden er særligt udviklet til Rikke Nielsen. 
         </p>
       </header>
 
-      <ListerExportClient players={players} coaches={coaches} teams={teams} fetchError={error} />
+      <ListerExportClient players={players} coaches={coaches} fetchError={error} />
     </div>
   );
 }
