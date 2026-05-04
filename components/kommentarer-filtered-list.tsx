@@ -345,7 +345,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                   </button>
                 ) : null}
 
-                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-lc-border bg-gray-50/80 px-5 py-3 dark:border-gray-700 dark:bg-gray-800/40">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-teal-200/70 bg-teal-50/50 px-5 py-3 dark:border-teal-900/40 dark:bg-teal-950/25">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">
                     {c.home_club?.trim() || "—"}
                   </p>
@@ -356,17 +356,21 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                     {formatDaDateTime(c.created_at)}
                   </time>
                 </div>
-                <div className="px-5 py-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {c.author_name}
+                <div className="border-b border-teal-100 bg-gradient-to-b from-teal-50/40 to-white px-5 py-4 dark:border-teal-900/30 dark:from-teal-950/20 dark:to-gray-900/20">
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Kommentar indsendt af:
                   </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{c.author_name}</p>
                   {c.author_phone?.trim() ? (
-                    <p className="mt-1 text-xs tabular-nums text-gray-600 dark:text-gray-400">
-                      <span className="font-semibold text-gray-700 dark:text-gray-300">Telefon:</span>{" "}
+                    <p className="mt-1.5 text-xs tabular-nums text-gray-600 dark:text-gray-400">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Telefon:</span>{" "}
                       {c.author_phone.trim()}
                     </p>
                   ) : null}
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                  <p className="mt-4 text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Kommentar
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm font-semibold italic leading-relaxed text-gray-900 dark:text-gray-100">
                     {c.comment_text}
                   </p>
                 </div>
@@ -455,44 +459,48 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                           className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                         />
                       </label>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={busyId === c.id}
-                          onClick={() => void postInternalMessage(c.id)}
-                          className="rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-200"
-                        >
-                          {busyId === c.id ? "Sender…" : "Send besked"}
-                        </button>
-                        {!handled ? (
+                      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             disabled={busyId === c.id}
-                            onClick={() => void markHandled(c.id)}
-                            className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200"
+                            onClick={() => void postInternalMessage(c.id)}
+                            className="rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-200"
                           >
-                            Marker som håndteret
+                            {busyId === c.id ? "Sender…" : "Send besked"}
                           </button>
-                        ) : (
+                        </div>
+                        <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+                          {!handled ? (
+                            <button
+                              type="button"
+                              disabled={busyId === c.id}
+                              onClick={() => void markHandled(c.id)}
+                              className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200"
+                            >
+                              Marker som håndteret
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={busyId === c.id}
+                              onClick={() => void reopenComment(c.id)}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                              Åbn igen (ikke håndteret)
+                            </button>
+                          )}
                           <button
                             type="button"
                             disabled={busyId === c.id}
-                            onClick={() => void reopenComment(c.id)}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+                            onClick={() => void deleteComment(c.id)}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 disabled:opacity-60 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
                           >
-                            <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                            Åbn igen (ikke håndteret)
+                            <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            Slet kommentar
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          disabled={busyId === c.id}
-                          onClick={() => void deleteComment(c.id)}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 disabled:opacity-60 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                          Slet kommentar
-                        </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
