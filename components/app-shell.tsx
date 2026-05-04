@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
+  ClipboardList,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -149,6 +150,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     if (href === "/admin") return pathname === "/admin" || pathname === "/dashboard";
     if (href === "/beskeder") return pathname === "/beskeder";
     if (href === "/analyse") return pathname === "/analyse";
+    if (href === "/lister") return pathname === "/lister";
     return pathname === href;
   }
 
@@ -536,7 +538,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <AnalyticsTracker />
-      <header className="sticky top-0 z-50 flex h-14 items-center gap-3 border-b border-teal-500/40 bg-[#14b8a6] px-4 text-white shadow-[0_4px_18px_rgba(15,118,110,0.24)] dark:border-teal-400/30 dark:bg-teal-600 dark:shadow-[0_4px_18px_rgba(15,118,110,0.2)]">
+      <header className="sticky top-0 z-50 flex h-14 items-center gap-3 border-b border-teal-500/40 bg-[#14b8a6] px-4 text-white shadow-[0_4px_18px_rgba(15,118,110,0.24)] print:hidden dark:border-teal-400/30 dark:bg-teal-600 dark:shadow-[0_4px_18px_rgba(15,118,110,0.2)]">
         <button
           type="button"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
@@ -554,6 +556,18 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           </span>
         </Link>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <Link
+            href="/lister"
+            onClick={() => setMobileOpen(false)}
+            className={`inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${
+              isActive("/lister") ? "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
+            }`}
+            aria-current={isActive("/lister") ? "page" : undefined}
+            title="Lister til udskrift — hold og spillere"
+          >
+            <ClipboardList className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            Lister
+          </Link>
           <Link
             href="/analyse"
             onClick={() => setMobileOpen(false)}
@@ -609,7 +623,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
 
       <aside
         id="app-sidebar"
-        className={`z-50 flex min-h-0 w-[16.5rem] flex-col border-r border-lc-border bg-white dark:border-gray-700 dark:bg-gray-900 max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:top-14 max-lg:transition-transform max-lg:duration-200 max-lg:ease-out lg:sticky lg:top-14 lg:h-[calc(100svh-3.5rem)] lg:max-h-[calc(100svh-3.5rem)] lg:shrink-0 lg:self-start ${
+        className={`z-50 flex min-h-0 w-[16.5rem] flex-col border-r border-lc-border bg-white print:hidden dark:border-gray-700 dark:bg-gray-900 max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:top-14 max-lg:transition-transform max-lg:duration-200 max-lg:ease-out lg:sticky lg:top-14 lg:h-[calc(100svh-3.5rem)] lg:max-h-[calc(100svh-3.5rem)] lg:shrink-0 lg:self-start ${
           mobileOpen ? "max-lg:translate-x-0 max-lg:shadow-lc-card" : "max-lg:-translate-x-full"
         } `}
       >

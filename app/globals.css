@@ -79,6 +79,12 @@ body {
     margin-bottom: 24px;
   }
 
+  .lister-print-team-block {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 1rem;
+  }
+
   body {
     background: #fff !important;
     color: #000 !important;
