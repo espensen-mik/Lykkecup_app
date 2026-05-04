@@ -21,3 +21,5 @@ comment on table public.club_feedback_internal_messages is 'Intern admin-tråd p
 
 -- Kun indloggede KontrolCenter-brugere (authenticated) læser/skriver.
 grant select, insert on table public.club_feedback_internal_messages to authenticated;
+
+-- RLS-politikker følger i 20260422201000_club_feedback_internal_messages_rls.sql (påkrævet når RLS er aktiv).
