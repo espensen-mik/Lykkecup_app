@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, ChevronDown, Search } from "lucide-react";
+import { CheckCircle2, ChevronDown, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
@@ -151,6 +151,74 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       return;
     }
     setExpandedHandled((prev) => ({ ...prev, [commentId]: false }));
+    router.refresh();
+  }
+
+  async function reopenComment(commentId: string) {
+    if (!currentUser) {
+      setErrorById((e) => ({ ...e, [commentId]: "Du skal være logget ind." }));
+      return;
+    }
+    setErrorById((e) => ({ ...e, [commentId]: null }));
+    setBusyId(commentId);
+    const supabase = getAuthBrowserClient();
+    const { error } = await supabase
+      .from("club_feedback")
+      .update({
+        handled_at: null,
+        handled_by: null,
+      })
+      .eq("id", commentId)
+      .eq("event_id", LYKKECUP_EVENT_ID);
+
+    setBusyId(null);
+    if (error) {
+      setErrorById((e) => ({
+        ...e,
+        [commentId]: error.message.includes("column") ? "Database mangler kolonner — kør migration i Supabase." : error.message,
+      }));
+      return;
+    }
+    setExpandedHandled((prev) => ({ ...prev, [commentId]: false }));
+    router.refresh();
+  }
+
+  async function deleteComment(commentId: string) {
+    if (!currentUser) {
+      setErrorById((e) => ({ ...e, [commentId]: "Du skal være logget ind." }));
+      return;
+    }
+    const ok = window.confirm(
+      "Slette denne kommentar permanent? Den forsvinder også fra den offentlige coach-feedback-side.",
+    );
+    if (!ok) return;
+
+    setErrorById((e) => ({ ...e, [commentId]: null }));
+    setBusyId(commentId);
+    const supabase = getAuthBrowserClient();
+    const { error } = await supabase.from("club_feedback").delete().eq("id", commentId).eq("event_id", LYKKECUP_EVENT_ID);
+
+    setBusyId(null);
+    if (error) {
+      setErrorById((e) => ({
+        ...e,
+        [commentId]:
+          error.message.includes("permission") || error.message.includes("policy")
+            ? "Ingen rettighed til at slette — kør migration club_feedback_authenticated_delete i Supabase."
+            : error.message,
+      }));
+      return;
+    }
+    setExpandedHandled((prev) => {
+      const next = { ...prev };
+      delete next[commentId];
+      return next;
+    });
+    setStatusDraft((d) => {
+      const next = { ...d };
+      delete next[commentId];
+      return next;
+    });
     router.refresh();
   }
 
@@ -378,7 +446,26 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                           >
                             Marker som håndteret
                           </button>
-                        ) : null}
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busyId === c.id}
+                            onClick={() => void reopenComment(c.id)}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            Åbn igen (ikke håndteret)
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={busyId === c.id}
+                          onClick={() => void deleteComment(c.id)}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 disabled:opacity-60 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          Slet kommentar
+                        </button>
                       </div>
                     </div>
                   ) : (
