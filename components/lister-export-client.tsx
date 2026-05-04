@@ -3,17 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
-import type { ListerCoachRow, ListerPlayerRow } from "@/lib/lister";
+import type { ListerCoachRow, ListerPlayerRow, ListerTeamRow } from "@/lib/lister";
 
 const INGEN_KLUB = "Ingen klub";
 
 type Props = {
   players: ListerPlayerRow[];
   coaches: ListerCoachRow[];
+  teams: ListerTeamRow[];
   fetchError: string | null;
 };
 
-type PrintKind = "alpha" | "playersByClub" | "mixedByClub" | "singleClub" | null;
+type PrintKind = "teamNames" | "alpha" | "playersByClub" | "mixedByClub" | "singleClub" | null;
 
 function csvSlug(s: string): string {
   return s
@@ -37,7 +38,7 @@ function clubLabelForPerson(home: string | null): string {
 const rowBtnClass =
   "inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800";
 
-export function ListerExportClient({ players, coaches, fetchError }: Props) {
+export function ListerExportClient({ players, coaches, teams, fetchError }: Props) {
   const [printKind, setPrintKind] = useState<PrintKind>(null);
   const [selectedClub, setSelectedClub] = useState<string>("");
 
@@ -76,6 +77,14 @@ export function ListerExportClient({ players, coaches, fetchError }: Props) {
     setPrintKind(kind);
     setTimeout(() => window.print(), 0);
   }
+
+  const downloadTeamNamesCsv = useCallback(() => {
+    const rows: (string | number | null | undefined)[][] = [
+      ["Niveau", "Holdnavn_visning", "Officielt_holdnavn"],
+      ...teams.map((t) => [t.levelKey, t.displayName, t.officialName]),
+    ];
+    downloadCsv("lister-holdnavne.csv", rows);
+  }, [teams]);
 
   const downloadAlpha = useCallback(() => {
     const rows: (string | number | null | undefined)[][] = [
@@ -215,6 +224,25 @@ export function ListerExportClient({ players, coaches, fetchError }: Props) {
 
         <ul className="space-y-4">
           <li className="flex flex-col gap-3 rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">Holdnavne</span>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                Ren liste: niveau, visningsnavn (kaldenavn), officielt navn — samme rækkefølge som i holddannelse.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={rowBtnClass} onClick={() => runPrint("teamNames")}>
+                <Printer className="h-3.5 w-3.5" aria-hidden />
+                Udskriv
+              </button>
+              <button type="button" className={rowBtnClass} onClick={downloadTeamNamesCsv}>
+                <Download className="h-3.5 w-3.5" aria-hidden />
+                CSV
+              </button>
+            </div>
+          </li>
+
+          <li className="flex flex-col gap-3 rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-sm font-medium text-gray-900 dark:text-white">Alle spillere alfabetisk</span>
             <div className="flex flex-wrap gap-2">
               <button type="button" className={rowBtnClass} onClick={() => runPrint("alpha")}>
@@ -303,6 +331,34 @@ export function ListerExportClient({ players, coaches, fetchError }: Props) {
 
       {/* Kun synlig ved udskrift */}
       <div className="hidden print:block">
+        {printKind === "teamNames" ? (
+          <div className="text-black">
+            <h1 className="mb-6 text-xl font-bold">Holdnavne</h1>
+            {teams.length === 0 ? (
+              <p className="text-sm text-neutral-600">Ingen hold.</p>
+            ) : (
+              <table className="w-full max-w-2xl border-collapse">
+                <thead>
+                  <tr>
+                    <th className={th}>Niveau</th>
+                    <th className={th}>Holdnavn</th>
+                    <th className={th}>Officielt navn</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teams.map((t) => (
+                    <tr key={t.id}>
+                      <td className={td}>{t.levelKey}</td>
+                      <td className={`${td} font-medium`}>{t.displayName}</td>
+                      <td className={td}>{t.officialName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ) : null}
+
         {printKind === "alpha" ? (
           <div className="text-black">
             <h1 className="mb-6 text-xl font-bold">Alle spillere (alfabetisk)</h1>
