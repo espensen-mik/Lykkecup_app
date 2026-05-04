@@ -48,6 +48,8 @@ const emptyDraft: PlayerDraft = {
   preferences: [],
 };
 
+const GENDER_PRESETS = ["Pige", "Dreng", "Diverse"] as const;
+
 const PREFERENCE_OPTIONS: { id: string; label: string }[] = [
   { id: "egen_klub", label: "Egen klub" },
   { id: "nye_venner", label: "Nye venner" },
@@ -138,6 +140,8 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [draft, setDraft] = useState<PlayerDraft>(emptyDraft);
   const [levelOptions, setLevelOptions] = useState<string[]>([]);
+  const [clubOptions, setClubOptions] = useState<string[]>([]);
+  const [genderOptions, setGenderOptions] = useState<string[]>([]);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -163,9 +167,12 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
     setEditing(false);
     setSaveError(null);
     setSaveNotice(null);
+    setLevelOptions([]);
+    setClubOptions([]);
+    setGenderOptions([]);
 
     (async () => {
-      const [{ data, error: supaError }, teamSummary, logsRes, levelsRes] = await Promise.all([
+      const [{ data, error: supaError }, teamSummary, logsRes, metaRes] = await Promise.all([
         supabase
           .from("players")
           .select(
@@ -182,7 +189,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
           .eq("event_id", LYKKECUP_EVENT_ID)
           .order("changed_at", { ascending: false })
           .limit(30),
-        supabase.from("players").select("level").eq("event_id", LYKKECUP_EVENT_ID),
+        supabase.from("players").select("home_club, gender, level").eq("event_id", LYKKECUP_EVENT_ID),
       ]);
 
       if (cancelled) return;
@@ -201,13 +208,44 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       setDraft(toDraft(detail));
       setAssignedTeam(teamSummary);
       setLogs((logsRes.data ?? []) as PlayerChangeLogRow[]);
-      if (!levelsRes.error) {
-        const vals = new Set<string>();
-        for (const row of (levelsRes.data ?? []) as { level: string | null }[]) {
-          const t = row.level?.trim();
-          if (t) vals.add(t);
+      if (!metaRes.error) {
+        const rows = (metaRes.data ?? []) as { home_club: string | null; gender: string | null; level: string | null }[];
+        const levels = new Set<string>();
+        const clubs = new Set<string>();
+        const genders = new Set<string>();
+        for (const row of rows) {
+          const lv = row.level?.trim();
+          if (lv) levels.add(lv);
+          const cl = row.home_club?.trim();
+          if (cl) clubs.add(cl);
+          const ge = row.gender?.trim();
+          if (ge) genders.add(ge);
         }
-        setLevelOptions(sortLevelKeysForNav([...vals]));
+        const curClub = (data as PlayerDetail).home_club?.trim();
+        if (curClub) clubs.add(curClub);
+        setLevelOptions(sortLevelKeysForNav([...levels]));
+        setClubOptions([...clubs].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" })));
+
+        const presetLower = new Set(GENDER_PRESETS.map((g) => g.toLowerCase()));
+        const merged: string[] = [...GENDER_PRESETS];
+        for (const g of genders) {
+          if (!presetLower.has(g.toLowerCase())) merged.push(g);
+        }
+        merged.sort((a, b) => {
+          const ia = GENDER_PRESETS.includes(a as (typeof GENDER_PRESETS)[number])
+            ? GENDER_PRESETS.indexOf(a as (typeof GENDER_PRESETS)[number])
+            : 99;
+          const ib = GENDER_PRESETS.includes(b as (typeof GENDER_PRESETS)[number])
+            ? GENDER_PRESETS.indexOf(b as (typeof GENDER_PRESETS)[number])
+            : 99;
+          if (ia !== ib) return ia - ib;
+          return a.localeCompare(b, "da", { sensitivity: "base" });
+        });
+        const curGender = (data as PlayerDetail).gender?.trim();
+        if (curGender && !merged.some((x) => x.toLowerCase() === curGender.toLowerCase())) {
+          merged.push(curGender);
+        }
+        setGenderOptions(merged);
       }
       setLoading(false);
     })();
@@ -407,11 +445,18 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
                     </label>
                     <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Hjemmeklub
-                      <input
+                      <select
                         value={draft.homeClub}
                         onChange={(e) => setDraft((d) => ({ ...d, homeClub: e.target.value }))}
                         className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
+                      >
+                        <option value="">Ingen klub</option>
+                        {clubOptions.map((club) => (
+                          <option key={club} value={club}>
+                            {club}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Fødselsdato
@@ -433,11 +478,18 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
                     </label>
                     <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Køn
-                      <input
+                      <select
                         value={draft.gender}
                         onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
                         className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
+                      >
+                        <option value="">Ikke angivet</option>
+                        {genderOptions.map((g) => (
+                          <option key={g} value={g}>
+                            {g}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Niveau
