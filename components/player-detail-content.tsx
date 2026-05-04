@@ -31,7 +31,19 @@ type Props = {
  */
 export function PlayerDetailContent({ player, assignedTeam }: Props) {
   const prefsText = formatPreferences(player.preferences);
-  const prefsIsMultiline = prefsText.includes("\n");
+  const prefsTextFriendly = Array.isArray(player.preferences)
+    ? player.preferences
+        .map((v) => {
+          const key = String(v).toLowerCase();
+          if (key === "egen_klub") return "Egen klub";
+          if (key === "nye_venner") return "Nye venner";
+          if (key === "alt_ok") return "Alt ok";
+          if (key === "klar_pa_alt") return "Klar på alt";
+          return String(v);
+        })
+        .join(", ")
+    : prefsText;
+  const prefsIsMultiline = prefsTextFriendly.includes("\n");
   const showOfficialSubtitle =
     assignedTeam &&
     assignedTeam.displayName.trim() !== assignedTeam.officialName.trim();
@@ -80,10 +92,10 @@ export function PlayerDetailContent({ player, assignedTeam }: Props) {
           value={
             prefsIsMultiline ? (
               <pre className="mt-1 max-h-48 overflow-auto border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200">
-                {prefsText}
+                {prefsTextFriendly}
               </pre>
             ) : (
-              prefsText
+              prefsTextFriendly
             )
           }
         />

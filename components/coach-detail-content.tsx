@@ -6,11 +6,11 @@ import type { Coach } from "@/types/coach";
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="border-b border-lc-border py-5 last:border-b-0 dark:border-gray-700">
-      <dt className="text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+    <div className="border border-gray-200 bg-white px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900">
+      <dt className="text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
         {label}
       </dt>
-      <dd className="mt-2 text-base leading-relaxed text-gray-900 dark:text-gray-100">{value}</dd>
+      <dd className="mt-1.5 text-sm leading-relaxed text-gray-900 dark:text-gray-100">{value}</dd>
     </div>
   );
 }
@@ -27,20 +27,21 @@ type Props = {
 export function CoachDetailContent({ coach }: Props) {
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">{coach.name}</h1>
-      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Trænerdetaljer</p>
+      <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Trænerdetaljer</p>
 
-      <dl className="mt-6">
+      <dl className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <DetailRow label="Hjemmeklub" value={formatDash(coach.home_club)} />
         <DetailRow label="Fødselsdato" value={formatBirthdate(coach.birthdate)} />
         <DetailRow label="Alder" value={formatDash(coach.age)} />
         <DetailRow label="T-shirt" value={formatDash(coach.tshirt_size)} />
         <DetailRow label="E-mail" value={formatDash(coach.email)} />
         <DetailRow label="Telefon" value={formatDash(coach.phone)} />
-        <DetailRow
-          label="Billet-ID"
-          value={<span className="font-mono text-sm text-gray-700 dark:text-gray-300">{formatDash(coach.ticket_id)}</span>}
-        />
+        <div className="sm:col-span-2">
+          <DetailRow
+            label="Billet-ID"
+            value={<span className="font-mono text-sm text-gray-700 dark:text-gray-300">{formatDash(coach.ticket_id)}</span>}
+          />
+        </div>
       </dl>
     </>
   );

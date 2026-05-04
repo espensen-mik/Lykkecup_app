@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { Coach } from "@/types/coach";
-import { fetchCoachById } from "@/lib/coaches";
+import { LYKKECUP_EVENT_ID } from "@/lib/players";
+import { supabase } from "@/lib/supabase";
 import { CoachDetailContent } from "@/components/coach-detail-content";
 
 type Props = {
@@ -11,15 +12,95 @@ type Props = {
   onClose: () => void;
 };
 
+type CoachDraft = {
+  name: string;
+  homeClub: string;
+  birthdate: string;
+  age: string;
+  tshirtSize: string;
+  email: string;
+  phone: string;
+};
+
+type CoachChangeLogRow = {
+  id: string;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_at: string;
+  changed_by_name: string | null;
+};
+
+const emptyCoachDraft: CoachDraft = {
+  name: "",
+  homeClub: "",
+  birthdate: "",
+  age: "",
+  tshirtSize: "",
+  email: "",
+  phone: "",
+};
+
+const tshirtOptions = ["", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"];
+
+function toCoachDraft(coach: Coach): CoachDraft {
+  return {
+    name: coach.name ?? "",
+    homeClub: coach.home_club ?? "",
+    birthdate: coach.birthdate ? coach.birthdate.slice(0, 10) : "",
+    age: coach.age == null ? "" : String(coach.age),
+    tshirtSize: coach.tshirt_size ?? "",
+    email: coach.email ?? "",
+    phone: coach.phone ?? "",
+  };
+}
+
+function coachFieldLabel(field: string): string {
+  switch (field) {
+    case "name":
+      return "Navn";
+    case "home_club":
+      return "Hjemmeklub";
+    case "birthdate":
+      return "Fødselsdato";
+    case "age":
+      return "Alder";
+    case "tshirt_size":
+      return "T-shirt";
+    case "email":
+      return "E-mail";
+    case "phone":
+      return "Telefon";
+    default:
+      return field;
+  }
+}
+
+function printValue(value: string | null): string {
+  if (value == null || value.trim() === "") return "—";
+  return value;
+}
+
 export function CoachDetailModal({ coachId, onClose }: Props) {
   const [coach, setCoach] = useState<Coach | null>(null);
+  const [logs, setLogs] = useState<CoachChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [draft, setDraft] = useState<CoachDraft>(emptyCoachDraft);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!coachId) {
       setCoach(null);
+      setLogs([]);
+      setDraft(emptyCoachDraft);
+      setEditing(false);
+      setSaveError(null);
+      setSaveNotice(null);
       setError(null);
       setLoading(false);
       return;
@@ -29,21 +110,43 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
     setLoading(true);
     setError(null);
     setCoach(null);
+    setLogs([]);
+    setDraft(emptyCoachDraft);
+    setEditing(false);
+    setSaveError(null);
+    setSaveNotice(null);
 
     (async () => {
-      const { coach, error } = await fetchCoachById(coachId);
+      const [{ data, error: coachError }, logsRes] = await Promise.all([
+        supabase
+          .from("coaches")
+          .select("id, event_id, ticket_id, name, home_club, email, phone, birthdate, age, tshirt_size")
+          .eq("id", coachId)
+          .eq("event_id", LYKKECUP_EVENT_ID)
+          .maybeSingle(),
+        supabase
+          .from("coach_change_log")
+          .select("id, field_name, old_value, new_value, changed_at, changed_by_name")
+          .eq("coach_id", coachId)
+          .eq("event_id", LYKKECUP_EVENT_ID)
+          .order("changed_at", { ascending: false })
+          .limit(30),
+      ]);
       if (cancelled) return;
-      if (error) {
-        setError(error);
+      if (coachError) {
+        setError(coachError.message);
         setLoading(false);
         return;
       }
-      if (!coach) {
+      if (!data) {
         setError("Træner ikke fundet.");
         setLoading(false);
         return;
       }
-      setCoach(coach);
+      const detail = data as Coach;
+      setCoach(detail);
+      setDraft(toCoachDraft(detail));
+      setLogs((logsRes.data ?? []) as CoachChangeLogRow[]);
       setLoading(false);
     })();
 
@@ -83,41 +186,122 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
     [onClose],
   );
 
+  async function refreshLogs(coachIdForLogs: string) {
+    const logsRes = await supabase
+      .from("coach_change_log")
+      .select("id, field_name, old_value, new_value, changed_at, changed_by_name")
+      .eq("coach_id", coachIdForLogs)
+      .eq("event_id", LYKKECUP_EVENT_ID)
+      .order("changed_at", { ascending: false })
+      .limit(30);
+    if (!logsRes.error) {
+      setLogs((logsRes.data ?? []) as CoachChangeLogRow[]);
+    }
+  }
+
+  async function saveChanges() {
+    if (!coachId || !coach) return;
+    setSaveError(null);
+    setSaveNotice(null);
+
+    const trimmedName = draft.name.trim();
+    if (!trimmedName) {
+      setSaveError("Navn er påkrævet.");
+      return;
+    }
+
+    const ageValue = draft.age.trim();
+    const nextAge = ageValue === "" ? null : Number(ageValue);
+    if (ageValue !== "" && !Number.isInteger(nextAge)) {
+      setSaveError("Alder skal være et helt tal.");
+      return;
+    }
+
+    const payload = {
+      name: trimmedName,
+      home_club: draft.homeClub.trim() || null,
+      birthdate: draft.birthdate || null,
+      age: nextAge,
+      tshirt_size: draft.tshirtSize.trim() || null,
+      email: draft.email.trim() || null,
+      phone: draft.phone.trim() || null,
+    };
+
+    const changed =
+      payload.name !== coach.name ||
+      payload.home_club !== (coach.home_club ?? null) ||
+      payload.birthdate !== (coach.birthdate ? coach.birthdate.slice(0, 10) : null) ||
+      payload.age !== (coach.age ?? null) ||
+      payload.tshirt_size !== (coach.tshirt_size ?? null) ||
+      payload.email !== (coach.email ?? null) ||
+      payload.phone !== (coach.phone ?? null);
+
+    if (!changed) {
+      setSaveNotice("Ingen ændringer at gemme.");
+      return;
+    }
+
+    setSaving(true);
+    const { error: updateError } = await supabase
+      .from("coaches")
+      .update(payload)
+      .eq("id", coachId)
+      .eq("event_id", LYKKECUP_EVENT_ID);
+    setSaving(false);
+
+    if (updateError) {
+      setSaveError(updateError.message);
+      return;
+    }
+
+    const updated: Coach = {
+      ...coach,
+      name: payload.name,
+      home_club: payload.home_club,
+      birthdate: payload.birthdate,
+      age: payload.age,
+      tshirt_size: payload.tshirt_size,
+      email: payload.email,
+      phone: payload.phone,
+    };
+    setCoach(updated);
+    setDraft(toCoachDraft(updated));
+    setEditing(false);
+    setSaveNotice("Træneroplysninger gemt.");
+    await refreshLogs(coachId);
+  }
+
   if (!coachId) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-gradient-to-b from-slate-950/55 via-slate-900/50 to-teal-950/35 px-4 py-10 backdrop-blur-md dark:from-black/70 dark:via-slate-950/60 dark:to-teal-950/25"
+      className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/45 px-4 py-8"
       role="presentation"
       onClick={handleBackdropClick}
     >
       <div
-        className="relative mt-0 w-full max-w-lg overflow-hidden rounded-2xl border border-white/40 bg-white/72 shadow-[0_32px_64px_-16px_rgba(15,23,42,0.45),inset_0_0_0_1px_rgba(255,255,255,0.55)] backdrop-blur-2xl dark:border-white/15 dark:bg-gray-950/58 dark:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.75),inset_0_0_0_1px_rgba(255,255,255,0.06)]"
+        className="relative mt-0 w-full max-w-2xl overflow-hidden rounded-none border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
         role="dialog"
         aria-modal="true"
         aria-label="Trænerdetaljer"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/70 to-transparent dark:via-teal-400/40"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -top-24 left-1/2 h-48 w-[min(100%,28rem)] -translate-x-1/2 rounded-full bg-teal-400/15 blur-3xl dark:bg-teal-500/10"
-          aria-hidden
-        />
+        <div className="flex items-center justify-between border-b border-teal-700 bg-[#0d9488] px-5 py-4">
+          <h2 className="truncate pr-4 text-xl font-semibold text-white">
+            {coach?.name ?? "Trænerdetaljer"}
+          </h2>
+          <button
+            ref={closeBtnRef}
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center border border-white/30 bg-white/95 text-gray-600 transition hover:bg-white hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            aria-label="Luk"
+          >
+            <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+          </button>
+        </div>
 
-        <button
-          ref={closeBtnRef}
-          type="button"
-          onClick={onClose}
-          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-gray-200/90 bg-white/90 text-gray-500 shadow-sm backdrop-blur-sm transition hover:border-gray-300 hover:bg-white hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b8a6]/35 dark:border-white/12 dark:bg-gray-900/75 dark:text-gray-300 dark:hover:border-white/22 dark:hover:bg-gray-800 dark:hover:text-white"
-          aria-label="Luk"
-        >
-          <X className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-        </button>
-
-        <div className="relative max-h-[min(85vh,720px)] overflow-y-auto p-6 pt-14 sm:p-8 sm:pt-16">
+        <div className="relative max-h-[min(85vh,780px)] overflow-y-auto p-5">
           {loading ? (
             <p className="text-sm text-gray-600/90 dark:text-gray-400">Indlæser …</p>
           ) : error ? (
@@ -125,7 +309,145 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
               {error}
             </div>
           ) : coach ? (
-            <CoachDetailContent coach={coach} />
+            <div className="space-y-4">
+              <CoachDetailContent coach={coach} />
+
+              <section className="rounded-xl border border-lc-border/80 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                    Rediger træner
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditing((prev) => !prev);
+                      setSaveError(null);
+                      setSaveNotice(null);
+                      if (coach) setDraft(toCoachDraft(coach));
+                    }}
+                    className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                  >
+                    {editing ? "Annuller" : "Rediger oplysninger"}
+                  </button>
+                </div>
+
+                {editing ? (
+                  <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Navn
+                      <input
+                        value={draft.name}
+                        onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Hjemmeklub
+                      <input
+                        value={draft.homeClub}
+                        onChange={(e) => setDraft((d) => ({ ...d, homeClub: e.target.value }))}
+                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Fødselsdato
+                      <input
+                        type="date"
+                        value={draft.birthdate}
+                        onChange={(e) => setDraft((d) => ({ ...d, birthdate: e.target.value }))}
+                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Alder
+                      <input
+                        type="number"
+                        value={draft.age}
+                        onChange={(e) => setDraft((d) => ({ ...d, age: e.target.value }))}
+                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      T-shirt
+                      <select
+                        value={draft.tshirtSize}
+                        onChange={(e) => setDraft((d) => ({ ...d, tshirtSize: e.target.value }))}
+                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                      >
+                        {tshirtOptions.map((size) => (
+                          <option key={size || "none"} value={size}>
+                            {size || "Ingen størrelse"}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      E-mail
+                      <input
+                        type="email"
+                        value={draft.email}
+                        onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                      />
+                    </label>
+                    <label className="sm:col-span-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Telefon
+                      <input
+                        type="tel"
+                        value={draft.phone}
+                        onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                      />
+                    </label>
+
+                    <div className="sm:col-span-2 mt-0.5 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void saveChanges()}
+                        disabled={saving}
+                        className="rounded-md bg-[#14b8a6] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0f766e] disabled:opacity-60"
+                      >
+                        {saving ? "Gemmer..." : "Gem ændringer"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {saveError ? <p className="mt-3 text-xs text-red-600 dark:text-red-400">{saveError}</p> : null}
+                {saveNotice ? <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">{saveNotice}</p> : null}
+              </section>
+
+              <section className="rounded-xl border border-lc-border/80 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                  Ændringsnoter
+                </h2>
+                {logs.length === 0 ? (
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Ingen ændringer registreret endnu.</p>
+                ) : (
+                  <ul className="mt-2 space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
+                    {logs.map((log) => (
+                      <li key={log.id} className="rounded-md border border-gray-200/80 bg-gray-50/80 px-3 py-2 dark:border-gray-700 dark:bg-gray-800/45">
+                        <p>
+                          <span className="font-semibold">{coachFieldLabel(log.field_name)}:</span> {printValue(log.old_value)}
+                          {" -> "}
+                          {printValue(log.new_value)}
+                        </p>
+                        <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                          {new Date(log.changed_at).toLocaleString("da-DK", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}{" "}
+                          · {log.changed_by_name?.trim() || "Ukendt bruger"}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
           ) : null}
         </div>
       </div>

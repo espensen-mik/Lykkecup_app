@@ -7,6 +7,8 @@ import {
   LYKKECUP_EVENT_ID,
   type PlayerAssignedTeamSummary,
 } from "@/lib/players";
+import { derivePreferenceBadge } from "@/lib/player-preferences";
+import { sortLevelKeysForNav } from "@/lib/holddannelse";
 import { supabase } from "@/lib/supabase";
 import type { PlayerDetail } from "@/types/player";
 import { PlayerDetailContent } from "@/components/player-detail-content";
@@ -24,7 +26,7 @@ type PlayerDraft = {
   age: string;
   gender: string;
   level: string;
-  preferences: string;
+  preferences: string[];
 };
 
 type PlayerChangeLogRow = {
@@ -43,11 +45,25 @@ const emptyDraft: PlayerDraft = {
   age: "",
   gender: "",
   level: "",
-  preferences: "",
+  preferences: [],
+};
+
+const PREFERENCE_OPTIONS: { id: string; label: string }[] = [
+  { id: "egen_klub", label: "Egen klub" },
+  { id: "nye_venner", label: "Nye venner" },
+  { id: "alt_ok", label: "Alt ok" },
+  { id: "klar_pa_alt", label: "Klar på alt" },
+];
+
+const prefIdByBadge: Record<string, string> = {
+  "Egen klub": "egen_klub",
+  "Nye venner": "nye_venner",
+  "Alt ok": "alt_ok",
+  "Klar på alt": "klar_pa_alt",
 };
 
 function toDraft(player: PlayerDetail): PlayerDraft {
-  const prefText = formatPreferences(player.preferences);
+  const prefIds = preferenceIdsFromValue(player.preferences);
   return {
     name: player.name ?? "",
     homeClub: player.home_club ?? "",
@@ -55,7 +71,7 @@ function toDraft(player: PlayerDetail): PlayerDraft {
     age: player.age == null ? "" : String(player.age),
     gender: player.gender ?? "",
     level: player.level ?? "",
-    preferences: prefText === "—" ? "" : prefText,
+    preferences: prefIds,
   };
 }
 
@@ -85,17 +101,29 @@ function printValue(value: string | null): string {
   return value;
 }
 
-function parsePreferencesInput(value: string): unknown {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      return trimmed;
+function preferenceIdsFromValue(value: unknown): string[] {
+  const set = new Set<string>();
+  const raw = formatPreferences(value).toLowerCase();
+
+  const badge = derivePreferenceBadge(value);
+  const badgeId = badge ? prefIdByBadge[badge] : null;
+  if (badgeId) set.add(badgeId);
+
+  if (raw.includes("egen") && raw.includes("klub")) set.add("egen_klub");
+  if (raw.includes("nye") && raw.includes("ven")) set.add("nye_venner");
+  if (raw.includes("alt ok") || raw.includes("det er ok")) set.add("alt_ok");
+  if (raw.includes("klar") && raw.includes("hele")) set.add("klar_pa_alt");
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const t = String(item).toLowerCase();
+      if (t.includes("egen")) set.add("egen_klub");
+      if (t.includes("ven")) set.add("nye_venner");
+      if (t.includes("alt_ok") || t === "alt ok") set.add("alt_ok");
+      if (t.includes("klar")) set.add("klar_pa_alt");
     }
   }
-  return trimmed;
+  return [...set];
 }
 
 export function PlayerDetailModal({ playerId, onClose }: Props) {
@@ -109,6 +137,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [draft, setDraft] = useState<PlayerDraft>(emptyDraft);
+  const [levelOptions, setLevelOptions] = useState<string[]>([]);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -136,7 +165,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
     setSaveNotice(null);
 
     (async () => {
-      const [{ data, error: supaError }, teamSummary, logsRes] = await Promise.all([
+      const [{ data, error: supaError }, teamSummary, logsRes, levelsRes] = await Promise.all([
         supabase
           .from("players")
           .select(
@@ -153,6 +182,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
           .eq("event_id", LYKKECUP_EVENT_ID)
           .order("changed_at", { ascending: false })
           .limit(30),
+        supabase.from("players").select("level").eq("event_id", LYKKECUP_EVENT_ID),
       ]);
 
       if (cancelled) return;
@@ -171,6 +201,14 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       setDraft(toDraft(detail));
       setAssignedTeam(teamSummary);
       setLogs((logsRes.data ?? []) as PlayerChangeLogRow[]);
+      if (!levelsRes.error) {
+        const vals = new Set<string>();
+        for (const row of (levelsRes.data ?? []) as { level: string | null }[]) {
+          const t = row.level?.trim();
+          if (t) vals.add(t);
+        }
+        setLevelOptions(sortLevelKeysForNav([...vals]));
+      }
       setLoading(false);
     })();
 
@@ -248,10 +286,11 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       age: nextAge,
       gender: draft.gender.trim() || null,
       level: draft.level.trim() || null,
-      preferences: parsePreferencesInput(draft.preferences),
+      preferences: draft.preferences.length > 0 ? draft.preferences : null,
     };
-
-    const beforePrefs = formatPreferences(player.preferences) === "—" ? "" : formatPreferences(player.preferences);
+    const beforePrefIds = preferenceIdsFromValue(player.preferences);
+    const beforePrefKey = [...beforePrefIds].sort().join("|");
+    const nextPrefKey = [...draft.preferences].sort().join("|");
     const changed =
       payload.name !== player.name ||
       payload.home_club !== (player.home_club ?? null) ||
@@ -259,7 +298,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       payload.age !== (player.age ?? null) ||
       payload.gender !== (player.gender ?? null) ||
       payload.level !== (player.level ?? null) ||
-      draft.preferences.trim() !== beforePrefs.trim();
+      beforePrefKey !== nextPrefKey;
 
     if (!changed) {
       setSaveNotice("Ingen ændringer at gemme.");
@@ -311,15 +350,15 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
         aria-label="Spillerdetaljer"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
-          <h2 className="truncate pr-4 text-xl font-semibold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between border-b border-teal-700 bg-[#0d9488] px-5 py-4">
+          <h2 className="truncate pr-4 text-xl font-semibold text-white">
             {player?.name ?? "Spillerdetaljer"}
           </h2>
           <button
             ref={closeBtnRef}
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center border border-gray-200 bg-white text-gray-500 transition hover:border-gray-300 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b8a6]/35 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:text-white"
+            className="flex h-10 w-10 items-center justify-center border border-white/30 bg-white/95 text-gray-600 transition hover:bg-white hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             aria-label="Luk"
           >
             <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
@@ -402,20 +441,44 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
                     </label>
                     <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Niveau
-                      <input
+                      <select
                         value={draft.level}
                         onChange={(e) => setDraft((d) => ({ ...d, level: e.target.value }))}
                         className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
+                      >
+                        <option value="">Ingen niveau</option>
+                        {levelOptions.map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label className="sm:col-span-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Præferencer
-                      <textarea
-                        value={draft.preferences}
-                        onChange={(e) => setDraft((d) => ({ ...d, preferences: e.target.value }))}
-                        rows={3}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
+                      <div className="mt-1 grid grid-cols-1 gap-1.5 rounded-md border border-gray-200 bg-white p-2.5 dark:border-gray-600 dark:bg-gray-950">
+                        {PREFERENCE_OPTIONS.map((opt) => {
+                          const checked = draft.preferences.includes(opt.id);
+                          return (
+                            <label key={opt.id} className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) =>
+                                  setDraft((d) => ({
+                                    ...d,
+                                    preferences: e.target.checked
+                                      ? [...d.preferences, opt.id]
+                                      : d.preferences.filter((x) => x !== opt.id),
+                                  }))
+                                }
+                                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                              />
+                              {opt.label}
+                            </label>
+                          );
+                        })}
+                      </div>
                     </label>
 
                     <div className="sm:col-span-2 mt-0.5 flex items-center gap-2">
