@@ -6,15 +6,15 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Lister",
-  description: "Udskriv lister over hold og spillere — LykkeCup KontrolCenter",
+  description: "CSV og udskrift — spillere og trænere efter klub — LykkeCup KontrolCenter",
 };
 
 export default async function ListerPage() {
-  const { teams, players, error } = await fetchListerExportData();
+  const { players, coaches, error } = await fetchListerExportData();
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8">
-      <header className="max-w-3xl">
+    <div className="mx-auto w-full max-w-3xl space-y-8">
+      <header>
         <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">
           Eksport
         </p>
@@ -22,12 +22,11 @@ export default async function ListerPage() {
           Lister
         </h1>
         <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
-          Byg lister til udskrift eller PDF: holdnavne, spillere grupperet efter hold, ét hold ad gangen, samt fuld
-          spillerliste og spillere uden hold.
+          Hent CSV eller udskriv lister. Navne vises ikke her — kun i fil eller udskriftsforhåndsvisning.
         </p>
       </header>
 
-      <ListerExportClient teams={teams} players={players} fetchError={error} />
+      <ListerExportClient players={players} coaches={coaches} fetchError={error} />
     </div>
   );
 }

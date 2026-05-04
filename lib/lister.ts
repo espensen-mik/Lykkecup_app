@@ -25,12 +25,20 @@ export type ListerPlayerRow = {
   team_levelKey: string | null;
 };
 
+export type ListerCoachRow = {
+  id: string;
+  name: string;
+  home_club: string | null;
+  age: number | null;
+};
+
 /**
- * Data til Lister-siden: alle hold og alle spillere med tilknyttet hold (hvis nogen).
+ * Data til Lister-siden: hold, spillere (med tilknyttet hold) og trænere til klub-lister.
  */
 export async function fetchListerExportData(): Promise<{
   teams: ListerTeamRow[];
   players: ListerPlayerRow[];
+  coaches: ListerCoachRow[];
   error: string | null;
 }> {
   const eventId = LYKKECUP_EVENT_ID;
@@ -39,6 +47,7 @@ export async function fetchListerExportData(): Promise<{
     { data: teamsData, error: tErr },
     { data: playersData, error: pErr },
     { data: membersData, error: mErr },
+    { data: coachesData, error: cErr },
   ] = await Promise.all([
     supabase
       .from("teams")
@@ -51,11 +60,13 @@ export async function fetchListerExportData(): Promise<{
       .select("id, name, home_club, level, age, gender")
       .eq("event_id", eventId),
     supabase.from("team_members").select("team_id, player_id").eq("event_id", eventId),
+    supabase.from("coaches").select("id, name, home_club, age").eq("event_id", eventId),
   ]);
 
-  if (tErr) return { teams: [], players: [], error: tErr.message };
-  if (pErr) return { teams: [], players: [], error: pErr.message };
-  if (mErr) return { teams: [], players: [], error: mErr.message };
+  if (tErr) return { teams: [], players: [], coaches: [], error: tErr.message };
+  if (pErr) return { teams: [], players: [], coaches: [], error: pErr.message };
+  if (mErr) return { teams: [], players: [], coaches: [], error: mErr.message };
+  if (cErr) return { teams: [], players: [], coaches: [], error: cErr.message };
 
   const rawTeams = (teamsData ?? []) as {
     id: string;
@@ -126,5 +137,20 @@ export async function fetchListerExportData(): Promise<{
 
   players.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
 
-  return { teams, players, error: null };
+  const rawCoaches = (coachesData ?? []) as {
+    id: string;
+    name: string;
+    home_club: string | null;
+    age: number | null;
+  }[];
+
+  const coaches: ListerCoachRow[] = rawCoaches.map((c) => ({
+    id: c.id,
+    name: c.name?.trim() || "—",
+    home_club: c.home_club?.trim() ? c.home_club.trim() : null,
+    age: c.age,
+  }));
+  coaches.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
+
+  return { teams, players, coaches, error: null };
 }
