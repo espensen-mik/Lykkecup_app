@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { fetchAssignedTeamNameForPlayer, LYKKECUP_EVENT_ID } from "@/lib/players";
+import {
+  fetchAssignedTeamForPlayer,
+  LYKKECUP_EVENT_ID,
+  type PlayerAssignedTeamSummary,
+} from "@/lib/players";
 import { supabase } from "@/lib/supabase";
 import type { PlayerDetail } from "@/types/player";
 import { PlayerDetailContent } from "@/components/player-detail-content";
@@ -96,7 +100,7 @@ function parsePreferencesInput(value: string): unknown {
 
 export function PlayerDetailModal({ playerId, onClose }: Props) {
   const [player, setPlayer] = useState<PlayerDetail | null>(null);
-  const [assignedTeamName, setAssignedTeamName] = useState<string | null>(null);
+  const [assignedTeam, setAssignedTeam] = useState<PlayerAssignedTeamSummary | null>(null);
   const [logs, setLogs] = useState<PlayerChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -110,7 +114,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
   useEffect(() => {
     if (!playerId) {
       setPlayer(null);
-      setAssignedTeamName(null);
+      setAssignedTeam(null);
       setLogs([]);
       setDraft(emptyDraft);
       setEditing(false);
@@ -125,14 +129,14 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
     setLoading(true);
     setError(null);
     setPlayer(null);
-    setAssignedTeamName(null);
+    setAssignedTeam(null);
     setLogs([]);
     setEditing(false);
     setSaveError(null);
     setSaveNotice(null);
 
     (async () => {
-      const [{ data, error: supaError }, teamName, logsRes] = await Promise.all([
+      const [{ data, error: supaError }, teamSummary, logsRes] = await Promise.all([
         supabase
           .from("players")
           .select(
@@ -141,7 +145,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
           .eq("id", playerId)
           .eq("event_id", LYKKECUP_EVENT_ID)
           .maybeSingle(),
-        fetchAssignedTeamNameForPlayer(playerId),
+        fetchAssignedTeamForPlayer(playerId),
         supabase
           .from("player_change_log")
           .select("id, field_name, old_value, new_value, changed_at, changed_by_name")
@@ -165,7 +169,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       const detail = data as PlayerDetail;
       setPlayer(detail);
       setDraft(toDraft(detail));
-      setAssignedTeamName(teamName);
+      setAssignedTeam(teamSummary);
       setLogs((logsRes.data ?? []) as PlayerChangeLogRow[]);
       setLoading(false);
     })();
@@ -331,7 +335,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
             </div>
           ) : player ? (
             <div className="space-y-4">
-              <PlayerDetailContent player={player} assignedTeamName={assignedTeamName} />
+              <PlayerDetailContent player={player} assignedTeam={assignedTeam} />
 
               <section className="rounded-xl border border-lc-border/80 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/40">
                 <div className="flex flex-wrap items-center justify-between gap-2">

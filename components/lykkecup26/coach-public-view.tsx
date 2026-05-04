@@ -52,9 +52,19 @@ export function CoachPublicView({ data, currentCoachId }: Props) {
         ) : (
           <ul className="mt-4 space-y-3">
             {teams.map((team) => (
-              <li key={team.id} className="rounded-xl border border-stone-200/90 bg-white px-4 py-3.5 shadow-sm">
-                <p className="font-semibold text-lc26-navy">{team.name}</p>
-                {team.level?.trim() ? <p className="mt-1 text-sm text-lc26-navy/50">{team.level.trim()}</p> : null}
+              <li
+                key={team.id}
+                className="rounded-2xl border border-lc26-navy/90 bg-lc26-navy px-5 py-4 shadow-[0_12px_36px_-14px_rgb(22_51_88/0.6)] ring-1 ring-white/10 sm:px-6 sm:py-5"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50">Hold</p>
+                <p className="mt-1.5 text-balance text-xl font-semibold tracking-tight text-white sm:text-[1.35rem]">
+                  {team.name}
+                </p>
+                {team.level?.trim() ? (
+                  <p className="mt-2.5 border-t border-white/15 pt-2.5 text-sm leading-snug text-white/72">
+                    {team.level.trim()}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>

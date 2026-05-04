@@ -46,8 +46,18 @@ export async function fetchPlayerById(
   return { player: data as PlayerDetail, error: null };
 }
 
-/** Navn på hold spilleren er på i dette arrangement, hvis nogen. */
-export async function fetchAssignedTeamNameForPlayer(playerId: string): Promise<string | null> {
+/** Tildelt hold i KontrolCenter: kaldenavn som primær tekst når sat, officielt navn til oversigt. */
+export type PlayerAssignedTeamSummary = {
+  /** Primær visning (kaldenavn hvis udfyldt, ellers officielt navn). */
+  displayName: string;
+  /** Autogenereret holdnavn fra holddannelse. */
+  officialName: string;
+};
+
+/** Hold spilleren er på i dette arrangement — med officielt navn og valgfrit kaldenavn. */
+export async function fetchAssignedTeamForPlayer(
+  playerId: string,
+): Promise<PlayerAssignedTeamSummary | null> {
   const { data: mem, error: memErr } = await supabase
     .from("team_members")
     .select("team_id")
@@ -60,14 +70,18 @@ export async function fetchAssignedTeamNameForPlayer(playerId: string): Promise<
 
   const { data: team, error: teamErr } = await supabase
     .from("teams")
-    .select("name")
+    .select("name, nickname")
     .eq("id", mem.team_id)
     .eq("event_id", LYKKECUP_EVENT_ID)
     .maybeSingle();
 
   if (teamErr || !team) return null;
-  const name = (team as { name: string }).name?.trim();
-  return name && name.length > 0 ? name : null;
+  const row = team as { name: string; nickname?: string | null };
+  const officialName = row.name?.trim() ?? "";
+  if (!officialName) return null;
+  const nick = row.nickname?.trim();
+  const displayName = nick && nick.length > 0 ? nick : officialName;
+  return { displayName, officialName };
 }
 
 /** All players for the event — dashboard aggregations and charts */

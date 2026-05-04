@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { PlayerDetailContent } from "@/components/player-detail-content";
-import { fetchAssignedTeamNameForPlayer, fetchPlayerById } from "@/lib/players";
+import { fetchAssignedTeamForPlayer, fetchPlayerById } from "@/lib/players";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +24,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PlayerDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const [{ player, error }, assignedTeamName] = await Promise.all([
+  const [{ player, error }, assignedTeam] = await Promise.all([
     fetchPlayerById(id),
-    fetchAssignedTeamNameForPlayer(id),
+    fetchAssignedTeamForPlayer(id),
   ]);
 
   if (error) {
@@ -59,7 +59,7 @@ export default async function PlayerDetailPage({ params }: PageProps) {
       </Link>
 
       <div className="rounded-lg border border-lc-border bg-white p-6 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none sm:p-8">
-        <PlayerDetailContent player={player} assignedTeamName={assignedTeamName} />
+        <PlayerDetailContent player={player} assignedTeam={assignedTeam} />
       </div>
     </div>
   );

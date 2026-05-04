@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { UsersRound } from "lucide-react";
+import type { PlayerAssignedTeamSummary } from "@/lib/players";
 import type { PlayerDetail } from "@/types/player";
 import { formatBirthdate, formatPreferences } from "@/lib/format";
 
@@ -21,27 +22,31 @@ function formatDash(value: string | number | null): string {
 
 type Props = {
   player: PlayerDetail;
-  /** Vises som fremhævet holdkort når spilleren er tildelt et hold */
-  assignedTeamName?: string | null;
+  /** Tildelt hold: kaldenavn stort når sat, officielt navn småt under. */
+  assignedTeam?: PlayerAssignedTeamSummary | null;
 };
 
 /**
  * Fælles spillerdetaljer til modal og evt. fuld side.
  */
-export function PlayerDetailContent({ player, assignedTeamName }: Props) {
+export function PlayerDetailContent({ player, assignedTeam }: Props) {
   const prefsText = formatPreferences(player.preferences);
   const prefsIsMultiline = prefsText.includes("\n");
-  const teamName = assignedTeamName?.trim();
+  const showOfficialSubtitle =
+    assignedTeam &&
+    assignedTeam.displayName.trim() !== assignedTeam.officialName.trim();
 
   return (
     <>
       <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Spillerdetaljer</p>
 
-      {teamName ? (
+      {assignedTeam ? (
         <div
           className="mt-4 border border-teal-200 bg-teal-50 px-3.5 py-3 dark:border-teal-800/70 dark:bg-teal-950/30"
           role="status"
-          aria-label={`Tildelt hold: ${teamName}`}
+          aria-label={`Tildelt hold: ${assignedTeam.displayName}${
+            showOfficialSubtitle ? ` (${assignedTeam.officialName})` : ""
+          }`}
         >
           <div className="flex items-start gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-[#14b8a6] text-white dark:bg-teal-500">
@@ -52,8 +57,13 @@ export function PlayerDetailContent({ player, assignedTeamName }: Props) {
                 Tildelt hold
               </p>
               <p className="mt-1 break-words text-base font-bold tracking-tight text-gray-900 dark:text-white">
-                {teamName}
+                {assignedTeam.displayName}
               </p>
+              {showOfficialSubtitle ? (
+                <p className="mt-1 break-words text-xs font-normal text-gray-600 dark:text-gray-400">
+                  {assignedTeam.officialName}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

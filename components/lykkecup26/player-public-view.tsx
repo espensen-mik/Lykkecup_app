@@ -57,11 +57,13 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
         <>
           <section className="mb-10">
             <h2 className={sectionTitle}>Dit hold til LykkeCup 26</h2>
-            <div className="mt-4 rounded-2xl border border-lc26-teal/20 border-l-[5px] border-l-lc26-teal bg-gradient-to-br from-lc26-teal/[0.06] via-white to-white p-6 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lc26-teal">Hold</p>
-              <p className="mt-2 text-xl font-semibold tracking-tight text-lc26-teal">{team.name}</p>
+            <div className="mt-4 rounded-2xl border border-lc26-navy/90 bg-lc26-navy px-5 py-5 shadow-[0_14px_40px_-14px_rgb(22_51_88/0.65)] ring-1 ring-white/10 sm:px-6 sm:py-6">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Hold</p>
+              <p className="mt-2 text-balance text-2xl font-semibold tracking-[-0.02em] text-white sm:text-[1.65rem]">
+                {team.name}
+              </p>
               {team.level?.trim() ? (
-                <p className="mt-1 text-sm text-lc26-navy/55">{team.level.trim()}</p>
+                <p className="mt-3 border-t border-white/15 pt-3 text-sm leading-snug text-white/75">{team.level.trim()}</p>
               ) : null}
             </div>
           </section>
