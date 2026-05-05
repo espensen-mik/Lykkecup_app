@@ -5,6 +5,7 @@ import { ResponsivePie } from "@nivo/pie";
 import {
   Building2,
   CheckCircle2,
+  Hourglass,
   MessageSquareText,
   Target,
   TrendingUp,
@@ -64,6 +65,14 @@ function useAnimatedNumber(target: number, durationMs = 600): number {
   return value;
 }
 
+function daysUntilLykkeCup2026(): number {
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const eventDate = new Date(2026, 5, 6);
+  const diffDays = Math.ceil((eventDate.getTime() - todayStart.getTime()) / 86_400_000);
+  return Math.max(0, diffDays);
+}
+
 function KpiCard({
   icon,
   label,
@@ -106,6 +115,7 @@ function KpiCard({
 export function PublicDashboardScreen() {
   const [data, setData] = useState<ApiData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hourglassFlipped, setHourglassFlipped] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,8 +140,14 @@ export function PublicDashboardScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setHourglassFlipped((prev) => !prev), 2600);
+    return () => window.clearInterval(id);
+  }, []);
+
   const percent = data?.progress.percentAssigned ?? 0;
   const clubBars = (data?.charts.clubBars ?? []).slice().reverse();
+  const daysLeft = daysUntilLykkeCup2026();
   return (
     <main className="h-screen w-screen overflow-hidden bg-[#0B1E2D] px-5 py-5 text-white xl:px-8 xl:py-6">
       <div className="pointer-events-none fixed inset-0 opacity-60">
@@ -185,7 +201,18 @@ export function PublicDashboardScreen() {
               label="Antal kommentarer håndteret"
               value={data?.totals.commentsHandled ?? 0}
             />
-            <KpiCard icon={<TrendingUp className="h-5 w-5" />} label="Sidst opdateret" value={data ? formatTime(data.updatedAt) : "—"} />
+            <KpiCard
+              icon={
+                <span
+                  className={`inline-flex transition-transform duration-700 ${hourglassFlipped ? "rotate-180" : "rotate-0"}`}
+                >
+                  <Hourglass className="h-5 w-5" />
+                </span>
+              }
+              label="Antal dage til LykkeCup 2026"
+              value={daysLeft}
+              suffix="dage"
+            />
           </section>
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm xl:p-5">
@@ -245,7 +272,7 @@ export function PublicDashboardScreen() {
               <div className="h-[calc(100%-1.5rem)] min-h-[260px]">
               <ResponsivePie
                 data={data?.charts.levelDistribution ?? []}
-                margin={{ top: 16, right: 110, bottom: 16, left: 16 }}
+                margin={{ top: 16, right: 240, bottom: 16, left: 16 }}
                 innerRadius={0.62}
                 padAngle={1.2}
                 cornerRadius={4}
@@ -266,8 +293,8 @@ export function PublicDashboardScreen() {
                   {
                     anchor: "right",
                     direction: "column",
-                    translateX: 95,
-                    itemWidth: 90,
+                    translateX: 130,
+                    itemWidth: 190,
                     itemHeight: 20,
                     symbolSize: 11,
                     itemTextColor: "#b8c7d8",
