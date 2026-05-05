@@ -274,7 +274,6 @@ export function PublicDashboardScreen() {
                 data={data?.charts.levelDistribution ?? []}
                 margin={{ top: 20, right: 260, bottom: 20, left: 30 }}
                 innerRadius={0.6}
-                fit={0.74}
                 padAngle={1.2}
                 cornerRadius={4}
                 activeOuterRadiusOffset={6}
