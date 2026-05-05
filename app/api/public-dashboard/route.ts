@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { fetchHolddannelseProgress } from "@/lib/holddannelse";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
-import { fetchHolddannelseProgress } from "@/lib/holddannelse";
 
 type PlayerRow = {
   id: string;
@@ -19,41 +19,28 @@ function normalizeClub(value: string | null): string | null {
   return t && t.length > 0 ? t : null;
 }
 
-function ageBuckets(players: PlayerRow[]): { label: string; count: number }[] {
-  type Acc = { count: number; sortKey: number };
-  const map = new Map<string, Acc>();
-  const add = (label: string, sortKey: number) => {
-    const cur = map.get(label);
-    if (cur) cur.count += 1;
-    else map.set(label, { count: 1, sortKey });
-  };
-
-  for (const p of players) {
-    const raw = p.age;
-    if (raw == null || Number.isNaN(Number(raw))) {
-      add("Ukendt", 10_000);
-      continue;
-    }
-    const age = Math.floor(Number(raw));
-    if (age < 0 || age > 120) {
-      add("Ukendt", 10_000);
-      continue;
-    }
-    if (age >= 25) add("25+", 25);
-    else add(String(age), age);
-  }
-
-  return Array.from(map.entries())
-    .map(([label, { count, sortKey }]) => ({ label, count, sortKey }))
-    .sort((a, b) => a.sortKey - b.sortKey)
-    .map(({ label, count }) => ({ label, count }));
+function averageAge(rows: { age: number | null }[]): number | null {
+  const nums = rows
+    .map((r) => r.age)
+    .filter((a): a is number => typeof a === "number" && !Number.isNaN(a));
+  if (nums.length === 0) return null;
+  return Math.round((nums.reduce((s, a) => s + a, 0) / nums.length) * 10) / 10;
 }
 
 export async function GET() {
-  const [playersRes, coachesRes, progressRes] = await Promise.all([
+  const [playersRes, coachesRes, progressRes, commentsTotalRes, commentsHandledRes] = await Promise.all([
     supabase.from("players").select("id, age, home_club").eq("event_id", LYKKECUP_EVENT_ID),
-    supabase.from("coaches").select("id, home_club").eq("event_id", LYKKECUP_EVENT_ID),
+    supabase.from("coaches").select("id, home_club, age").eq("event_id", LYKKECUP_EVENT_ID),
     fetchHolddannelseProgress(),
+    supabase
+      .from("club_feedback")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", LYKKECUP_EVENT_ID),
+    supabase
+      .from("club_feedback")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", LYKKECUP_EVENT_ID)
+      .not("handled_at", "is", null),
   ]);
 
   if (playersRes.error) {
@@ -61,6 +48,12 @@ export async function GET() {
   }
   if (coachesRes.error) {
     return NextResponse.json({ error: coachesRes.error.message }, { status: 500 });
+  }
+  if (commentsTotalRes.error) {
+    return NextResponse.json({ error: commentsTotalRes.error.message }, { status: 500 });
+  }
+  if (commentsHandledRes.error) {
+    return NextResponse.json({ error: commentsHandledRes.error.message }, { status: 500 });
   }
   if (progressRes.error || !progressRes.progress) {
     return NextResponse.json(
@@ -70,7 +63,7 @@ export async function GET() {
   }
 
   const players = (playersRes.data ?? []) as PlayerRow[];
-  const coaches = (coachesRes.data ?? []) as CoachRow[];
+  const coaches = (coachesRes.data ?? []) as (CoachRow & { age: number | null })[];
 
   const clubs = new Set<string>();
   for (const p of players) {
@@ -82,17 +75,20 @@ export async function GET() {
     if (c) clubs.add(c.toLocaleLowerCase("da"));
   }
 
-  const ageRows = ageBuckets(players);
-
   return NextResponse.json(
     {
       totals: {
         players: players.length,
         coaches: coaches.length,
         clubs: clubs.size,
+        commentsTotal: commentsTotalRes.count ?? 0,
+        commentsHandled: commentsHandledRes.count ?? 0,
+      },
+      averages: {
+        playersAge: averageAge(players),
+        coachesAge: averageAge(coaches),
       },
       progress: progressRes.progress,
-      ageDistribution: ageRows,
       updatedAt: new Date().toISOString(),
     },
     {
