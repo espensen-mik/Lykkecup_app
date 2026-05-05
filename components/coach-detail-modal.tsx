@@ -22,6 +22,8 @@ type CoachDraft = {
   phone: string;
 };
 
+type CoachEditableField = "name" | "home_club" | "birthdate" | "age" | "tshirt_size" | "email" | "phone";
+
 type CoachChangeLogRow = {
   id: string;
   field_name: string;
@@ -86,7 +88,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
   const [logs, setLogs] = useState<CoachChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editingField, setEditingField] = useState<CoachEditableField | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
       setCoach(null);
       setLogs([]);
       setDraft(emptyCoachDraft);
-      setEditing(false);
+      setEditingField(null);
       setSaveError(null);
       setSaveNotice(null);
       setError(null);
@@ -112,7 +114,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
     setCoach(null);
     setLogs([]);
     setDraft(emptyCoachDraft);
-    setEditing(false);
+    setEditingField(null);
     setSaveError(null);
     setSaveNotice(null);
 
@@ -266,7 +268,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
     };
     setCoach(updated);
     setDraft(toCoachDraft(updated));
-    setEditing(false);
+    setEditingField(null);
     setSaveNotice("Træneroplysninger gemt.");
     await refreshLogs(coachId);
   }
@@ -313,105 +315,150 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
               <CoachDetailContent coach={coach} />
 
               <section className="rounded-xl border border-lc-border/80 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
-                    Rediger træner
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditing((prev) => !prev);
-                      setSaveError(null);
-                      setSaveNotice(null);
-                      if (coach) setDraft(toCoachDraft(coach));
-                    }}
-                    className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-                  >
-                    {editing ? "Annuller" : "Rediger oplysninger"}
-                  </button>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                  Rediger træner
+                </h2>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Rediger ét felt ad gangen.</p>
+
+                <div className="mt-3 space-y-2">
+                  {(
+                    [
+                      ["name", "Navn"],
+                      ["home_club", "Hjemmeklub"],
+                      ["birthdate", "Fødselsdato"],
+                      ["age", "Alder"],
+                      ["tshirt_size", "T-shirt"],
+                      ["email", "E-mail"],
+                      ["phone", "Telefon"],
+                    ] as [CoachEditableField, string][]
+                  ).map(([field, label]) => {
+                    const active = editingField === field;
+                    return (
+                      <div key={field} className="rounded-md border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-900/60">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
+                          {!active ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingField(field);
+                                setSaveError(null);
+                                setSaveNotice(null);
+                                if (coach) setDraft(toCoachDraft(coach));
+                              }}
+                              className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                            >
+                              Rediger
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {!active ? (
+                          <p className="mt-1.5 text-sm text-gray-900 dark:text-gray-100">
+                            {field === "name"
+                              ? draft.name || "—"
+                              : field === "home_club"
+                                ? draft.homeClub || "—"
+                                : field === "birthdate"
+                                  ? draft.birthdate || "—"
+                                  : field === "age"
+                                    ? draft.age || "—"
+                                    : field === "tshirt_size"
+                                      ? draft.tshirtSize || "—"
+                                      : field === "email"
+                                        ? draft.email || "—"
+                                        : draft.phone || "—"}
+                          </p>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {field === "name" ? (
+                              <input
+                                value={draft.name}
+                                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              />
+                            ) : null}
+                            {field === "home_club" ? (
+                              <input
+                                value={draft.homeClub}
+                                onChange={(e) => setDraft((d) => ({ ...d, homeClub: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              />
+                            ) : null}
+                            {field === "birthdate" ? (
+                              <input
+                                type="date"
+                                value={draft.birthdate}
+                                onChange={(e) => setDraft((d) => ({ ...d, birthdate: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              />
+                            ) : null}
+                            {field === "age" ? (
+                              <input
+                                type="number"
+                                value={draft.age}
+                                onChange={(e) => setDraft((d) => ({ ...d, age: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              />
+                            ) : null}
+                            {field === "tshirt_size" ? (
+                              <select
+                                value={draft.tshirtSize}
+                                onChange={(e) => setDraft((d) => ({ ...d, tshirtSize: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              >
+                                {tshirtOptions.map((size) => (
+                                  <option key={size || "none"} value={size}>
+                                    {size || "Ingen størrelse"}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                            {field === "email" ? (
+                              <input
+                                type="email"
+                                value={draft.email}
+                                onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              />
+                            ) : null}
+                            {field === "phone" ? (
+                              <input
+                                type="tel"
+                                value={draft.phone}
+                                onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              />
+                            ) : null}
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void saveChanges()}
+                                disabled={saving}
+                                className="rounded-md bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0f766e] disabled:opacity-60"
+                              >
+                                {saving ? "Gemmer..." : "Gem"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingField(null);
+                                  setSaveError(null);
+                                  setSaveNotice(null);
+                                  if (coach) setDraft(toCoachDraft(coach));
+                                }}
+                                className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                              >
+                                Annuller
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-
-                {editing ? (
-                  <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Navn
-                      <input
-                        value={draft.name}
-                        onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Hjemmeklub
-                      <input
-                        value={draft.homeClub}
-                        onChange={(e) => setDraft((d) => ({ ...d, homeClub: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Fødselsdato
-                      <input
-                        type="date"
-                        value={draft.birthdate}
-                        onChange={(e) => setDraft((d) => ({ ...d, birthdate: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Alder
-                      <input
-                        type="number"
-                        value={draft.age}
-                        onChange={(e) => setDraft((d) => ({ ...d, age: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      T-shirt
-                      <select
-                        value={draft.tshirtSize}
-                        onChange={(e) => setDraft((d) => ({ ...d, tshirtSize: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      >
-                        {tshirtOptions.map((size) => (
-                          <option key={size || "none"} value={size}>
-                            {size || "Ingen størrelse"}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      E-mail
-                      <input
-                        type="email"
-                        value={draft.email}
-                        onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
-                    </label>
-                    <label className="sm:col-span-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Telefon
-                      <input
-                        type="tel"
-                        value={draft.phone}
-                        onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
-                    </label>
-
-                    <div className="sm:col-span-2 mt-0.5 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void saveChanges()}
-                        disabled={saving}
-                        className="rounded-md bg-[#14b8a6] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0f766e] disabled:opacity-60"
-                      >
-                        {saving ? "Gemmer..." : "Gem ændringer"}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
 
                 {saveError ? <p className="mt-3 text-xs text-red-600 dark:text-red-400">{saveError}</p> : null}
                 {saveNotice ? <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">{saveNotice}</p> : null}

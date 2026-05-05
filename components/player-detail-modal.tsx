@@ -29,6 +29,8 @@ type PlayerDraft = {
   preferences: string[];
 };
 
+type PlayerEditableField = "name" | "home_club" | "birthdate" | "age" | "gender" | "level" | "preferences";
+
 type PlayerChangeLogRow = {
   id: string;
   field_name: string;
@@ -73,7 +75,8 @@ function toDraft(player: PlayerDetail): PlayerDraft {
     age: player.age == null ? "" : String(player.age),
     gender: player.gender ?? "",
     level: player.level ?? "",
-    preferences: prefIds,
+    // UI er single-select for præferencer; behold første matchede værdi.
+    preferences: prefIds.slice(0, 1),
   };
 }
 
@@ -187,7 +190,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
   const [logs, setLogs] = useState<PlayerChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editingField, setEditingField] = useState<PlayerEditableField | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
@@ -203,7 +206,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       setAssignedTeam(null);
       setLogs([]);
       setDraft(emptyDraft);
-      setEditing(false);
+      setEditingField(null);
       setSaveError(null);
       setSaveNotice(null);
       setError(null);
@@ -217,7 +220,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
     setPlayer(null);
     setAssignedTeam(null);
     setLogs([]);
-    setEditing(false);
+    setEditingField(null);
     setSaveError(null);
     setSaveNotice(null);
     setLevelOptions([]);
@@ -427,7 +430,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
     };
     setPlayer(updated);
     setDraft(toDraft(updated));
-    setEditing(false);
+    setEditingField(null);
     setSaveNotice("Spilleroplysninger gemt.");
     await refreshLogs(playerId);
   }
@@ -474,136 +477,177 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
               <PlayerDetailContent player={player} assignedTeam={assignedTeam} />
 
               <section className="rounded-xl border border-lc-border/80 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
-                    Rediger spiller
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditing((prev) => !prev);
-                      setSaveError(null);
-                      setSaveNotice(null);
-                      if (player) setDraft(toDraft(player));
-                    }}
-                    className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-                  >
-                    {editing ? "Annuller" : "Rediger oplysninger"}
-                  </button>
-                </div>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                  Rediger spiller
+                </h2>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Rediger ét felt ad gangen.</p>
 
-                {editing ? (
-                  <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Navn
-                      <input
-                        value={draft.name}
-                        onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Hjemmeklub
-                      <select
-                        value={draft.homeClub}
-                        onChange={(e) => setDraft((d) => ({ ...d, homeClub: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      >
-                        <option value="">Ingen klub</option>
-                        {clubOptions.map((club) => (
-                          <option key={club} value={club}>
-                            {club}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Fødselsdato
-                      <input
-                        type="date"
-                        value={draft.birthdate}
-                        onChange={(e) => setDraft((d) => ({ ...d, birthdate: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Alder
-                      <input
-                        type="number"
-                        value={draft.age}
-                        onChange={(e) => setDraft((d) => ({ ...d, age: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      />
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Køn
-                      <select
-                        value={draft.gender}
-                        onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      >
-                        <option value="">Ikke angivet</option>
-                        {genderOptions.map((g) => (
-                          <option key={g} value={g}>
-                            {g}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Niveau
-                      <select
-                        value={draft.level}
-                        onChange={(e) => setDraft((d) => ({ ...d, level: e.target.value }))}
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                      >
-                        <option value="">Ingen niveau</option>
-                        {levelOptions.map((level) => (
-                          <option key={level} value={level}>
-                            {level}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="sm:col-span-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Præferencer
-                      <div className="mt-1 grid grid-cols-1 gap-1.5 rounded-md border border-gray-200 bg-white p-2.5 dark:border-gray-600 dark:bg-gray-950">
-                        {PREFERENCE_OPTIONS.map((opt) => {
-                          const checked = draft.preferences.includes(opt.id);
-                          return (
-                            <label key={opt.id} className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
+                <div className="mt-3 space-y-2">
+                  {(
+                    [
+                      ["name", "Navn"],
+                      ["home_club", "Hjemmeklub"],
+                      ["birthdate", "Fødselsdato"],
+                      ["age", "Alder"],
+                      ["gender", "Køn"],
+                      ["level", "Niveau"],
+                      ["preferences", "Præferencer"],
+                    ] as [PlayerEditableField, string][]
+                  ).map(([field, label]) => {
+                    const active = editingField === field;
+                    return (
+                      <div key={field} className="rounded-md border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-900/60">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
+                          {!active ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingField(field);
+                                setSaveError(null);
+                                setSaveNotice(null);
+                                if (player) setDraft(toDraft(player));
+                              }}
+                              className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                            >
+                              Rediger
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {!active ? (
+                          <p className="mt-1.5 text-sm text-gray-900 dark:text-gray-100">
+                            {field === "name"
+                              ? draft.name || "—"
+                              : field === "home_club"
+                                ? draft.homeClub || "—"
+                                : field === "birthdate"
+                                  ? draft.birthdate || "—"
+                                  : field === "age"
+                                    ? draft.age || "—"
+                                    : field === "gender"
+                                      ? draft.gender || "—"
+                                      : field === "level"
+                                        ? draft.level || "—"
+                                        : draft.preferences.length > 0
+                                          ? (PREFERENCE_OPTIONS.find((o) => o.id === draft.preferences[0])?.label ?? draft.preferences[0])
+                                          : "—"}
+                          </p>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {field === "name" ? (
                               <input
-                                type="checkbox"
-                                checked={checked}
+                                value={draft.name}
+                                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              />
+                            ) : null}
+                            {field === "home_club" ? (
+                              <select
+                                value={draft.homeClub}
+                                onChange={(e) => setDraft((d) => ({ ...d, homeClub: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              >
+                                <option value="">Ingen klub</option>
+                                {clubOptions.map((club) => (
+                                  <option key={club} value={club}>
+                                    {club}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                            {field === "birthdate" ? (
+                              <input
+                                type="date"
+                                value={draft.birthdate}
+                                onChange={(e) => setDraft((d) => ({ ...d, birthdate: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              />
+                            ) : null}
+                            {field === "age" ? (
+                              <input
+                                type="number"
+                                value={draft.age}
+                                onChange={(e) => setDraft((d) => ({ ...d, age: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              />
+                            ) : null}
+                            {field === "gender" ? (
+                              <select
+                                value={draft.gender}
+                                onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              >
+                                <option value="">Ikke angivet</option>
+                                {genderOptions.map((g) => (
+                                  <option key={g} value={g}>
+                                    {g}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                            {field === "level" ? (
+                              <select
+                                value={draft.level}
+                                onChange={(e) => setDraft((d) => ({ ...d, level: e.target.value }))}
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              >
+                                <option value="">Ingen niveau</option>
+                                {levelOptions.map((level) => (
+                                  <option key={level} value={level}>
+                                    {level}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                            {field === "preferences" ? (
+                              <select
+                                value={draft.preferences[0] ?? ""}
                                 onChange={(e) =>
                                   setDraft((d) => ({
                                     ...d,
-                                    preferences: e.target.checked
-                                      ? [...d.preferences, opt.id]
-                                      : d.preferences.filter((x) => x !== opt.id),
+                                    preferences: e.target.value ? [e.target.value] : [],
                                   }))
                                 }
-                                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                              />
-                              {opt.label}
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </label>
+                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                              >
+                                <option value="">Ingen præference</option>
+                                {PREFERENCE_OPTIONS.map((opt) => (
+                                  <option key={opt.id} value={opt.id}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
 
-                    <div className="sm:col-span-2 mt-0.5 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void saveChanges()}
-                        disabled={saving}
-                        className="rounded-md bg-[#14b8a6] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0f766e] disabled:opacity-60"
-                      >
-                        {saving ? "Gemmer..." : "Gem ændringer"}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void saveChanges()}
+                                disabled={saving}
+                                className="rounded-md bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0f766e] disabled:opacity-60"
+                              >
+                                {saving ? "Gemmer..." : "Gem"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingField(null);
+                                  setSaveError(null);
+                                  setSaveNotice(null);
+                                  if (player) setDraft(toDraft(player));
+                                }}
+                                className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                              >
+                                Annuller
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
                 {saveError ? <p className="mt-3 text-xs text-red-600 dark:text-red-400">{saveError}</p> : null}
                 {saveNotice ? <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">{saveNotice}</p> : null}
