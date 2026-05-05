@@ -103,6 +103,31 @@ function printValue(value: string | null): string {
   return value;
 }
 
+function formatLogFieldValue(field: string, value: string | null): string {
+  if (field !== "preferences") return printValue(value);
+  if (value == null || value.trim() === "") return "—";
+
+  // Loggen gemmer preferences som rå tekst (ofte JSON-array), så gør den læsbar.
+  const raw = value.trim();
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      const labels = parsed.map((item) => {
+        const key = String(item).toLowerCase();
+        if (key === "egen_klub") return "Egen klub";
+        if (key === "nye_venner") return "Nye venner";
+        if (key === "alt_ok") return "Alt ok";
+        if (key === "klar_pa_alt") return "Klar på alt";
+        return String(item);
+      });
+      return labels.join(", ");
+    }
+  } catch {
+    // Ikke JSON - falder tilbage til rå tekst.
+  }
+  return raw;
+}
+
 function readableFieldNoun(field: string): string {
   switch (field) {
     case "home_club":
@@ -590,8 +615,8 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
                       <li key={log.id} className="rounded-md border border-gray-200/80 bg-gray-50/80 px-3 py-2 dark:border-gray-700 dark:bg-gray-800/45">
                         <p>
                           {firstName(log.changed_by_name)} ændrede {readableFieldNoun(log.field_name)} fra{" "}
-                          <span className="font-semibold">{printValue(log.old_value)}</span> til{" "}
-                          <span className="font-semibold">{printValue(log.new_value)}</span>.
+                          <span className="font-semibold">{formatLogFieldValue(log.field_name, log.old_value)}</span> til{" "}
+                          <span className="font-semibold">{formatLogFieldValue(log.field_name, log.new_value)}</span>.
                         </p>
                         <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                           {new Date(log.changed_at).toLocaleString("da-DK", {
