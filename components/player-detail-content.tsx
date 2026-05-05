@@ -20,6 +20,29 @@ function formatDash(value: string | number | null): string {
   return String(value);
 }
 
+function preferenceLabel(raw: string): string {
+  const key = raw.trim().toLowerCase();
+  if (key === "egen_klub") return "Egen klub";
+  if (key === "nye_venner") return "Nye venner";
+  if (key === "alt_ok") return "Alt ok";
+  if (key === "klar_pa_alt") return "Klar på alt";
+  return raw;
+}
+
+function parsePreferenceList(value: unknown): string[] | null {
+  if (Array.isArray(value)) return value.map((v) => preferenceLabel(String(v)));
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) return parsed.map((v) => preferenceLabel(String(v)));
+  } catch {
+    // Not JSON; keep fallback below.
+  }
+  return null;
+}
+
 type Props = {
   player: PlayerDetail;
   /** Tildelt hold: kaldenavn stort når sat, officielt navn småt under. */
@@ -30,19 +53,8 @@ type Props = {
  * Fælles spillerdetaljer til modal og evt. fuld side.
  */
 export function PlayerDetailContent({ player, assignedTeam }: Props) {
-  const prefsText = formatPreferences(player.preferences);
-  const prefsTextFriendly = Array.isArray(player.preferences)
-    ? player.preferences
-        .map((v) => {
-          const key = String(v).toLowerCase();
-          if (key === "egen_klub") return "Egen klub";
-          if (key === "nye_venner") return "Nye venner";
-          if (key === "alt_ok") return "Alt ok";
-          if (key === "klar_pa_alt") return "Klar på alt";
-          return String(v);
-        })
-        .join(", ")
-    : prefsText;
+  const parsedPrefs = parsePreferenceList(player.preferences);
+  const prefsTextFriendly = parsedPrefs ? parsedPrefs.join(", ") : formatPreferences(player.preferences);
   const prefsIsMultiline = prefsTextFriendly.includes("\n");
   const showOfficialSubtitle =
     assignedTeam &&

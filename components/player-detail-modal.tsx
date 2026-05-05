@@ -370,6 +370,11 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       return;
     }
 
+    const beforePrefIds = preferenceIdsFromValue(player.preferences);
+    const beforePrefKey = [...beforePrefIds].sort().join("|");
+    const nextPrefKey = [...draft.preferences].sort().join("|");
+    const preferencesChanged = beforePrefKey !== nextPrefKey;
+
     const payload = {
       name: trimmedName,
       home_club: draft.homeClub.trim() || null,
@@ -377,11 +382,12 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       age: nextAge,
       gender: draft.gender.trim() || null,
       level: draft.level.trim() || null,
-      preferences: draft.preferences.length > 0 ? draft.preferences : null,
+      preferences: preferencesChanged
+        ? draft.preferences.length > 0
+          ? draft.preferences
+          : null
+        : (player.preferences ?? null),
     };
-    const beforePrefIds = preferenceIdsFromValue(player.preferences);
-    const beforePrefKey = [...beforePrefIds].sort().join("|");
-    const nextPrefKey = [...draft.preferences].sort().join("|");
     const changed =
       payload.name !== player.name ||
       payload.home_club !== (player.home_club ?? null) ||
@@ -389,7 +395,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       payload.age !== (player.age ?? null) ||
       payload.gender !== (player.gender ?? null) ||
       payload.level !== (player.level ?? null) ||
-      beforePrefKey !== nextPrefKey;
+      preferencesChanged;
 
     if (!changed) {
       setSaveNotice("Ingen ændringer at gemme.");
