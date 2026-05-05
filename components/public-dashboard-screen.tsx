@@ -1,7 +1,6 @@
 "use client";
 
 import { ResponsiveBar } from "@nivo/bar";
-import { ResponsiveLine } from "@nivo/line";
 import { ResponsivePie } from "@nivo/pie";
 import {
   Building2,
@@ -13,7 +12,7 @@ import {
   Users,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type ApiData = {
   totals: {
@@ -132,17 +131,6 @@ export function PublicDashboardScreen() {
   }, []);
 
   const percent = data?.progress.percentAssigned ?? 0;
-  const timelineBars = data?.charts.playersTimeline ?? [];
-  const timelineLine = useMemo(
-    () => [
-      {
-        id: "Spillere i alt",
-        data: timelineBars.map((d) => ({ x: d.day.slice(5), y: d.total })),
-      },
-    ],
-    [timelineBars],
-  );
-
   return (
     <main className="h-screen w-screen overflow-hidden bg-[#0B1E2D] px-5 py-5 text-white xl:px-8 xl:py-6">
       <div className="pointer-events-none fixed inset-0 opacity-60">
@@ -215,72 +203,12 @@ export function PublicDashboardScreen() {
                 {percent.toFixed(1)}%
               </div>
             </div>
+            <p className="mt-2 text-right text-xs font-semibold uppercase tracking-[0.08em] text-teal-100/85">
+              Procent faerdig: {percent.toFixed(1)}%
+            </p>
           </section>
 
-          <section className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-3">
-            <article className="min-h-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Spillere over tid</p>
-              <div className="relative h-[calc(100%-1.5rem)] min-h-[260px]">
-              <div className="absolute inset-0">
-                <ResponsiveBar
-                  data={timelineBars.map((d) => ({ day: d.day.slice(5), added: d.added }))}
-                  keys={["added"]}
-                  indexBy="day"
-                  margin={{ top: 16, right: 12, bottom: 50, left: 36 }}
-                  padding={0.25}
-                  borderRadius={4}
-                  enableGridY={false}
-                  axisTop={null}
-                  axisRight={null}
-                  axisLeft={{
-                    tickSize: 0,
-                    tickPadding: 8,
-                    legend: "nye",
-                    legendOffset: -30,
-                    legendPosition: "middle",
-                    tickValues: 5,
-                  }}
-                  axisBottom={{
-                    tickRotation: -35,
-                    tickSize: 0,
-                    tickPadding: 10,
-                    tickValues: 8,
-                  }}
-                  colors={["rgba(45,212,191,0.45)"]}
-                  theme={{
-                    axis: { ticks: { text: { fill: "#9fb2c7", fontSize: 10 } }, legend: { text: { fill: "#9fb2c7" } } },
-                    tooltip: { container: { background: "#0f2235", color: "#d8e7f7", border: "1px solid rgba(255,255,255,0.15)" } },
-                    grid: { line: { stroke: "rgba(148,163,184,0.15)", strokeWidth: 1 } },
-                  }}
-                  tooltip={({ data }) => (
-                    <div className="rounded-md border border-white/10 bg-[#0f2235] px-2 py-1 text-xs text-slate-100">
-                      {String(data.day)} · nye: {String(data.added)}
-                    </div>
-                  )}
-                />
-              </div>
-              <div className="pointer-events-none absolute inset-0">
-                <ResponsiveLine
-                  data={timelineLine}
-                  margin={{ top: 16, right: 12, bottom: 50, left: 36 }}
-                  xScale={{ type: "point" }}
-                  yScale={{ type: "linear", min: "auto", max: "auto", stacked: false, reverse: false }}
-                  axisTop={null}
-                  axisRight={null}
-                  axisLeft={null}
-                  axisBottom={null}
-                  enableGridX={false}
-                  enableGridY={false}
-                  enablePoints={false}
-                  colors={["#34d399"]}
-                  lineWidth={3}
-                  useMesh={false}
-                  theme={{}}
-                />
-              </div>
-            </div>
-          </article>
-
+          <section className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[0.92fr_1.08fr]">
             <article className="min-h-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Top klubber</p>
               <div className="h-[calc(100%-1.5rem)] min-h-[260px]">
@@ -292,9 +220,10 @@ export function PublicDashboardScreen() {
                 margin={{ top: 12, right: 24, bottom: 12, left: 170 }}
                 padding={0.35}
                 borderRadius={5}
+                reverse
                 axisTop={null}
                 axisRight={null}
-                axisBottom={{ tickSize: 0, tickPadding: 6, tickValues: 4 }}
+                axisBottom={null}
                 axisLeft={{ tickSize: 0, tickPadding: 8 }}
                 colors={({ index }) => {
                   const palette = ["#2dd4bf", "#34d399", "#22d3ee", "#14b8a6", "#10b981"];
