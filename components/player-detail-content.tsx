@@ -4,12 +4,33 @@ import type { PlayerAssignedTeamSummary } from "@/lib/players";
 import type { PlayerDetail } from "@/types/player";
 import { formatBirthdate, formatPreferences } from "@/lib/format";
 
-function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+type EditablePlayerField = "name" | "home_club" | "birthdate" | "age" | "gender" | "level" | "preferences";
+
+function DetailRow({
+  label,
+  value,
+  onEdit,
+}: {
+  label: string;
+  value: ReactNode;
+  onEdit?: () => void;
+}) {
   return (
     <div className="border border-gray-200 bg-white px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900">
-      <dt className="text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-        {label}
-      </dt>
+      <div className="flex items-center justify-between gap-2">
+        <dt className="text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+          {label}
+        </dt>
+        {onEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-md border border-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            Rediger
+          </button>
+        ) : null}
+      </div>
       <dd className="mt-1.5 text-sm leading-relaxed text-gray-900 dark:text-gray-100">{value}</dd>
     </div>
   );
@@ -47,12 +68,13 @@ type Props = {
   player: PlayerDetail;
   /** Tildelt hold: kaldenavn stort når sat, officielt navn småt under. */
   assignedTeam?: PlayerAssignedTeamSummary | null;
+  onEditField?: (field: EditablePlayerField) => void;
 };
 
 /**
  * Fælles spillerdetaljer til modal og evt. fuld side.
  */
-export function PlayerDetailContent({ player, assignedTeam }: Props) {
+export function PlayerDetailContent({ player, assignedTeam, onEditField }: Props) {
   const parsedPrefs = parsePreferenceList(player.preferences);
   const prefsTextFriendly = parsedPrefs ? parsedPrefs.join(", ") : formatPreferences(player.preferences);
   const prefsIsMultiline = prefsTextFriendly.includes("\n");
@@ -94,11 +116,20 @@ export function PlayerDetailContent({ player, assignedTeam }: Props) {
       ) : null}
 
       <dl className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <DetailRow label="Hjemmeklub" value={formatDash(player.home_club)} />
-        <DetailRow label="Fødselsdato" value={formatBirthdate(player.birthdate)} />
-        <DetailRow label="Alder" value={formatDash(player.age)} />
-        <DetailRow label="Køn" value={formatDash(player.gender)} />
-        <DetailRow label="Niveau" value={formatDash(player.level)} />
+        <DetailRow label="Navn" value={formatDash(player.name)} onEdit={onEditField ? () => onEditField("name") : undefined} />
+        <DetailRow
+          label="Hjemmeklub"
+          value={formatDash(player.home_club)}
+          onEdit={onEditField ? () => onEditField("home_club") : undefined}
+        />
+        <DetailRow
+          label="Fødselsdato"
+          value={formatBirthdate(player.birthdate)}
+          onEdit={onEditField ? () => onEditField("birthdate") : undefined}
+        />
+        <DetailRow label="Alder" value={formatDash(player.age)} onEdit={onEditField ? () => onEditField("age") : undefined} />
+        <DetailRow label="Køn" value={formatDash(player.gender)} onEdit={onEditField ? () => onEditField("gender") : undefined} />
+        <DetailRow label="Niveau" value={formatDash(player.level)} onEdit={onEditField ? () => onEditField("level") : undefined} />
         <DetailRow
           label="Præferencer"
           value={
@@ -110,6 +141,7 @@ export function PlayerDetailContent({ player, assignedTeam }: Props) {
               prefsTextFriendly
             )
           }
+          onEdit={onEditField ? () => onEditField("preferences") : undefined}
         />
         <div className="sm:col-span-2">
           <DetailRow

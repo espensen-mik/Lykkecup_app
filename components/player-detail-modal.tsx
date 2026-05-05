@@ -356,49 +356,55 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
   }
 
   async function saveChanges() {
-    if (!playerId || !player) return;
+    if (!playerId || !player || !editingField) return;
     setSaveError(null);
     setSaveNotice(null);
-
-    const trimmedName = draft.name.trim();
-    if (!trimmedName) {
-      setSaveError("Navn er påkrævet.");
-      return;
-    }
-
-    const ageValue = draft.age.trim();
-    const nextAge = ageValue === "" ? null : Number(ageValue);
-    if (ageValue !== "" && !Number.isInteger(nextAge)) {
-      setSaveError("Alder skal være et helt tal.");
-      return;
-    }
 
     const beforePrefIds = preferenceIdsFromValue(player.preferences);
     const beforePrefKey = [...beforePrefIds].sort().join("|");
     const nextPrefKey = [...draft.preferences].sort().join("|");
     const preferencesChanged = beforePrefKey !== nextPrefKey;
+    const payload: Record<string, unknown> = {};
+    let changed = false;
 
-    const payload = {
-      name: trimmedName,
-      home_club: draft.homeClub.trim() || null,
-      birthdate: draft.birthdate || null,
-      age: nextAge,
-      gender: draft.gender.trim() || null,
-      level: draft.level.trim() || null,
-      preferences: preferencesChanged
-        ? draft.preferences.length > 0
-          ? draft.preferences
-          : null
-        : (player.preferences ?? null),
-    };
-    const changed =
-      payload.name !== player.name ||
-      payload.home_club !== (player.home_club ?? null) ||
-      payload.birthdate !== (player.birthdate ? player.birthdate.slice(0, 10) : null) ||
-      payload.age !== (player.age ?? null) ||
-      payload.gender !== (player.gender ?? null) ||
-      payload.level !== (player.level ?? null) ||
-      preferencesChanged;
+    if (editingField === "name") {
+      const trimmedName = draft.name.trim();
+      if (!trimmedName) {
+        setSaveError("Navn er påkrævet.");
+        return;
+      }
+      payload.name = trimmedName;
+      changed = trimmedName !== player.name;
+    } else if (editingField === "home_club") {
+      const next = draft.homeClub.trim() || null;
+      payload.home_club = next;
+      changed = next !== (player.home_club ?? null);
+    } else if (editingField === "birthdate") {
+      const next = draft.birthdate || null;
+      payload.birthdate = next;
+      changed = next !== (player.birthdate ? player.birthdate.slice(0, 10) : null);
+    } else if (editingField === "age") {
+      const ageValue = draft.age.trim();
+      const nextAge = ageValue === "" ? null : Number(ageValue);
+      if (ageValue !== "" && !Number.isInteger(nextAge)) {
+        setSaveError("Alder skal være et helt tal.");
+        return;
+      }
+      payload.age = nextAge;
+      changed = nextAge !== (player.age ?? null);
+    } else if (editingField === "gender") {
+      const next = draft.gender.trim() || null;
+      payload.gender = next;
+      changed = next !== (player.gender ?? null);
+    } else if (editingField === "level") {
+      const next = draft.level.trim() || null;
+      payload.level = next;
+      changed = next !== (player.level ?? null);
+    } else if (editingField === "preferences") {
+      const next = draft.preferences.length > 0 ? draft.preferences : null;
+      payload.preferences = next;
+      changed = preferencesChanged;
+    }
 
     if (!changed) {
       setSaveNotice("Ingen ændringer at gemme.");
@@ -418,16 +424,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       return;
     }
 
-    const updated: PlayerDetail = {
-      ...player,
-      name: payload.name,
-      home_club: payload.home_club,
-      birthdate: payload.birthdate,
-      age: payload.age,
-      gender: payload.gender,
-      level: payload.level,
-      preferences: payload.preferences,
-    };
+    const updated: PlayerDetail = { ...player, ...(payload as Partial<PlayerDetail>) };
     setPlayer(updated);
     setDraft(toDraft(updated));
     setEditingField(null);
@@ -474,180 +471,141 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
             </div>
           ) : player ? (
             <div className="space-y-4">
-              <PlayerDetailContent player={player} assignedTeam={assignedTeam} />
+              <PlayerDetailContent
+                player={player}
+                assignedTeam={assignedTeam}
+                onEditField={(field) => {
+                  setEditingField(field);
+                  setSaveError(null);
+                  setSaveNotice(null);
+                  if (player) setDraft(toDraft(player));
+                }}
+              />
 
               <section className="rounded-xl border border-lc-border/80 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/40">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
                   Rediger spiller
                 </h2>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Rediger ét felt ad gangen.</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Tryk “Rediger” direkte i feltet ovenfor. Herunder redigeres kun det valgte felt.
+                </p>
 
-                <div className="mt-3 space-y-2">
-                  {(
-                    [
-                      ["name", "Navn"],
-                      ["home_club", "Hjemmeklub"],
-                      ["birthdate", "Fødselsdato"],
-                      ["age", "Alder"],
-                      ["gender", "Køn"],
-                      ["level", "Niveau"],
-                      ["preferences", "Præferencer"],
-                    ] as [PlayerEditableField, string][]
-                  ).map(([field, label]) => {
-                    const active = editingField === field;
-                    return (
-                      <div key={field} className="rounded-md border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-900/60">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-                          {!active ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingField(field);
-                                setSaveError(null);
-                                setSaveNotice(null);
-                                if (player) setDraft(toDraft(player));
-                              }}
-                              className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-                            >
-                              Rediger
-                            </button>
-                          ) : null}
-                        </div>
+                {editingField ? (
+                  <div className="mt-3 rounded-md border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-900/60">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {fieldLabel(editingField)}
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {editingField === "name" ? (
+                        <input
+                          value={draft.name}
+                          onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                          className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                        />
+                      ) : null}
+                      {editingField === "home_club" ? (
+                        <select
+                          value={draft.homeClub}
+                          onChange={(e) => setDraft((d) => ({ ...d, homeClub: e.target.value }))}
+                          className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                        >
+                          <option value="">Ingen klub</option>
+                          {clubOptions.map((club) => (
+                            <option key={club} value={club}>
+                              {club}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                      {editingField === "birthdate" ? (
+                        <input
+                          type="date"
+                          value={draft.birthdate}
+                          onChange={(e) => setDraft((d) => ({ ...d, birthdate: e.target.value }))}
+                          className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                        />
+                      ) : null}
+                      {editingField === "age" ? (
+                        <input
+                          type="number"
+                          value={draft.age}
+                          onChange={(e) => setDraft((d) => ({ ...d, age: e.target.value }))}
+                          className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                        />
+                      ) : null}
+                      {editingField === "gender" ? (
+                        <select
+                          value={draft.gender}
+                          onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
+                          className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                        >
+                          <option value="">Ikke angivet</option>
+                          {genderOptions.map((g) => (
+                            <option key={g} value={g}>
+                              {g}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                      {editingField === "level" ? (
+                        <select
+                          value={draft.level}
+                          onChange={(e) => setDraft((d) => ({ ...d, level: e.target.value }))}
+                          className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                        >
+                          <option value="">Ingen niveau</option>
+                          {levelOptions.map((level) => (
+                            <option key={level} value={level}>
+                              {level}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                      {editingField === "preferences" ? (
+                        <select
+                          value={draft.preferences[0] ?? ""}
+                          onChange={(e) =>
+                            setDraft((d) => ({
+                              ...d,
+                              preferences: e.target.value ? [e.target.value] : [],
+                            }))
+                          }
+                          className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+                        >
+                          <option value="">Ingen præference</option>
+                          {PREFERENCE_OPTIONS.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
 
-                        {!active ? (
-                          <p className="mt-1.5 text-sm text-gray-900 dark:text-gray-100">
-                            {field === "name"
-                              ? draft.name || "—"
-                              : field === "home_club"
-                                ? draft.homeClub || "—"
-                                : field === "birthdate"
-                                  ? draft.birthdate || "—"
-                                  : field === "age"
-                                    ? draft.age || "—"
-                                    : field === "gender"
-                                      ? draft.gender || "—"
-                                      : field === "level"
-                                        ? draft.level || "—"
-                                        : draft.preferences.length > 0
-                                          ? (PREFERENCE_OPTIONS.find((o) => o.id === draft.preferences[0])?.label ?? draft.preferences[0])
-                                          : "—"}
-                          </p>
-                        ) : (
-                          <div className="mt-2 space-y-2">
-                            {field === "name" ? (
-                              <input
-                                value={draft.name}
-                                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                              />
-                            ) : null}
-                            {field === "home_club" ? (
-                              <select
-                                value={draft.homeClub}
-                                onChange={(e) => setDraft((d) => ({ ...d, homeClub: e.target.value }))}
-                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                              >
-                                <option value="">Ingen klub</option>
-                                {clubOptions.map((club) => (
-                                  <option key={club} value={club}>
-                                    {club}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-                            {field === "birthdate" ? (
-                              <input
-                                type="date"
-                                value={draft.birthdate}
-                                onChange={(e) => setDraft((d) => ({ ...d, birthdate: e.target.value }))}
-                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                              />
-                            ) : null}
-                            {field === "age" ? (
-                              <input
-                                type="number"
-                                value={draft.age}
-                                onChange={(e) => setDraft((d) => ({ ...d, age: e.target.value }))}
-                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                              />
-                            ) : null}
-                            {field === "gender" ? (
-                              <select
-                                value={draft.gender}
-                                onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
-                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                              >
-                                <option value="">Ikke angivet</option>
-                                {genderOptions.map((g) => (
-                                  <option key={g} value={g}>
-                                    {g}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-                            {field === "level" ? (
-                              <select
-                                value={draft.level}
-                                onChange={(e) => setDraft((d) => ({ ...d, level: e.target.value }))}
-                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                              >
-                                <option value="">Ingen niveau</option>
-                                {levelOptions.map((level) => (
-                                  <option key={level} value={level}>
-                                    {level}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-                            {field === "preferences" ? (
-                              <select
-                                value={draft.preferences[0] ?? ""}
-                                onChange={(e) =>
-                                  setDraft((d) => ({
-                                    ...d,
-                                    preferences: e.target.value ? [e.target.value] : [],
-                                  }))
-                                }
-                                className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-                              >
-                                <option value="">Ingen præference</option>
-                                {PREFERENCE_OPTIONS.map((opt) => (
-                                  <option key={opt.id} value={opt.id}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => void saveChanges()}
-                                disabled={saving}
-                                className="rounded-md bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0f766e] disabled:opacity-60"
-                              >
-                                {saving ? "Gemmer..." : "Gem"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingField(null);
-                                  setSaveError(null);
-                                  setSaveNotice(null);
-                                  if (player) setDraft(toDraft(player));
-                                }}
-                                className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-                              >
-                                Annuller
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void saveChanges()}
+                          disabled={saving}
+                          className="rounded-md bg-[#14b8a6] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0f766e] disabled:opacity-60"
+                        >
+                          {saving ? "Gemmer..." : "Gem"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingField(null);
+                            setSaveError(null);
+                            setSaveNotice(null);
+                            if (player) setDraft(toDraft(player));
+                          }}
+                          className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                        >
+                          Annuller
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 {saveError ? <p className="mt-3 text-xs text-red-600 dark:text-red-400">{saveError}</p> : null}
                 {saveNotice ? <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">{saveNotice}</p> : null}
