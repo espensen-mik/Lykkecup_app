@@ -272,8 +272,9 @@ export function PublicDashboardScreen() {
               <div className="h-[calc(100%-1.5rem)] min-h-[260px]">
               <ResponsivePie
                 data={data?.charts.levelDistribution ?? []}
-                margin={{ top: 16, right: 240, bottom: 16, left: 16 }}
-                innerRadius={0.62}
+                margin={{ top: 20, right: 260, bottom: 20, left: 30 }}
+                innerRadius={0.6}
+                fit={0.74}
                 padAngle={1.2}
                 cornerRadius={4}
                 activeOuterRadiusOffset={6}
@@ -293,7 +294,7 @@ export function PublicDashboardScreen() {
                   {
                     anchor: "right",
                     direction: "column",
-                    translateX: 130,
+                    translateX: 145,
                     itemWidth: 190,
                     itemHeight: 20,
                     symbolSize: 11,
