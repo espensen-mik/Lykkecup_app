@@ -70,7 +70,7 @@ function toDraft(player: PlayerDetail): PlayerDraft {
   const prefIds = preferenceIdsFromValue(player.preferences);
   return {
     name: player.name ?? "",
-    homeClub: player.home_club ?? "",
+    homeClub: normalizeClubName(player.home_club ?? ""),
     birthdate: player.birthdate ? player.birthdate.slice(0, 10) : "",
     age: player.age == null ? "" : String(player.age),
     gender: player.gender ?? "",
@@ -104,6 +104,14 @@ function fieldLabel(field: string): string {
 function printValue(value: string | null): string {
   if (value == null || value.trim() === "") return "—";
   return value;
+}
+
+function normalizeClubName(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/\u00A0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function formatLogFieldValue(field: string, value: string | null): string {
@@ -267,20 +275,26 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       if (!metaRes.error) {
         const rows = (metaRes.data ?? []) as { home_club: string | null; gender: string | null; level: string | null }[];
         const levels = new Set<string>();
-        const clubs = new Set<string>();
+        const clubsByKey = new Map<string, string>();
         const genders = new Set<string>();
         for (const row of rows) {
           const lv = row.level?.trim();
           if (lv) levels.add(lv);
-          const cl = row.home_club?.trim();
-          if (cl) clubs.add(cl);
+          const cl = normalizeClubName(row.home_club ?? "");
+          if (cl) {
+            const key = cl.toLocaleLowerCase("da");
+            if (!clubsByKey.has(key)) clubsByKey.set(key, cl);
+          }
           const ge = row.gender?.trim();
           if (ge) genders.add(ge);
         }
-        const curClub = (data as PlayerDetail).home_club?.trim();
-        if (curClub) clubs.add(curClub);
+        const curClub = normalizeClubName((data as PlayerDetail).home_club ?? "");
+        if (curClub) {
+          const key = curClub.toLocaleLowerCase("da");
+          if (!clubsByKey.has(key)) clubsByKey.set(key, curClub);
+        }
         setLevelOptions(sortLevelKeysForNav([...levels]));
-        setClubOptions([...clubs].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" })));
+        setClubOptions([...clubsByKey.values()].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" })));
 
         const presetLower = new Set(GENDER_PRESETS.map((g) => g.toLowerCase()));
         const merged: string[] = [...GENDER_PRESETS];
@@ -376,9 +390,9 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       payload.name = trimmedName;
       changed = trimmedName !== player.name;
     } else if (editingField === "home_club") {
-      const next = draft.homeClub.trim() || null;
+      const next = normalizeClubName(draft.homeClub) || null;
       payload.home_club = next;
-      changed = next !== (player.home_club ?? null);
+      changed = next !== (normalizeClubName(player.home_club ?? "") || null);
     } else if (editingField === "birthdate") {
       const next = draft.birthdate || null;
       payload.birthdate = next;
