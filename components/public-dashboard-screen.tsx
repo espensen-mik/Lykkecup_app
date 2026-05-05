@@ -131,6 +131,7 @@ export function PublicDashboardScreen() {
   }, []);
 
   const percent = data?.progress.percentAssigned ?? 0;
+  const clubBars = (data?.charts.clubBars ?? []).slice().reverse();
   return (
     <main className="h-screen w-screen overflow-hidden bg-[#0B1E2D] px-5 py-5 text-white xl:px-8 xl:py-6">
       <div className="pointer-events-none fixed inset-0 opacity-60">
@@ -213,14 +214,13 @@ export function PublicDashboardScreen() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Top klubber</p>
               <div className="h-[calc(100%-1.5rem)] min-h-[260px]">
               <ResponsiveBar
-                data={data?.charts.clubBars ?? []}
+                data={clubBars}
                 keys={["players"]}
                 indexBy="club"
                 layout="horizontal"
                 margin={{ top: 12, right: 24, bottom: 12, left: 170 }}
                 padding={0.35}
                 borderRadius={5}
-                reverse
                 axisTop={null}
                 axisRight={null}
                 axisBottom={null}
