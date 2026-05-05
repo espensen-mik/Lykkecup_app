@@ -7,6 +7,8 @@ type PlayerRow = {
   id: string;
   age: number | null;
   home_club: string | null;
+  level: string | null;
+  created_at: string | null;
 };
 
 type CoachRow = {
@@ -29,7 +31,7 @@ function averageAge(rows: { age: number | null }[]): number | null {
 
 export async function GET() {
   const [playersRes, coachesRes, progressRes, commentsTotalRes, commentsHandledRes] = await Promise.all([
-    supabase.from("players").select("id, age, home_club").eq("event_id", LYKKECUP_EVENT_ID),
+    supabase.from("players").select("id, age, home_club, level, created_at").eq("event_id", LYKKECUP_EVENT_ID),
     supabase.from("coaches").select("id, home_club, age").eq("event_id", LYKKECUP_EVENT_ID),
     fetchHolddannelseProgress(),
     supabase
@@ -75,6 +77,39 @@ export async function GET() {
     if (c) clubs.add(c.toLocaleLowerCase("da"));
   }
 
+  const byLevel = new Map<string, number>();
+  const byClub = new Map<string, number>();
+  for (const p of players) {
+    const level = p.level?.trim() || "Ukendt";
+    byLevel.set(level, (byLevel.get(level) ?? 0) + 1);
+    const club = normalizeClub(p.home_club);
+    if (club) byClub.set(club, (byClub.get(club) ?? 0) + 1);
+  }
+
+  const levelDistribution = Array.from(byLevel.entries())
+    .map(([id, value]) => ({ id, label: id, value }))
+    .sort((a, b) => b.value - a.value);
+
+  const clubBars = Array.from(byClub.entries())
+    .map(([club, playersCount]) => ({ club, players: playersCount }))
+    .sort((a, b) => b.players - a.players)
+    .slice(0, 10);
+
+  const timelineMap = new Map<string, number>();
+  for (const p of players) {
+    const dt = p.created_at ? new Date(p.created_at) : null;
+    if (!dt || Number.isNaN(dt.getTime())) continue;
+    const day = dt.toISOString().slice(0, 10);
+    timelineMap.set(day, (timelineMap.get(day) ?? 0) + 1);
+  }
+  const timelineDays = Array.from(timelineMap.keys()).sort();
+  let running = 0;
+  const playersTimeline = timelineDays.map((day) => {
+    const added = timelineMap.get(day) ?? 0;
+    running += added;
+    return { day, added, total: running };
+  });
+
   return NextResponse.json(
     {
       totals: {
@@ -89,6 +124,11 @@ export async function GET() {
         coachesAge: averageAge(coaches),
       },
       progress: progressRes.progress,
+      charts: {
+        playersTimeline,
+        clubBars,
+        levelDistribution,
+      },
       updatedAt: new Date().toISOString(),
     },
     {

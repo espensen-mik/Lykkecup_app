@@ -1,7 +1,19 @@
 "use client";
 
-import { MessageSquareText, Target, UserRound, Users, UsersRound, Building2, CheckCircle2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ResponsiveBar } from "@nivo/bar";
+import { ResponsiveLine } from "@nivo/line";
+import { ResponsivePie } from "@nivo/pie";
+import {
+  Building2,
+  CheckCircle2,
+  MessageSquareText,
+  Target,
+  TrendingUp,
+  UserRound,
+  Users,
+  UsersRound,
+} from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type ApiData = {
   totals: {
@@ -20,6 +32,11 @@ type ApiData = {
     assignedPlayers: number;
     percentAssigned: number;
   };
+  charts: {
+    playersTimeline: { day: string; added: number; total: number }[];
+    clubBars: { club: string; players: number }[];
+    levelDistribution: { id: string; label: string; value: number }[];
+  };
   updatedAt: string;
 };
 
@@ -29,8 +46,62 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatAvg(value: number | null): string {
-  return value == null ? "—" : value.toFixed(1).replace(".", ",");
+function useAnimatedNumber(target: number, durationMs = 600): number {
+  const [value, setValue] = useState(target);
+  useEffect(() => {
+    const startValue = value;
+    const diff = target - startValue;
+    if (diff === 0) return;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (ts: number) => {
+      const p = Math.min(1, (ts - start) / durationMs);
+      setValue(startValue + diff * p);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
+  return value;
+}
+
+function KpiCard({
+  icon,
+  label,
+  value,
+  suffix,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number | string;
+  suffix?: string;
+}) {
+  const numeric = typeof value === "number" ? value : Number.NaN;
+  const animated = useAnimatedNumber(Number.isFinite(numeric) ? numeric : 0);
+  const display =
+    typeof value === "number"
+      ? Number.isInteger(value)
+        ? Math.round(animated).toLocaleString("da-DK")
+        : animated.toFixed(1).replace(".", ",")
+      : value;
+
+  return (
+    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-teal-300/35 hover:shadow-[0_12px_34px_rgba(20,184,166,0.22)]">
+      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br from-teal-300/20 to-emerald-300/5 blur-2xl" />
+      <div className="relative flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-teal-200">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-300/85">{label}</p>
+          <p className="mt-1 text-4xl font-black tracking-tight text-white drop-shadow-[0_0_14px_rgba(45,212,191,0.35)]">
+            {display}
+            {suffix ? <span className="ml-1 text-2xl font-bold text-teal-200/95">{suffix}</span> : null}
+          </p>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export function PublicDashboardScreen() {
@@ -61,95 +132,226 @@ export function PublicDashboardScreen() {
   }, []);
 
   const percent = data?.progress.percentAssigned ?? 0;
+  const timelineBars = data?.charts.playersTimeline ?? [];
+  const timelineLine = useMemo(
+    () => [
+      {
+        id: "Spillere i alt",
+        data: timelineBars.map((d) => ({ x: d.day.slice(5), y: d.total })),
+      },
+    ],
+    [timelineBars],
+  );
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#f0fbfa] to-white px-10 py-8 text-gray-900">
-      <div className="mx-auto h-full w-full max-w-[1920px]">
-        <h1 className="text-4xl font-extrabold tracking-tight text-[#0f766e]">
-          LykkeCup 2026 - KontrolCenter Dashboard
-        </h1>
+    <main className="h-screen w-screen overflow-hidden bg-[#0B1E2D] px-5 py-5 text-white xl:px-8 xl:py-6">
+      <div className="pointer-events-none fixed inset-0 opacity-60">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_15%,rgba(45,212,191,0.16),transparent_40%),radial-gradient(circle_at_84%_10%,rgba(16,185,129,0.12),transparent_38%),radial-gradient(circle_at_60%_80%,rgba(59,130,246,0.12),transparent_48%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:42px_42px]" />
+      </div>
+      <div className="relative mx-auto flex h-full w-full max-w-[1920px] flex-col">
+        <header className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 backdrop-blur-sm xl:px-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-teal-200/90">Mission Control</p>
+              <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-white">
+                LykkeCup 2026 - KontrolCenter Dashboard
+              </h1>
+            </div>
+            <div className="rounded-xl border border-teal-300/25 bg-teal-400/10 px-4 py-2 text-right">
+              <p className="text-xs uppercase tracking-wide text-teal-100/80">Live Data</p>
+              <p className="text-lg font-bold text-teal-100">{data ? formatTime(data.updatedAt) : "—"}</p>
+            </div>
+          </div>
+        </header>
 
         {error ? (
-          <p className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">{error}</p>
+          <p className="mt-4 rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-3 text-red-200">{error}</p>
         ) : null}
 
-        <section className="mt-8 grid grid-cols-4 gap-5">
-          <article className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-            <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-gray-500">
-              <Users className="h-4 w-4 text-teal-600" aria-hidden />
-              Antal spillere tilmeldt
-            </p>
-            <p className="mt-2 text-5xl font-bold text-[#0f766e]">{data?.totals.players ?? "—"}</p>
-          </article>
-          <article className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-            <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-gray-500">
-              <UsersRound className="h-4 w-4 text-teal-600" aria-hidden />
-              Antal trænere tilmeldt
-            </p>
-            <p className="mt-2 text-5xl font-bold text-[#0f766e]">{data?.totals.coaches ?? "—"}</p>
-          </article>
-          <article className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-            <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-gray-500">
-              <Building2 className="h-4 w-4 text-teal-600" aria-hidden />
-              Antal klubber der deltager
-            </p>
-            <p className="mt-2 text-5xl font-bold text-[#0f766e]">{data?.totals.clubs ?? "—"}</p>
-          </article>
-          <article className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-            <p className="text-sm uppercase tracking-wide text-gray-500">Sidst opdateret</p>
-            <p className="mt-2 text-3xl font-bold text-[#0f766e]">{data ? formatTime(data.updatedAt) : "—"}</p>
-            <p className="mt-2 text-sm text-gray-500">Opdaterer automatisk hvert minut</p>
-          </article>
-        </section>
+        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+          <section className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">
+            <KpiCard icon={<Users className="h-5 w-5" />} label="Antal spillere tilmeldt" value={data?.totals.players ?? 0} />
+            <KpiCard icon={<UsersRound className="h-5 w-5" />} label="Antal trænere tilmeldt" value={data?.totals.coaches ?? 0} />
+            <KpiCard icon={<Building2 className="h-5 w-5" />} label="Antal klubber der deltager" value={data?.totals.clubs ?? 0} />
+            <KpiCard
+              icon={<UserRound className="h-5 w-5" />}
+              label="Gennemsnitsalder spillere"
+              value={data?.averages.playersAge ?? "—"}
+              suffix={data?.averages.playersAge != null ? "år" : undefined}
+            />
+            <KpiCard
+              icon={<UsersRound className="h-5 w-5" />}
+              label="Gennemsnitsalder trænere"
+              value={data?.averages.coachesAge ?? "—"}
+              suffix={data?.averages.coachesAge != null ? "år" : undefined}
+            />
+            <KpiCard
+              icon={<MessageSquareText className="h-5 w-5" />}
+              label="Antal kommentarer i alt"
+              value={data?.totals.commentsTotal ?? 0}
+            />
+            <KpiCard
+              icon={<CheckCircle2 className="h-5 w-5" />}
+              label="Antal kommentarer håndteret"
+              value={data?.totals.commentsHandled ?? 0}
+            />
+            <KpiCard icon={<TrendingUp className="h-5 w-5" />} label="Sidst opdateret" value={data ? formatTime(data.updatedAt) : "—"} />
+          </section>
 
-        <section className="mt-6 grid grid-cols-4 gap-5">
-          <article className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-            <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-gray-500">
-              <UserRound className="h-4 w-4 text-teal-600" aria-hidden />
-              Gennemsnitsalder spillere
-            </p>
-            <p className="mt-2 text-5xl font-bold text-[#0f766e]">{formatAvg(data?.averages.playersAge ?? null)}</p>
-          </article>
-          <article className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-            <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-gray-500">
-              <UsersRound className="h-4 w-4 text-teal-600" aria-hidden />
-              Gennemsnitsalder trænere
-            </p>
-            <p className="mt-2 text-5xl font-bold text-[#0f766e]">{formatAvg(data?.averages.coachesAge ?? null)}</p>
-          </article>
-          <article className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-            <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-gray-500">
-              <MessageSquareText className="h-4 w-4 text-teal-600" aria-hidden />
-              Antal kommentarer i alt
-            </p>
-            <p className="mt-2 text-5xl font-bold text-[#0f766e]">{data?.totals.commentsTotal ?? "—"}</p>
-          </article>
-          <article className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-            <p className="flex items-center gap-2 text-sm uppercase tracking-wide text-gray-500">
-              <CheckCircle2 className="h-4 w-4 text-teal-600" aria-hidden />
-              Antal kommentarer håndteret
-            </p>
-            <p className="mt-2 text-5xl font-bold text-[#0f766e]">{data?.totals.commentsHandled ?? "—"}</p>
-          </article>
-        </section>
+          <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm xl:p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">Holddannelse fremdrift</h2>
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-300">
+                {percent >= 100 ? <Target className="h-5 w-5 text-amber-400" aria-hidden /> : null}
+                {data?.progress.assignedPlayers ?? 0} af {data?.progress.totalPlayers ?? 0} spillere
+              </div>
+            </div>
+            <div className="h-12 w-full overflow-hidden rounded-full border border-white/10 bg-[#112B3C]">
+              <div
+                className="flex h-full items-center justify-end bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 pr-4 text-sm font-extrabold text-[#083344] transition-[width] duration-700 ease-out"
+                style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
+              >
+                {percent.toFixed(1)}%
+              </div>
+            </div>
+          </section>
 
-        <section className="mt-8 rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800">Holddannelse fremdrift</h2>
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
-              {percent >= 100 ? <Target className="h-5 w-5 text-amber-500" aria-hidden /> : null}
-              {data?.progress.assignedPlayers ?? 0} af {data?.progress.totalPlayers ?? 0} spillere
+          <section className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-3">
+            <article className="min-h-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Spillere over tid</p>
+              <div className="relative h-[calc(100%-1.5rem)] min-h-[260px]">
+              <div className="absolute inset-0">
+                <ResponsiveBar
+                  data={timelineBars.map((d) => ({ day: d.day.slice(5), added: d.added }))}
+                  keys={["added"]}
+                  indexBy="day"
+                  margin={{ top: 16, right: 12, bottom: 50, left: 36 }}
+                  padding={0.25}
+                  borderRadius={4}
+                  enableGridY={false}
+                  axisTop={null}
+                  axisRight={null}
+                  axisLeft={{
+                    tickSize: 0,
+                    tickPadding: 8,
+                    legend: "nye",
+                    legendOffset: -30,
+                    legendPosition: "middle",
+                    tickValues: 5,
+                  }}
+                  axisBottom={{
+                    tickRotation: -35,
+                    tickSize: 0,
+                    tickPadding: 10,
+                    tickValues: 8,
+                  }}
+                  colors={["rgba(45,212,191,0.45)"]}
+                  theme={{
+                    axis: { ticks: { text: { fill: "#9fb2c7", fontSize: 10 } }, legend: { text: { fill: "#9fb2c7" } } },
+                    tooltip: { container: { background: "#0f2235", color: "#d8e7f7", border: "1px solid rgba(255,255,255,0.15)" } },
+                    grid: { line: { stroke: "rgba(148,163,184,0.15)", strokeWidth: 1 } },
+                  }}
+                  tooltip={({ data }) => (
+                    <div className="rounded-md border border-white/10 bg-[#0f2235] px-2 py-1 text-xs text-slate-100">
+                      {String(data.day)} · nye: {String(data.added)}
+                    </div>
+                  )}
+                />
+              </div>
+              <div className="pointer-events-none absolute inset-0">
+                <ResponsiveLine
+                  data={timelineLine}
+                  margin={{ top: 16, right: 12, bottom: 50, left: 36 }}
+                  xScale={{ type: "point" }}
+                  yScale={{ type: "linear", min: "auto", max: "auto", stacked: false, reverse: false }}
+                  axisTop={null}
+                  axisRight={null}
+                  axisLeft={null}
+                  axisBottom={null}
+                  enableGridX={false}
+                  enableGridY={false}
+                  enablePoints={false}
+                  colors={["#34d399"]}
+                  lineWidth={3}
+                  useMesh={false}
+                  theme={{}}
+                />
+              </div>
             </div>
-          </div>
-          <div className="h-10 w-full overflow-hidden rounded-full bg-teal-100">
-            <div
-              className="flex h-full items-center justify-end bg-gradient-to-r from-teal-500 to-teal-600 pr-3 text-sm font-bold text-white transition-all duration-500"
-              style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
-            >
-              {percent.toFixed(1)}%
+          </article>
+
+            <article className="min-h-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Top klubber</p>
+              <div className="h-[calc(100%-1.5rem)] min-h-[260px]">
+              <ResponsiveBar
+                data={data?.charts.clubBars ?? []}
+                keys={["players"]}
+                indexBy="club"
+                layout="horizontal"
+                margin={{ top: 12, right: 24, bottom: 12, left: 170 }}
+                padding={0.35}
+                borderRadius={5}
+                axisTop={null}
+                axisRight={null}
+                axisBottom={{ tickSize: 0, tickPadding: 6, tickValues: 4 }}
+                axisLeft={{ tickSize: 0, tickPadding: 8 }}
+                colors={({ index }) => {
+                  const palette = ["#2dd4bf", "#34d399", "#22d3ee", "#14b8a6", "#10b981"];
+                  return palette[index % palette.length]!;
+                }}
+                labelSkipWidth={20}
+                labelTextColor="#0b1e2d"
+                theme={{
+                  axis: { ticks: { text: { fill: "#b3c5d8", fontSize: 11 } } },
+                  grid: { line: { stroke: "rgba(148,163,184,0.15)", strokeWidth: 1 } },
+                  tooltip: { container: { background: "#0f2235", color: "#d8e7f7", border: "1px solid rgba(255,255,255,0.15)" } },
+                }}
+              />
             </div>
-          </div>
-        </section>
+          </article>
+
+            <article className="min-h-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Spillere fordelt på niveau</p>
+              <div className="h-[calc(100%-1.5rem)] min-h-[260px]">
+              <ResponsivePie
+                data={data?.charts.levelDistribution ?? []}
+                margin={{ top: 16, right: 110, bottom: 16, left: 16 }}
+                innerRadius={0.62}
+                padAngle={1.2}
+                cornerRadius={4}
+                activeOuterRadiusOffset={6}
+                colors={({ id }) => {
+                  const key = String(id).toLowerCase();
+                  if (key.includes("power")) return "#34d399";
+                  if (key.includes("cool")) return "#2dd4bf";
+                  if (key.includes("turbo")) return "#22d3ee";
+                  if (key.includes("jazz")) return "#60a5fa";
+                  if (key.includes("funk")) return "#10b981";
+                  return "#14b8a6";
+                }}
+                enableArcLabels={false}
+                arcLinkLabelsColor="#b8c7d8"
+                arcLinkLabelsTextColor="#dbe7f3"
+                legends={[
+                  {
+                    anchor: "right",
+                    direction: "column",
+                    translateX: 95,
+                    itemWidth: 90,
+                    itemHeight: 20,
+                    symbolSize: 11,
+                    itemTextColor: "#b8c7d8",
+                  },
+                ]}
+                theme={{
+                  tooltip: { container: { background: "#0f2235", color: "#d8e7f7", border: "1px solid rgba(255,255,255,0.15)" } },
+                }}
+              />
+            </div>
+          </article>
+          </section>
+        </div>
       </div>
     </main>
   );
