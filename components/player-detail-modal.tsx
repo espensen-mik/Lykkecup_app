@@ -9,7 +9,7 @@ import {
 } from "@/lib/players";
 import { derivePreferenceBadge } from "@/lib/player-preferences";
 import { sortLevelKeysForNav } from "@/lib/holddannelse";
-import { supabase } from "@/lib/supabase";
+import { getAuthBrowserClient } from "@/lib/auth-browser";
 import type { PlayerDetail } from "@/types/player";
 import { PlayerDetailContent } from "@/components/player-detail-content";
 import { formatPreferences } from "@/lib/format";
@@ -103,6 +103,33 @@ function printValue(value: string | null): string {
   return value;
 }
 
+function readableFieldNoun(field: string): string {
+  switch (field) {
+    case "home_club":
+      return "klub";
+    case "birthdate":
+      return "fødselsdato";
+    case "age":
+      return "alder";
+    case "gender":
+      return "køn";
+    case "level":
+      return "niveau";
+    case "preferences":
+      return "præferencer";
+    case "name":
+      return "navn";
+    default:
+      return field;
+  }
+}
+
+function firstName(value: string | null | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return "En admin";
+  return trimmed.split(/\s+/)[0] ?? "En admin";
+}
+
 function preferenceIdsFromValue(value: unknown): string[] {
   const set = new Set<string>();
   const raw = formatPreferences(value).toLowerCase();
@@ -129,6 +156,7 @@ function preferenceIdsFromValue(value: unknown): string[] {
 }
 
 export function PlayerDetailModal({ playerId, onClose }: Props) {
+  const supabase = getAuthBrowserClient();
   const [player, setPlayer] = useState<PlayerDetail | null>(null);
   const [assignedTeam, setAssignedTeam] = useState<PlayerAssignedTeamSummary | null>(null);
   const [logs, setLogs] = useState<PlayerChangeLogRow[]>([]);
@@ -561,9 +589,9 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
                     {logs.map((log) => (
                       <li key={log.id} className="rounded-md border border-gray-200/80 bg-gray-50/80 px-3 py-2 dark:border-gray-700 dark:bg-gray-800/45">
                         <p>
-                          <span className="font-semibold">{fieldLabel(log.field_name)}:</span> {printValue(log.old_value)}
-                          {" -> "}
-                          {printValue(log.new_value)}
+                          {firstName(log.changed_by_name)} ændrede {readableFieldNoun(log.field_name)} fra{" "}
+                          <span className="font-semibold">{printValue(log.old_value)}</span> til{" "}
+                          <span className="font-semibold">{printValue(log.new_value)}</span>.
                         </p>
                         <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                           {new Date(log.changed_at).toLocaleString("da-DK", {
@@ -572,8 +600,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
                             year: "numeric",
                             hour: "2-digit",
                             minute: "2-digit",
-                          })}{" "}
-                          · {log.changed_by_name?.trim() || "Ukendt bruger"}
+                          })}
                         </p>
                       </li>
                     ))}
