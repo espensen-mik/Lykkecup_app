@@ -243,7 +243,7 @@ export function PublicDashboardScreen() {
               </div>
             </div>
             <p className="mt-2 text-right text-xs font-semibold uppercase tracking-[0.08em] text-teal-100/85">
-              Procent faerdig: {percent.toFixed(1)}%
+              Procent færdig: {percent.toFixed(1)}%
             </p>
           </section>
 
