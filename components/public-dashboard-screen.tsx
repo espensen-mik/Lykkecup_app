@@ -6,6 +6,7 @@ import {
   Building2,
   CheckCircle2,
   Hourglass,
+  Mail,
   MessageSquareText,
   Target,
   TrendingUp,
@@ -78,11 +79,15 @@ function KpiCard({
   label,
   value,
   suffix,
+  cardClassName,
+  iconClassName,
 }: {
   icon: ReactNode;
   label: string;
   value: number | string;
   suffix?: string;
+  cardClassName?: string;
+  iconClassName?: string;
 }) {
   const numeric = typeof value === "number" ? value : Number.NaN;
   const animated = useAnimatedNumber(Number.isFinite(numeric) ? numeric : 0);
@@ -94,10 +99,14 @@ function KpiCard({
       : value;
 
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-teal-300/35 hover:shadow-[0_12px_34px_rgba(20,184,166,0.22)]">
+    <article
+      className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-teal-300/35 hover:shadow-[0_12px_34px_rgba(20,184,166,0.22)] ${cardClassName ?? ""}`}
+    >
       <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br from-teal-300/20 to-emerald-300/5 blur-2xl" />
       <div className="relative flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-teal-200">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-teal-200 ${iconClassName ?? ""}`}
+        >
           {icon}
         </div>
         <div className="min-w-0">
@@ -192,9 +201,11 @@ export function PublicDashboardScreen() {
               suffix={data?.averages.coachesAge != null ? "år" : undefined}
             />
             <KpiCard
-              icon={<MessageSquareText className="h-5 w-5" />}
-              label="Antal kommentarer i alt"
+              icon={<Mail className="h-5 w-5" />}
+              label="Kommentarer fra traenere"
               value={data?.totals.commentsTotal ?? 0}
+              cardClassName="border-cyan-300/35 bg-gradient-to-br from-cyan-400/16 via-teal-300/10 to-emerald-300/8 shadow-[0_14px_32px_rgba(34,211,238,0.20)]"
+              iconClassName="animate-pulse [animation-duration:2.6s]"
             />
             <KpiCard
               icon={<CheckCircle2 className="h-5 w-5" />}
@@ -269,14 +280,19 @@ export function PublicDashboardScreen() {
 
             <article className="min-h-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Spillere fordelt på niveau</p>
-              <div className="h-[calc(100%-1.5rem)] min-h-[260px]">
+              <div className="h-[calc(100%-1.5rem)] min-h-[320px] overflow-visible">
               <ResponsivePie
                 data={data?.charts.levelDistribution ?? []}
-                margin={{ top: 20, right: 260, bottom: 20, left: 30 }}
+                margin={{ top: 34, right: 135, bottom: 54, left: 135 }}
                 innerRadius={0.6}
                 padAngle={1.2}
                 cornerRadius={4}
                 activeOuterRadiusOffset={6}
+                arcLinkLabelsSkipAngle={0}
+                arcLinkLabelsOffset={10}
+                arcLinkLabelsDiagonalLength={14}
+                arcLinkLabelsStraightLength={22}
+                arcLinkLabel={(d) => String(d.label)}
                 colors={({ id }) => {
                   const key = String(id).toLowerCase();
                   if (key.includes("power")) return "#34d399";
@@ -287,20 +303,10 @@ export function PublicDashboardScreen() {
                   return "#14b8a6";
                 }}
                 enableArcLabels={false}
-                arcLinkLabelsColor="#b8c7d8"
-                arcLinkLabelsTextColor="#dbe7f3"
-                legends={[
-                  {
-                    anchor: "right",
-                    direction: "column",
-                    translateX: 145,
-                    itemWidth: 190,
-                    itemHeight: 20,
-                    symbolSize: 11,
-                    itemTextColor: "#b8c7d8",
-                  },
-                ]}
+                arcLinkLabelsColor="#c9d8e8"
+                arcLinkLabelsTextColor="#eef6ff"
                 theme={{
+                  labels: { text: { fill: "#eef6ff", fontSize: 13, fontWeight: 600 } },
                   tooltip: { container: { background: "#0f2235", color: "#d8e7f7", border: "1px solid rgba(255,255,255,0.15)" } },
                 }}
               />
