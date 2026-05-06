@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CheckCircle2, ChevronDown } from "lucide-react";
 import { OpenPlayerRowButton } from "@/components/open-player";
 import { UNKNOWN_CLUB_LABEL, groupPlayersByClub } from "@/lib/clubs";
 import { indexFeedbackByClub, fetchClubFeedbackForEvent } from "@/lib/club-feedback";
@@ -125,10 +126,16 @@ export default async function KlubberPage() {
                   })}
                 </ul>
                 {clubComments.length > 0 ? (
-                  <div className="border-t border-lc-border dark:border-gray-700">
-                    <p className="border-b border-gray-100 bg-gray-50/50 px-5 py-2 text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:bg-gray-800/30 dark:text-gray-400">
-                      Kommentarer
-                    </p>
+                  <details className="group border-t border-lc-border dark:border-gray-700">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-gray-50/50 px-5 py-2 text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 transition-colors hover:bg-gray-100/70 dark:bg-gray-800/30 dark:text-gray-400 dark:hover:bg-gray-800/45">
+                      <span>
+                        Træner kommentar
+                        <span className="ml-1 text-[0.62rem] font-medium normal-case tracking-normal text-gray-400 dark:text-gray-500">
+                          ({clubComments.length})
+                        </span>
+                      </span>
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
+                    </summary>
                     <ul className="max-h-56 divide-y divide-lc-border overflow-y-auto dark:divide-gray-700">
                       {clubComments.map((c) => (
                         <li key={c.id} className="px-5 py-3">
@@ -151,10 +158,16 @@ export default async function KlubberPage() {
                           <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-gray-600 dark:text-gray-400">
                             {c.comment_text}
                           </p>
+                          {c.handled_at ? (
+                            <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                              Håndteret
+                            </p>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </details>
                 ) : null}
               </li>
             );
