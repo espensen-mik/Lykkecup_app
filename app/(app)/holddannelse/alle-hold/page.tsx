@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AllTeamsExport } from "@/components/all-teams-export";
 import { AllTeamsOverviewList } from "@/components/holddannelse/all-teams-overview-list";
-import { sortLevelKeysForNav } from "@/lib/holddannelse";
+import { fetchTeamsPrintData, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { fetchListerExportData } from "@/lib/lister";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,10 @@ export const metadata: Metadata = {
 };
 
 export default async function AlleHoldPage() {
-  const { teams, players, error } = await fetchListerExportData();
+  const [{ teams, players, error }, printData] = await Promise.all([
+    fetchListerExportData(),
+    fetchTeamsPrintData(null),
+  ]);
 
   const playerCountByTeamId = new Map<string, number>();
   for (const p of players) {
@@ -51,8 +54,15 @@ export default async function AlleHoldPage() {
       officialName: string;
       nickname: string | null;
       players: { id: string; name: string }[];
+      coaches: { name: string }[];
     }[]
   >();
+  const coachesByTeamId = new Map<string, { name: string }[]>();
+  for (const group of printData.groups) {
+    for (const entry of group.teams) {
+      coachesByTeamId.set(entry.team.id, entry.coaches);
+    }
+  }
   for (const team of teams) {
     const list = teamsByLevel.get(team.levelKey) ?? [];
     list.push({
@@ -61,6 +71,7 @@ export default async function AlleHoldPage() {
       officialName: team.officialName,
       nickname: team.nickname,
       players: playersByTeamId.get(team.id) ?? [],
+      coaches: coachesByTeamId.get(team.id) ?? [],
     });
     teamsByLevel.set(team.levelKey, list);
   }

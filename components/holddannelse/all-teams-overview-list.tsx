@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { usePlayerModal } from "@/components/player-modal-context";
 
 type PlayerListItem = {
@@ -15,6 +15,7 @@ type TeamListItem = {
   officialName: string;
   nickname: string | null;
   players: PlayerListItem[];
+  coaches: { name: string }[];
 };
 
 type LevelGroup = {
@@ -25,11 +26,39 @@ type LevelGroup = {
 export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
   const { openPlayer } = usePlayerModal();
   const [levelFilter, setLevelFilter] = useState<string>("all");
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLocaleLowerCase("da");
 
   const visibleGroups = useMemo(() => {
-    if (levelFilter === "all") return groups;
-    return groups.filter((g) => g.levelKey === levelFilter);
-  }, [groups, levelFilter]);
+    const base = levelFilter === "all" ? groups : groups.filter((g) => g.levelKey === levelFilter);
+    if (!q) return base;
+
+    return base
+      .map((g) => ({
+        ...g,
+        teams: g.teams.filter((team) => {
+          const playerMatch = team.players.some((p) => p.name.toLocaleLowerCase("da").includes(q));
+          const coachMatch = team.coaches.some((c) => c.name.toLocaleLowerCase("da").includes(q));
+          return playerMatch || coachMatch;
+        }),
+      }))
+      .filter((g) => g.teams.length > 0);
+  }, [groups, levelFilter, q]);
+
+  function highlight(text: string): ReactNode {
+    if (!q) return text;
+    const lower = text.toLocaleLowerCase("da");
+    const idx = lower.indexOf(q);
+    if (idx < 0) return text;
+    const end = idx + q.length;
+    return (
+      <>
+        {text.slice(0, idx)}
+        <mark className="rounded bg-amber-100 px-0.5 text-current dark:bg-amber-700/40">{text.slice(idx, end)}</mark>
+        {text.slice(end)}
+      </>
+    );
+  }
 
   if (groups.length === 0) {
     return (
@@ -42,21 +71,32 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-lc-border bg-white p-3 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35">
-        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Filtrer niveau
-          <select
-            value={levelFilter}
-            onChange={(e) => setLevelFilter(e.target.value)}
-            className="mt-1.5 block w-full max-w-sm rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-          >
-            <option value="all">Alle niveauer</option>
-            {groups.map((group) => (
-              <option key={group.levelKey} value={group.levelKey}>
-                {group.levelKey}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Filtrer niveau
+            <select
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value)}
+              className="mt-1.5 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+            >
+              <option value="all">Alle niveauer</option>
+              {groups.map((group) => (
+                <option key={group.levelKey} value={group.levelKey}>
+                  {group.levelKey}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Søg spiller/træner
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Fx Sofie eller Mads"
+              className="mt-1.5 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+            />
+          </label>
+        </div>
       </div>
 
       {visibleGroups.map((group, idx) => (
@@ -104,13 +144,33 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
                           className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-white px-2 py-1 text-xs font-medium text-[#0f766e] transition hover:bg-teal-50 dark:border-teal-800 dark:bg-gray-950 dark:text-teal-200 dark:hover:bg-teal-950/40"
                           title="Åbn spillerdetaljer"
                         >
-                          {player.name}
+                          {highlight(player.name)}
                           <ExternalLink className="h-3 w-3" aria-hidden />
                         </button>
                       </li>
                     ))}
                   </ul>
                 )}
+
+                <div className="mt-2 border-t border-gray-200 pt-2 dark:border-gray-700">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Trænere
+                  </p>
+                  {team.coaches.length === 0 ? (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Ingen trænere på holdet endnu.</p>
+                  ) : (
+                    <ul className="mt-1 flex flex-wrap gap-1.5">
+                      {team.coaches.map((coach) => (
+                        <li
+                          key={`${team.id}-${coach.name}`}
+                          className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200"
+                        >
+                          {highlight(coach.name)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </article>
             ))}
           </div>
