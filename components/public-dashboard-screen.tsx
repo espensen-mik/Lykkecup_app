@@ -14,7 +14,7 @@ import {
   Users,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type ApiData = {
   totals: {
@@ -150,6 +150,13 @@ export function PublicDashboardScreen() {
   }, []);
 
   useEffect(() => {
+    const id = window.setInterval(() => {
+      window.location.reload();
+    }, 5 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     const id = window.setInterval(() => setHourglassFlipped((prev) => !prev), 2600);
     return () => window.clearInterval(id);
   }, []);
@@ -158,15 +165,6 @@ export function PublicDashboardScreen() {
   const clubBars = (data?.charts.clubBars ?? []).slice().reverse();
   const daysLeft = daysUntilLykkeCup2026();
   const levelDistribution = data?.charts.levelDistribution ?? [];
-  const levelTotal = useMemo(
-    () => levelDistribution.reduce((sum, item) => sum + (typeof item.value === "number" ? item.value : 0), 0),
-    [levelDistribution],
-  );
-
-  function levelPercent(value: number): string {
-    if (!levelTotal) return "0,0";
-    return ((value / levelTotal) * 100).toFixed(1).replace(".", ",");
-  }
   return (
     <main className="h-screen w-screen overflow-hidden bg-[#0B1E2D] px-5 py-5 text-white xl:px-8 xl:py-6">
       <div className="pointer-events-none fixed inset-0 opacity-60">
@@ -302,7 +300,7 @@ export function PublicDashboardScreen() {
                 arcLinkLabelsOffset={10}
                 arcLinkLabelsDiagonalLength={14}
                 arcLinkLabelsStraightLength={22}
-                arcLinkLabel={(d) => `${String(d.label)} ${levelPercent(Number(d.value))}%`}
+                arcLinkLabel={(d) => `${String(d.label)} (${Number(d.value)} spillere)`}
                 colors={({ id }) => {
                   const key = String(id).toLowerCase();
                   if (key.includes("power")) return "#34d399";
@@ -320,14 +318,6 @@ export function PublicDashboardScreen() {
                   tooltip: { container: { background: "#0f2235", color: "#d8e7f7", border: "1px solid rgba(255,255,255,0.15)" } },
                 }}
               />
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-300/90">
-              {levelDistribution.map((item) => (
-                <span key={String(item.id)} className="inline-flex items-baseline gap-1">
-                  <span className="font-semibold text-slate-200">{item.label}</span>
-                  <span className="text-slate-400">({item.value} spillere)</span>
-                </span>
-              ))}
             </div>
           </article>
           </section>

@@ -1,10 +1,11 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePlayerModal } from "@/components/player-modal-context";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { getLevelVisualClasses } from "@/lib/level-colors";
+import { subscribePlayerUpdated } from "@/lib/player-updates";
 import type { Player } from "@/types/player";
 
 type Props = {
@@ -153,11 +154,35 @@ function SortableTh({
 
 export function PlayersAdmin({ players, fetchError }: Props) {
   const { openPlayer } = usePlayerModal();
+  const [rows, setRows] = useState<Player[]>(players);
   const [search, setSearch] = useState("");
   const [level, setLevel] = useState<string>("");
   const [club, setClub] = useState<string>("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  useEffect(() => {
+    setRows(players);
+  }, [players]);
+
+  useEffect(() => {
+    return subscribePlayerUpdated((updated) => {
+      setRows((prev) =>
+        prev.map((p) =>
+          p.id === updated.id
+            ? {
+                ...p,
+                name: updated.name ?? p.name,
+                home_club: updated.home_club ?? null,
+                level: updated.level ?? null,
+                age: updated.age ?? null,
+                ticket_id: updated.ticket_id ?? p.ticket_id,
+              }
+            : p,
+        ),
+      );
+    });
+  }, []);
 
   function goToPlayer(playerId: string) {
     openPlayer(playerId);
@@ -165,31 +190,31 @@ export function PlayersAdmin({ players, fetchError }: Props) {
 
   const levels = useMemo(() => {
     const set = new Set<string>();
-    for (const p of players) {
+    for (const p of rows) {
       if (p.level != null && p.level !== "") set.add(String(p.level));
     }
     return [...set].sort((a, b) =>
       a.localeCompare(b, "da", { numeric: true }),
     );
-  }, [players]);
+  }, [rows]);
 
   const clubs = useMemo(() => {
     const set = new Set<string>();
-    for (const p of players) {
+    for (const p of rows) {
       if (p.home_club != null && p.home_club !== "") set.add(p.home_club);
     }
     return [...set].sort((a, b) => a.localeCompare(b, "da"));
-  }, [players]);
+  }, [rows]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return players.filter((p) => {
+    return rows.filter((p) => {
       if (q && !p.name.toLowerCase().includes(q)) return false;
       if (level && String(p.level) !== level) return false;
       if (club && p.home_club !== club) return false;
       return true;
     });
-  }, [players, search, level, club]);
+  }, [rows, search, level, club]);
 
   const clubSortMode = club !== "";
 
@@ -259,7 +284,7 @@ export function PlayersAdmin({ players, fetchError }: Props) {
 
       <p className="text-sm text-gray-500 dark:text-gray-400">
         Viser <span className="tabular-nums font-medium text-gray-700 dark:text-gray-300">{sortedRows.length}</span> af{" "}
-        <span className="tabular-nums font-medium text-gray-700 dark:text-gray-300">{players.length}</span> spillere
+        <span className="tabular-nums font-medium text-gray-700 dark:text-gray-300">{rows.length}</span> spillere
         {sortedRows.length > 0 ? (
           clubSortMode ? (
             <span className="text-gray-400">

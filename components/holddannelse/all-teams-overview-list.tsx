@@ -1,8 +1,9 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePlayerModal } from "@/components/player-modal-context";
+import { subscribePlayerUpdated } from "@/lib/player-updates";
 
 type PlayerListItem = {
   id: string;
@@ -25,12 +26,58 @@ type LevelGroup = {
 
 export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
   const { openPlayer } = usePlayerModal();
+  const [liveGroups, setLiveGroups] = useState<LevelGroup[]>(groups);
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
   const q = query.trim().toLocaleLowerCase("da");
 
+  useEffect(() => {
+    setLiveGroups(groups);
+  }, [groups]);
+
+  useEffect(() => {
+    return subscribePlayerUpdated((updated) => {
+      setLiveGroups((prev) =>
+        prev.map((level) => ({
+          ...level,
+          teams: level.teams.map((team) => ({
+            ...team,
+            players: team.players.map((player) =>
+              player.id === updated.id
+                ? {
+                    ...player,
+                    name: updated.name,
+                  }
+                : player,
+            ),
+          })),
+        })),
+      );
+    });
+  }, []);
+  const suggestions = useMemo(() => {
+    const byKey = new Map<string, string>();
+    for (const group of liveGroups) {
+      for (const team of group.teams) {
+        for (const player of team.players) {
+          const full = player.name.trim();
+          if (full) byKey.set(full.toLocaleLowerCase("da"), full);
+          const first = full.split(/\s+/)[0]?.trim();
+          if (first) byKey.set(first.toLocaleLowerCase("da"), first);
+        }
+        for (const coach of team.coaches) {
+          const full = coach.name.trim();
+          if (full) byKey.set(full.toLocaleLowerCase("da"), full);
+          const first = full.split(/\s+/)[0]?.trim();
+          if (first) byKey.set(first.toLocaleLowerCase("da"), first);
+        }
+      }
+    }
+    return [...byKey.values()].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" }));
+  }, [liveGroups]);
+
   const visibleGroups = useMemo(() => {
-    const base = levelFilter === "all" ? groups : groups.filter((g) => g.levelKey === levelFilter);
+    const base = levelFilter === "all" ? liveGroups : liveGroups.filter((g) => g.levelKey === levelFilter);
     if (!q) return base;
 
     return base
@@ -43,7 +90,7 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
         }),
       }))
       .filter((g) => g.teams.length > 0);
-  }, [groups, levelFilter, q]);
+  }, [liveGroups, levelFilter, q]);
 
   function highlight(text: string): ReactNode {
     if (!q) return text;
@@ -60,7 +107,7 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
     );
   }
 
-  if (groups.length === 0) {
+  if (liveGroups.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900/35 dark:text-gray-400">
         Ingen hold oprettet endnu.
@@ -80,7 +127,7 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
               className="mt-1.5 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
             >
               <option value="all">Alle niveauer</option>
-              {groups.map((group) => (
+              {liveGroups.map((group) => (
                 <option key={group.levelKey} value={group.levelKey}>
                   {group.levelKey}
                 </option>
@@ -92,9 +139,15 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              list="alle-hold-name-suggestions"
               placeholder="Fx Sofie eller Mads"
               className="mt-1.5 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
             />
+            <datalist id="alle-hold-name-suggestions">
+              {suggestions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </label>
         </div>
       </div>

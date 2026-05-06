@@ -13,6 +13,7 @@ import { getAuthBrowserClient } from "@/lib/auth-browser";
 import type { PlayerDetail } from "@/types/player";
 import { PlayerDetailContent } from "@/components/player-detail-content";
 import { formatPreferences } from "@/lib/format";
+import { emitPlayerUpdated } from "@/lib/player-updates";
 
 type Props = {
   playerId: string | null;
@@ -440,6 +441,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
 
     const updated: PlayerDetail = { ...player, ...(payload as Partial<PlayerDetail>) };
     setPlayer(updated);
+    emitPlayerUpdated(updated);
     setDraft(toDraft(updated));
     setEditingField(null);
     setSaveNotice("Spilleroplysninger gemt.");

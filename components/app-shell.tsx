@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   CalendarDays,
+  CheckCircle2,
   ChevronDown,
   ClipboardList,
   LayoutDashboard,
@@ -268,13 +269,14 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                 <Link
                   href="/holddannelse/alle-hold"
                   onClick={() => setMobileOpen(false)}
-                  className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
+                  className={`flex max-w-[13rem] items-center gap-1.5 truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-semibold transition-colors ${
                     pathname === "/holddannelse/alle-hold"
                       ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
                       : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
                   }`}
                 >
-                  Alle hold
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">Alle hold</span>
                 </Link>
               </li>
             </ul>
