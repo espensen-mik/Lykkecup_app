@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AllTeamsExport } from "@/components/all-teams-export";
 import { AllTeamsOverviewList } from "@/components/holddannelse/all-teams-overview-list";
+import { sortLevelKeysForNav } from "@/lib/holddannelse";
 import { fetchListerExportData } from "@/lib/lister";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,8 @@ export default async function AlleHoldPage() {
     item.playersOnTeams += playerCountByTeamId.get(t.id) ?? 0;
     perLevel.set(t.levelKey, item);
   }
-  const levelRows = [...perLevel.values()];
+  const levelOrder = sortLevelKeysForNav([...perLevel.keys()]);
+  const levelRows = levelOrder.map((key) => perLevel.get(key)!).filter(Boolean);
 
   const playersByTeamId = new Map<string, { id: string; name: string }[]>();
   for (const p of players) {
@@ -62,9 +64,9 @@ export default async function AlleHoldPage() {
     });
     teamsByLevel.set(team.levelKey, list);
   }
-  const levelGroups = [...teamsByLevel.entries()].map(([levelKey, levelTeams]) => ({
-    levelKey,
-    teams: levelTeams,
+  const levelGroups = sortLevelKeysForNav([...teamsByLevel.keys()]).map((key) => ({
+    levelKey: key,
+    teams: teamsByLevel.get(key) ?? [],
   }));
 
   if (error) {

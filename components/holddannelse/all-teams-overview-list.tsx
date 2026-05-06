@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import { useMemo, useState } from "react";
 import { usePlayerModal } from "@/components/player-modal-context";
 
 type PlayerListItem = {
@@ -23,6 +24,12 @@ type LevelGroup = {
 
 export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
   const { openPlayer } = usePlayerModal();
+  const [levelFilter, setLevelFilter] = useState<string>("all");
+
+  const visibleGroups = useMemo(() => {
+    if (levelFilter === "all") return groups;
+    return groups.filter((g) => g.levelKey === levelFilter);
+  }, [groups, levelFilter]);
 
   if (groups.length === 0) {
     return (
@@ -33,12 +40,38 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
   }
 
   return (
-    <div className="space-y-6">
-      {groups.map((group) => (
-        <section key={group.levelKey} className="rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#0d9488] dark:text-teal-300">
-            {group.levelKey}
-          </h2>
+    <div className="space-y-5">
+      <div className="rounded-xl border border-lc-border bg-white p-3 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35">
+        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          Filtrer niveau
+          <select
+            value={levelFilter}
+            onChange={(e) => setLevelFilter(e.target.value)}
+            className="mt-1.5 block w-full max-w-sm rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+          >
+            <option value="all">Alle niveauer</option>
+            {groups.map((group) => (
+              <option key={group.levelKey} value={group.levelKey}>
+                {group.levelKey}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {visibleGroups.map((group, idx) => (
+        <section
+          key={group.levelKey}
+          className={`rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 ${
+            levelFilter === "all" && idx > 0 ? "pt-5" : ""
+          }`}
+        >
+          <div className="mb-3 flex items-center gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#0d9488] dark:text-teal-300">
+              {group.levelKey}
+            </h2>
+            <span className="h-px flex-1 bg-gradient-to-r from-teal-300/70 to-transparent dark:from-teal-700/70" />
+          </div>
 
           <div className="mt-3 space-y-3">
             {group.teams.map((team) => (
@@ -83,6 +116,12 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
           </div>
         </section>
       ))}
+
+      {visibleGroups.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-gray-200 bg-white px-5 py-8 text-center text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900/35 dark:text-gray-400">
+          Ingen hold for det valgte niveau.
+        </p>
+      ) : null}
     </div>
   );
 }
