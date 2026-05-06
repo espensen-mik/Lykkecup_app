@@ -162,6 +162,8 @@ export function PublicDashboardScreen() {
   }, []);
 
   const percent = data?.progress.percentAssigned ?? 0;
+  const clampedPercent = Math.max(0, Math.min(100, percent));
+  const progressTextInside = clampedPercent >= 16;
   const clubBars = (data?.charts.clubBars ?? []).slice().reverse();
   const daysLeft = daysUntilLykkeCup2026();
   const levelDistribution = data?.charts.levelDistribution ?? [];
@@ -244,12 +246,17 @@ export function PublicDashboardScreen() {
             </div>
             <div className="h-12 w-full overflow-hidden rounded-full border border-white/10 bg-[#112B3C]">
               <div
-                className="flex h-full items-center justify-end bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 pr-4 text-sm font-extrabold text-[#083344] transition-[width] duration-700 ease-out"
-                style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
+                className={`flex h-full items-center bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 text-sm font-extrabold transition-[width] duration-700 ease-out ${
+                  progressTextInside ? "justify-end pr-4 text-[#083344]" : "justify-start pl-0 text-transparent"
+                }`}
+                style={{ width: `${clampedPercent}%` }}
               >
-                {percent.toFixed(1)}%
+                {progressTextInside ? `${percent.toFixed(1)}%` : ""}
               </div>
             </div>
+            {!progressTextInside ? (
+              <p className="mt-1 text-right text-xs font-bold text-teal-100">{percent.toFixed(1)}%</p>
+            ) : null}
             <p className="mt-2 text-right text-xs font-semibold uppercase tracking-[0.08em] text-teal-100/85">
               Procent færdig: {percent.toFixed(1)}%
             </p>
@@ -286,21 +293,21 @@ export function PublicDashboardScreen() {
             </div>
           </article>
 
-            <article className="min-h-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+            <article className="min-h-0 overflow-visible rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Spillere fordelt på niveau</p>
-              <div className="h-[calc(100%-1.5rem)] min-h-[320px] overflow-visible">
+              <div className="h-[calc(100%-1.5rem)] min-h-[360px] overflow-visible px-1 pb-1">
               <ResponsivePie
                 data={levelDistribution}
-                margin={{ top: 34, right: 135, bottom: 54, left: 135 }}
+                margin={{ top: 52, right: 155, bottom: 72, left: 155 }}
                 innerRadius={0.6}
                 padAngle={1.2}
                 cornerRadius={4}
                 activeOuterRadiusOffset={6}
                 arcLinkLabelsSkipAngle={0}
-                arcLinkLabelsOffset={10}
-                arcLinkLabelsDiagonalLength={14}
-                arcLinkLabelsStraightLength={22}
-                arcLinkLabel={(d) => `${String(d.label)} (${Number(d.value)} spillere)`}
+                arcLinkLabelsOffset={8}
+                arcLinkLabelsDiagonalLength={10}
+                arcLinkLabelsStraightLength={16}
+                arcLinkLabel={(d) => `${String(d.label)} (${Number(d.value)})`}
                 colors={({ id }) => {
                   const key = String(id).toLowerCase();
                   if (key.includes("power")) return "#34d399";
@@ -314,7 +321,7 @@ export function PublicDashboardScreen() {
                 arcLinkLabelsColor="#c9d8e8"
                 arcLinkLabelsTextColor="#eef6ff"
                 theme={{
-                  labels: { text: { fill: "#eef6ff", fontSize: 13, fontWeight: 600 } },
+                  labels: { text: { fill: "#eef6ff", fontSize: 12, fontWeight: 600 } },
                   tooltip: { container: { background: "#0f2235", color: "#d8e7f7", border: "1px solid rgba(255,255,255,0.15)" } },
                 }}
               />
