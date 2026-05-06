@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ListerPage() {
-  const { players, coaches, error } = await fetchListerExportData();
+  const { teams, players, coaches, error } = await fetchListerExportData();
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-8">
@@ -26,7 +26,7 @@ export default async function ListerPage() {
         </p>
       </header>
 
-      <ListerExportClient players={players} coaches={coaches} fetchError={error} />
+      <ListerExportClient teams={teams} players={players} coaches={coaches} fetchError={error} />
     </div>
   );
 }

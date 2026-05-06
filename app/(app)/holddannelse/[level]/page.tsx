@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ level: string }>;
+  searchParams?: Promise<{ team?: string }>;
 };
 
 function decodeLevelParam(segment: string): string {
@@ -29,8 +30,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function HoldLevelPage({ params }: PageProps) {
+export default async function HoldLevelPage({ params, searchParams }: PageProps) {
   const { level } = await params;
+  const qp = searchParams ? await searchParams : undefined;
+  const requestedTeamId = qp?.team?.trim() || null;
   const levelKey = normalizeLevelKey(decodeLevelParam(level));
 
   const bundle = await fetchHoldLevelData(levelKey);
@@ -85,6 +88,9 @@ export default async function HoldLevelPage({ params }: PageProps) {
         initialEventAssignedPlayerIds={bundle.eventAssignedPlayerIds}
         initialCoaches={bundle.coaches}
         initialTeamCoaches={bundle.teamCoaches}
+        initialActiveTeamId={
+          requestedTeamId && bundle.teams.some((t) => t.id === requestedTeamId) ? requestedTeamId : null
+        }
       />
     </div>
   );

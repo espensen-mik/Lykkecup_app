@@ -242,7 +242,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
               <ChevronDown className={`h-4 w-4 transition-transform ${holdOpen ? "" : "-rotate-90"}`} aria-hidden />
             </button>
           </div>
-          {holdOpen && sortedHoldLevels.length > 0 ? (
+          {holdOpen ? (
             <ul className="ml-6 space-y-0.5 border-l border-gray-200 py-0.5 pl-3 dark:border-gray-700" aria-label="Holddannelse niveauer">
               {sortedHoldLevels.map((levelKey) => {
                 const href = `/holddannelse/${encodeURIComponent(levelKey)}`;
@@ -264,6 +264,19 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                   </li>
                 );
               })}
+              <li key="hold-alle-hold">
+                <Link
+                  href="/holddannelse/alle-hold"
+                  onClick={() => setMobileOpen(false)}
+                  className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
+                    pathname === "/holddannelse/alle-hold"
+                      ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+                  }`}
+                >
+                  Alle hold
+                </Link>
+              </li>
             </ul>
           ) : null}
         </div>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { UsersRound } from "lucide-react";
+import Link from "next/link";
 import type { PlayerAssignedTeamSummary } from "@/lib/players";
 import type { PlayerDetail } from "@/types/player";
 import { formatBirthdate, formatPreferences } from "@/lib/format";
@@ -110,6 +111,14 @@ export function PlayerDetailContent({ player, assignedTeam, onEditField }: Props
                   {assignedTeam.officialName}
                 </p>
               ) : null}
+              <p className="mt-2">
+                <Link
+                  href={`/holddannelse/${encodeURIComponent(assignedTeam.levelKey)}?team=${encodeURIComponent(assignedTeam.teamId)}`}
+                  className="inline-flex items-center rounded-md border border-teal-300/80 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#0f766e] hover:bg-teal-50 dark:border-teal-700 dark:bg-transparent dark:text-teal-200 dark:hover:bg-teal-950/40"
+                >
+                  Se holdmedlemmer i Holddannelse
+                </Link>
+              </p>
             </div>
           </div>
         </div>

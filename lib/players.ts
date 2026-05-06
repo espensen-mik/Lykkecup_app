@@ -48,6 +48,10 @@ export async function fetchPlayerById(
 
 /** Tildelt hold i KontrolCenter: kaldenavn som primær tekst når sat, officielt navn til oversigt. */
 export type PlayerAssignedTeamSummary = {
+  /** Team id til dybdelink fra spiller-modal. */
+  teamId: string;
+  /** Niveau-nøgle til link til korrekt holddannelse-side. */
+  levelKey: string;
   /** Primær visning (kaldenavn hvis udfyldt, ellers officielt navn). */
   displayName: string;
   /** Autogenereret holdnavn fra holddannelse. */
@@ -70,18 +74,19 @@ export async function fetchAssignedTeamForPlayer(
 
   const { data: team, error: teamErr } = await supabase
     .from("teams")
-    .select("name, nickname")
+    .select("id, name, nickname, level")
     .eq("id", mem.team_id)
     .eq("event_id", LYKKECUP_EVENT_ID)
     .maybeSingle();
 
   if (teamErr || !team) return null;
-  const row = team as { name: string; nickname?: string | null };
+  const row = team as { id: string; name: string; nickname?: string | null; level: string | null };
   const officialName = row.name?.trim() ?? "";
   if (!officialName) return null;
   const nick = row.nickname?.trim();
   const displayName = nick && nick.length > 0 ? nick : officialName;
-  return { displayName, officialName };
+  const levelKey = row.level?.trim() || "Ukendt niveau";
+  return { teamId: row.id, levelKey, displayName, officialName };
 }
 
 /** All players for the event — dashboard aggregations and charts */

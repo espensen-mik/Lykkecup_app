@@ -8,6 +8,7 @@ import {
   preferencesTooltipText,
   type PreferenceBadgeLabel,
 } from "@/lib/player-preferences";
+import { publicTeamDisplayName } from "@/lib/team-public-display-name";
 import { supabase } from "@/lib/supabase";
 import type { HoldCoachRow, HoldPlayerRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 import { StyledSelect } from "@/components/ui/styled-select";
@@ -20,6 +21,7 @@ type Props = {
   initialEventAssignedPlayerIds: string[];
   initialCoaches: HoldCoachRow[];
   initialTeamCoaches: TeamCoachRow[];
+  initialActiveTeamId?: string | null;
 };
 
 const BADGE_CLASS: Record<PreferenceBadgeLabel, string> = {
@@ -59,6 +61,7 @@ export function TeamBuilder({
   initialEventAssignedPlayerIds,
   initialCoaches,
   initialTeamCoaches,
+  initialActiveTeamId,
 }: Props) {
   const canonical = normalizeLevelKey(levelKey);
 
@@ -71,7 +74,9 @@ export function TeamBuilder({
   const [coaches] = useState<HoldCoachRow[]>(initialCoaches);
   const [teamCoachLinks, setTeamCoachLinks] = useState<TeamCoachRow[]>(initialTeamCoaches);
 
-  const [activeTeamId, setActiveTeamId] = useState<string | null>(() => initialTeams[0]?.id ?? null);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(
+    () => initialActiveTeamId ?? initialTeams[0]?.id ?? null,
+  );
   const [leftTab, setLeftTab] = useState<"spillere" | "traenere">("spillere");
   const [search, setSearch] = useState("");
   const [clubFilter, setClubFilter] = useState<string>("");
@@ -826,7 +831,7 @@ export function TeamBuilder({
                           />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-base font-semibold text-emerald-950 dark:text-emerald-50">
-                              {t.name}
+                              {publicTeamDisplayName(t)}
                             </span>
                             <span className="mt-0.5 block text-xs tabular-nums text-emerald-800/90 dark:text-emerald-200/90">
                               {tMembers.length} {tMembers.length === 1 ? "spiller" : "spillere"}
