@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AllTeamsExport } from "@/components/all-teams-export";
+import { AllTeamsOverviewList } from "@/components/holddannelse/all-teams-overview-list";
 import { fetchListerExportData } from "@/lib/lister";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,43 @@ export default async function AlleHoldPage() {
     perLevel.set(t.levelKey, item);
   }
   const levelRows = [...perLevel.values()];
+
+  const playersByTeamId = new Map<string, { id: string; name: string }[]>();
+  for (const p of players) {
+    if (!p.team_id) continue;
+    const list = playersByTeamId.get(p.team_id) ?? [];
+    list.push({ id: p.id, name: p.name });
+    playersByTeamId.set(p.team_id, list);
+  }
+  for (const list of playersByTeamId.values()) {
+    list.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
+  }
+
+  const teamsByLevel = new Map<
+    string,
+    {
+      id: string;
+      displayName: string;
+      officialName: string;
+      nickname: string | null;
+      players: { id: string; name: string }[];
+    }[]
+  >();
+  for (const team of teams) {
+    const list = teamsByLevel.get(team.levelKey) ?? [];
+    list.push({
+      id: team.id,
+      displayName: team.displayName,
+      officialName: team.officialName,
+      nickname: team.nickname,
+      players: playersByTeamId.get(team.id) ?? [],
+    });
+    teamsByLevel.set(team.levelKey, list);
+  }
+  const levelGroups = [...teamsByLevel.entries()].map(([levelKey, levelTeams]) => ({
+    levelKey,
+    teams: levelTeams,
+  }));
 
   if (error) {
     return (
@@ -84,6 +122,16 @@ export default async function AlleHoldPage() {
         printTitle="Alle hold til LykkeCup26"
         csvFilename="alle-hold-til-lykkecup26.csv"
       />
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          Hold og spillere
+        </h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Klik på et spillernavn for at åbne spillerens detalje-modal.
+        </p>
+        <AllTeamsOverviewList groups={levelGroups} />
+      </section>
     </div>
   );
 }

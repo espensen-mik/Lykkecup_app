@@ -488,6 +488,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
               <PlayerDetailContent
                 player={player}
                 assignedTeam={assignedTeam}
+                onAssignedTeamNavigate={onClose}
                 onEditField={(field) => {
                   setEditingField(field);
                   setSaveError(null);
