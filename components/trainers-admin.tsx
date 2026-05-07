@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check } from "lucide-react";
 import { useMemo, useState } from "react";
 import { StyledSelect } from "@/components/ui/styled-select";
 import type { Coach } from "@/types/coach";
@@ -9,6 +9,7 @@ import { useCoachModal } from "@/components/coach-modal-context";
 type Props = {
   coaches: Coach[];
   fetchError: string | null;
+  assignedCoachIds: string[];
 };
 
 type SortKey = "name" | "home_club" | "age";
@@ -147,12 +148,13 @@ function SortableTh({
   );
 }
 
-export function TrainersAdmin({ coaches, fetchError }: Props) {
+export function TrainersAdmin({ coaches, fetchError, assignedCoachIds }: Props) {
   const [search, setSearch] = useState("");
   const [club, setClub] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const { openCoach } = useCoachModal();
+  const assignedCoachIdSet = useMemo(() => new Set(assignedCoachIds), [assignedCoachIds]);
 
   const clubs = useMemo(() => {
     const set = new Set<string>();
@@ -293,7 +295,7 @@ export function TrainersAdmin({ coaches, fetchError }: Props) {
 
       <div className="-mx-1 overflow-x-auto sm:mx-0">
         <div className="inline-block min-w-full rounded-lg border border-lc-border dark:border-gray-700">
-          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-lc-border bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/50">
                 <SortableTh label="Navn" columnKey="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -305,18 +307,23 @@ export function TrainersAdmin({ coaches, fetchError }: Props) {
                 <th scope="col" className="px-5 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500">
                   Billet-id
                 </th>
+                <th scope="col" className="px-5 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500">
+                  På hold
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-lc-border bg-white dark:divide-gray-700 dark:bg-gray-900/20">
               {sortedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
                     Ingen trænere matcher filtrene.
                   </td>
                 </tr>
               ) : (
-                sortedRows.map((c) => (
-                  <tr
+                sortedRows.map((c) => {
+                  const isAssigned = assignedCoachIdSet.has(c.id);
+                  return (
+                    <tr
                     key={c.id}
                     tabIndex={0}
                     role="link"
@@ -329,14 +336,32 @@ export function TrainersAdmin({ coaches, fetchError }: Props) {
                       }
                     }}
                     className="cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#14b8a6]/25 odd:bg-white even:bg-gray-50/35 dark:odd:bg-gray-900/20 dark:even:bg-gray-900/35"
-                  >
-                    <td className="px-5 py-3.5 font-medium text-gray-900 dark:text-white">{c.name}</td>
-                    <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">{formatCell(c.home_club)}</td>
-                    <td className="px-5 py-3.5 tabular-nums text-gray-600 dark:text-gray-300">{formatCell(c.age)}</td>
-                    <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">{formatCell(c.tshirt_size)}</td>
-                    <td className="px-5 py-3.5 font-mono text-xs text-gray-500 dark:text-gray-400">{formatCell(c.ticket_id)}</td>
-                  </tr>
-                ))
+                    >
+                      <td className="px-5 py-3.5 font-medium text-gray-900 dark:text-white">{c.name}</td>
+                      <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">{formatCell(c.home_club)}</td>
+                      <td className="px-5 py-3.5 tabular-nums text-gray-600 dark:text-gray-300">{formatCell(c.age)}</td>
+                      <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">{formatCell(c.tshirt_size)}</td>
+                      <td className="px-5 py-3.5 font-mono text-xs text-gray-500 dark:text-gray-400">
+                        {formatCell(c.ticket_id)}
+                      </td>
+                      <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">
+                        {isAssigned ? (
+                          <span
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                            aria-label="På hold"
+                            title="Træneren er på hold"
+                          >
+                            <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 dark:text-gray-600" aria-hidden>
+                            —
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

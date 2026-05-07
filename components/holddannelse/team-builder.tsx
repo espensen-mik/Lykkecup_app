@@ -81,7 +81,6 @@ export function TeamBuilder({
   const [search, setSearch] = useState("");
   const [clubFilter, setClubFilter] = useState<string>("");
   const [coachSearch, setCoachSearch] = useState("");
-  const [coachClubFilter, setCoachClubFilter] = useState<string>("");
   const [prefFilter, setPrefFilter] = useState<string>("alle");
   const [onlyUnassigned, setOnlyUnassigned] = useState(true);
   const [onlyUnassignedCoaches, setOnlyUnassignedCoaches] = useState(true);
@@ -222,13 +221,13 @@ export function TeamBuilder({
     return coaches.filter((c) => {
       if (onlyUnassignedCoaches && coachIdsOnAnyTeamInEvent.has(c.id)) return false;
       if (q && !c.name.toLowerCase().includes(q)) return false;
-      if (coachClubFilter) {
+      if (clubFilter) {
         const club = c.home_club?.trim() ?? "";
-        if (club !== coachClubFilter) return false;
+        if (club !== clubFilter) return false;
       }
       return true;
     });
-  }, [coaches, coachSearch, coachClubFilter, onlyUnassignedCoaches, coachIdsOnAnyTeamInEvent]);
+  }, [coaches, coachSearch, clubFilter, onlyUnassignedCoaches, coachIdsOnAnyTeamInEvent]);
 
   const addPlayerToActiveTeam = useCallback(
     async (playerId: string) => {
@@ -690,8 +689,8 @@ export function TeamBuilder({
                   <StyledSelect
                     id="holddannelse-coach-club"
                     className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                    value={coachClubFilter}
-                    onChange={(e) => setCoachClubFilter(e.target.value)}
+                    value={clubFilter}
+                    onChange={(e) => setClubFilter(e.target.value)}
                   >
                     <option value="">Alle klubber</option>
                     {coachClubOptions.map((club) => (
