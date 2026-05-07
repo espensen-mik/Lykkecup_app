@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { usePlayerModal } from "@/components/player-modal-context";
 import { StyledSelect } from "@/components/ui/styled-select";
@@ -11,6 +11,7 @@ import type { Player } from "@/types/player";
 type Props = {
   players: Player[];
   fetchError: string | null;
+  assignedPlayerIds: string[];
 };
 
 function formatCell(value: string | number | null): string {
@@ -152,7 +153,7 @@ function SortableTh({
   );
 }
 
-export function PlayersAdmin({ players, fetchError }: Props) {
+export function PlayersAdmin({ players, fetchError, assignedPlayerIds }: Props) {
   const { openPlayer } = usePlayerModal();
   const [rows, setRows] = useState<Player[]>(players);
   const [search, setSearch] = useState("");
@@ -224,6 +225,7 @@ export function PlayersAdmin({ players, fetchError }: Props) {
     }
     return [...filtered].sort((a, b) => comparePlayers(a, b, sortKey, sortDir));
   }, [filtered, sortKey, sortDir, clubSortMode]);
+  const assignedPlayerIdSet = useMemo(() => new Set(assignedPlayerIds), [assignedPlayerIds]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -302,7 +304,7 @@ export function PlayersAdmin({ players, fetchError }: Props) {
 
       <div className="-mx-1 overflow-x-auto sm:mx-0">
         <div className="inline-block min-w-full rounded-lg border border-lc-border dark:border-gray-700">
-          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[700px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-lc-border bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/50">
                 <SortableTh
@@ -345,13 +347,18 @@ export function PlayersAdmin({ players, fetchError }: Props) {
                   onSort={toggleSort}
                   sortDisabled={clubSortMode}
                 />
+                <th scope="col" className="px-5 py-3 text-left align-bottom">
+                  <span className="inline-flex max-w-full items-center rounded-md text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    På hold
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-lc-border bg-white dark:divide-gray-700 dark:bg-gray-900/20">
             {sortedRows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400"
                 >
                   Ingen spillere matcher filtrene.
@@ -360,6 +367,7 @@ export function PlayersAdmin({ players, fetchError }: Props) {
             ) : (
               sortedRows.map((p) => {
                 const lv = getLevelVisualClasses(p.level);
+                const isAssigned = assignedPlayerIdSet.has(p.id);
                 return (
                 <tr
                   key={p.id}
@@ -389,6 +397,21 @@ export function PlayersAdmin({ players, fetchError }: Props) {
                   </td>
                   <td className="px-5 py-3.5 font-mono text-xs text-gray-500 dark:text-gray-400">
                     {formatCell(p.ticket_id)}
+                  </td>
+                  <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">
+                    {isAssigned ? (
+                      <span
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        aria-label="På hold"
+                        title="Spilleren er på hold"
+                      >
+                        <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 dark:text-gray-600" aria-hidden>
+                        —
+                      </span>
+                    )}
                   </td>
                 </tr>
                 );

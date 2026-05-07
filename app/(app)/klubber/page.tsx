@@ -5,7 +5,8 @@ import { UNKNOWN_CLUB_LABEL, groupPlayersByClub } from "@/lib/clubs";
 import { indexFeedbackByClub, fetchClubFeedbackForEvent } from "@/lib/club-feedback";
 import { formatDaDateTime } from "@/lib/datetime";
 import { getLevelVisualClasses } from "@/lib/level-colors";
-import { fetchPlayersForEvent } from "@/lib/players";
+import { fetchPlayersForEvent, LYKKECUP_EVENT_ID } from "@/lib/players";
+import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +21,18 @@ function formatLevel(level: string | null): string | null {
 }
 
 export default async function KlubberPage() {
-  const [playersRes, feedbackRes] = await Promise.all([
+  const [playersRes, feedbackRes, membersRes] = await Promise.all([
     fetchPlayersForEvent(),
     fetchClubFeedbackForEvent(),
+    supabase.from("team_members").select("player_id").eq("event_id", LYKKECUP_EVENT_ID),
   ]);
   const { players, error } = playersRes;
   const feedbackByClub = indexFeedbackByClub(feedbackRes.comments);
   const feedbackLoadError = feedbackRes.error;
+  const membersLoadError = membersRes.error?.message ?? null;
+  const assignedPlayerIds = new Set(
+    ((membersRes.data ?? []) as { player_id: string }[]).map((row) => row.player_id),
+  );
 
   if (error) {
     return (
@@ -78,6 +84,11 @@ export default async function KlubberPage() {
           Kommentarer kunne ikke indlæses: {feedbackLoadError}
         </div>
       ) : null}
+      {membersLoadError ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+          Holddannelse-fremdrift kunne ikke indlæses: {membersLoadError}
+        </div>
+      ) : null}
 
       {groups.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">Ingen spillere at vise.</p>
@@ -85,6 +96,12 @@ export default async function KlubberPage() {
         <ul className="grid gap-4 lg:grid-cols-2 lg:gap-5">
           {groups.map((group) => {
             const clubComments = feedbackByClub.get(group.name) ?? [];
+            const totalPlayers = group.players.length;
+            const assignedPlayers = group.players.reduce(
+              (count, player) => count + (assignedPlayerIds.has(player.id) ? 1 : 0),
+              0,
+            );
+            const progressPercent = totalPlayers > 0 ? (assignedPlayers / totalPlayers) * 100 : 0;
             return (
               <li
                 key={group.name}
@@ -92,17 +109,33 @@ export default async function KlubberPage() {
                   group.name === UNKNOWN_CLUB_LABEL ? "lg:col-span-2" : ""
                 }`}
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-lc-border bg-gray-50/80 px-5 py-3.5 dark:border-gray-700 dark:bg-gray-800/40">
-                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                    {group.name}
-                  </h2>
-                  <span
-                    title={`Antal spillere i ${group.name}: ${group.players.length}`}
-                    className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-medium tabular-nums text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-300"
-                  >
-                    {group.players.length}{" "}
-                    {group.players.length === 1 ? "spiller" : "spillere"}
-                  </span>
+                <div className="space-y-2 border-b border-lc-border bg-gray-50/80 px-5 py-3.5 dark:border-gray-700 dark:bg-gray-800/40">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {group.name}
+                    </h2>
+                    <span
+                      title={`Antal spillere i ${group.name}: ${group.players.length}`}
+                      className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-medium tabular-nums text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-300"
+                    >
+                      {group.players.length}{" "}
+                      {group.players.length === 1 ? "spiller" : "spillere"}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="mb-1 flex items-center justify-between gap-2 text-[0.7rem] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      <span>Holddannelse</span>
+                      <span className="tabular-nums">
+                        {assignedPlayers}/{totalPlayers} · {Math.round(progressPercent)}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-500 transition-[width] duration-300"
+                        style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
                 <ul className="divide-y divide-lc-border dark:divide-gray-700">
                   {group.players.map((p) => {
