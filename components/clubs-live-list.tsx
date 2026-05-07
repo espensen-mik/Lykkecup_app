@@ -110,22 +110,41 @@ export function ClubsLiveList({
           Holddannelse-fremdrift kunne ikke indlæses: {membersLoadError}
         </div>
       ) : null}
-      <div className="max-w-sm">
-        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Filtrer klub
-        </label>
-        <StyledSelect
-          value={clubFilter}
-          onChange={(e) => setClubFilter(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-        >
-          <option value="">Alle klubber</option>
-          {clubOptions.map((club) => (
-            <option key={club} value={club}>
-              {club}
-            </option>
-          ))}
-        </StyledSelect>
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="max-w-sm flex-1 min-w-[240px]">
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Filtrer klub
+          </label>
+          <StyledSelect
+            value={clubFilter}
+            onChange={(e) => setClubFilter(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          >
+            <option value="">Alle klubber</option>
+            {clubOptions.map((club) => (
+              <option key={club} value={club}>
+                {club}
+              </option>
+            ))}
+          </StyledSelect>
+        </div>
+        <div className="pb-1 text-xs text-gray-600 dark:text-gray-300">
+          <p className="mb-1 font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Forklaring</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-1.5" title="Spilleren er tildelt et hold i Holddannelse.">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+              </span>
+              På hold
+            </span>
+            <span className="inline-flex items-center gap-1.5" title="Spilleren er endnu ikke tildelt et hold.">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500">
+                <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+              </span>
+              Ikke på hold
+            </span>
+          </div>
+        </div>
       </div>
 
       {visibleGroups.length === 0 ? (
@@ -182,21 +201,27 @@ export function ClubsLiveList({
                           playerId={p.id}
                           className={`flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3 text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#14b8a6]/25 dark:focus-visible:ring-teal-500/30 ${lv.row} ${lv.rowHover} ${lv.rowFocus}`}
                         >
-                          <span className="font-medium text-[#0d9488] underline-offset-4 hover:underline dark:text-teal-400">
-                            {p.name}
+                          <span className="inline-flex min-w-0 items-center gap-2">
+                            <span
+                              className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                                assignedPlayerIdSet.has(p.id)
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                  : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                              }`}
+                              title={
+                                assignedPlayerIdSet.has(p.id)
+                                  ? "Spilleren er tildelt et hold."
+                                  : "Spilleren er endnu ikke tildelt et hold."
+                              }
+                              aria-label={assignedPlayerIdSet.has(p.id) ? "På hold" : "Ikke på hold"}
+                            >
+                              <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+                            </span>
+                            <span className="truncate font-medium text-[#0d9488] underline-offset-4 hover:underline dark:text-teal-400">
+                              {p.name}
+                            </span>
                           </span>
-                          <span className="inline-flex items-center gap-2">
-                            {assignedPlayerIdSet.has(p.id) ? (
-                              <span
-                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                title="På hold"
-                                aria-label="På hold"
-                              >
-                                <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
-                              </span>
-                            ) : null}
-                            {lvl ? <span className={lv.badge}>Niveau {lvl}</span> : null}
-                          </span>
+                          {lvl ? <span className={lv.badge}>Niveau {lvl}</span> : null}
                         </OpenPlayerRowButton>
                       </li>
                     );
