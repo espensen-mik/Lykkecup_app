@@ -42,7 +42,11 @@ type PlayerChangeLogRow = {
 };
 
 function filterLegacyUnknownLogs(rows: PlayerChangeLogRow[]): PlayerChangeLogRow[] {
-  return rows.filter((row) => (row.changed_by_name?.trim() ?? "") !== "Ukendt");
+  return rows.filter((row) => {
+    const actor = row.changed_by_name?.trim() ?? "";
+    if (!actor) return true;
+    return !actor.toLocaleLowerCase("da").startsWith("ukendt");
+  });
 }
 
 const emptyDraft: PlayerDraft = {
