@@ -22,6 +22,8 @@ type Props = {
 };
 
 const ALL_CLUBS = "__all__";
+const SORT_NEWEST = "newest";
+const SORT_CLUB = "club";
 
 function initialsFromName(name: string): string {
   const parts = name
@@ -38,9 +40,10 @@ function initialsFromName(name: string): string {
 export function KommentarerFilteredList({ comments, totalCount, currentUser }: Props) {
   const router = useRouter();
   const [clubKey, setClubKey] = useState<string>(ALL_CLUBS);
+  const [sortMode, setSortMode] = useState<string>(SORT_CLUB);
   const [query, setQuery] = useState("");
   const [messageDraft, setMessageDraft] = useState<Record<string, string>>({});
-  const [expandedHandled, setExpandedHandled] = useState<Record<string, boolean>>({});
+  const [expandedById, setExpandedById] = useState<Record<string, boolean>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorById, setErrorById] = useState<Record<string, string | null>>({});
 
@@ -80,9 +83,15 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       const aHandled = Boolean(a.handled_at);
       const bHandled = Boolean(b.handled_at);
       if (aHandled !== bHandled) return aHandled ? 1 : -1;
+      if (sortMode === SORT_CLUB) {
+        const clubCmp = (a.home_club?.trim() ?? "").localeCompare(b.home_club?.trim() ?? "", "da", {
+          sensitivity: "base",
+        });
+        if (clubCmp !== 0) return clubCmp;
+      }
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [comments, clubKey, query]);
+  }, [comments, clubKey, query, sortMode]);
 
   const filterActive =
     clubKey !== ALL_CLUBS || query.trim().length > 0 || filtered.length !== totalCount;
@@ -148,7 +157,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       }));
       return;
     }
-    setExpandedHandled((prev) => ({ ...prev, [commentId]: false }));
+    setExpandedById((prev) => ({ ...prev, [commentId]: false }));
     router.refresh();
   }
 
@@ -177,7 +186,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       }));
       return;
     }
-    setExpandedHandled((prev) => ({ ...prev, [commentId]: false }));
+    setExpandedById((prev) => ({ ...prev, [commentId]: false }));
     router.refresh();
   }
 
@@ -207,7 +216,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       }));
       return;
     }
-    setExpandedHandled((prev) => {
+    setExpandedById((prev) => {
       const next = { ...prev };
       delete next[commentId];
       return next;
@@ -276,6 +285,23 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
             />
           </div>
         </div>
+        <div className="min-w-0 flex-1 sm:max-w-xs">
+          <label
+            htmlFor="kommentarer-sortering"
+            className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+          >
+            Sortering
+          </label>
+          <StyledSelect
+            id="kommentarer-sortering"
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value)}
+            className="rounded-lg border border-lc-border bg-white py-2.5 pl-3 text-sm text-gray-900 shadow-sm outline-none transition-colors focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/25 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          >
+            <option value={SORT_NEWEST}>Nyeste først</option>
+            <option value={SORT_CLUB}>Alfabetisk ved klub</option>
+          </StyledSelect>
+        </div>
       </div>
 
       <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -302,27 +328,54 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
         <ul className="space-y-4">
           {filtered.map((c) => {
             const handled = Boolean(c.handled_at);
-            const expanded = expandedHandled[c.id] === true;
+            const expanded = expandedById[c.id] === true;
 
-            if (handled && !expanded) {
+            if (!expanded) {
               return (
                 <li key={c.id}>
                   <button
                     type="button"
-                    onClick={() => setExpandedHandled((prev) => ({ ...prev, [c.id]: true }))}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/95 px-4 py-3 text-left shadow-sm transition hover:bg-emerald-100/90 dark:border-emerald-900/50 dark:bg-emerald-950/35 dark:hover:bg-emerald-950/50"
+                    onClick={() => setExpandedById((prev) => ({ ...prev, [c.id]: true }))}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left shadow-sm transition ${
+                      handled
+                        ? "border-emerald-200 bg-emerald-50/95 hover:bg-emerald-100/90 dark:border-emerald-900/50 dark:bg-emerald-950/35 dark:hover:bg-emerald-950/50"
+                        : "border-lc-border bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900/35 dark:hover:bg-gray-900/50"
+                    }`}
                   >
                     <span className="flex min-w-0 flex-wrap items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                      <span className="font-semibold text-emerald-900 dark:text-emerald-100">Håndteret</span>
-                      <span className="text-xs tabular-nums text-emerald-800/90 dark:text-emerald-200/90">
-                        {c.handled_at ? formatDaDateTime(c.handled_at) : ""}
+                      {handled ? (
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                      ) : (
+                        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 text-[0.65rem] font-bold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+                          !
+                        </span>
+                      )}
+                      <span
+                        className={`font-semibold ${
+                          handled ? "text-emerald-900 dark:text-emerald-100" : "text-gray-900 dark:text-gray-100"
+                        }`}
+                      >
+                        {handled ? "Håndteret" : "Ikke håndteret"}
                       </span>
-                      <span className="truncate text-sm text-emerald-900/80 dark:text-emerald-200/80">
+                      <span
+                        className={`text-xs tabular-nums ${
+                          handled ? "text-emerald-800/90 dark:text-emerald-200/90" : "text-gray-500 dark:text-gray-400"
+                        }`}
+                      >
+                        {formatDaDateTime(c.created_at)}
+                      </span>
+                      <span
+                        className={`truncate text-sm ${
+                          handled ? "text-emerald-900/80 dark:text-emerald-200/80" : "text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
                         · {c.home_club?.trim() || "—"}
                       </span>
                     </span>
-                    <ChevronDown className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden />
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 ${handled ? "text-emerald-700 dark:text-emerald-300" : "text-gray-500 dark:text-gray-400"}`}
+                      aria-hidden
+                    />
                   </button>
                 </li>
               );
@@ -340,7 +393,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                 {handled ? (
                   <button
                     type="button"
-                    onClick={() => setExpandedHandled((prev) => ({ ...prev, [c.id]: false }))}
+                    onClick={() => setExpandedById((prev) => ({ ...prev, [c.id]: false }))}
                     className="flex w-full items-center justify-between gap-2 border-b border-emerald-100 bg-emerald-50/90 px-4 py-2.5 text-left text-sm font-medium text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-100"
                   >
                     <span className="flex items-center gap-2">
@@ -349,7 +402,16 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                     </span>
                     <ChevronDown className="h-4 w-4 rotate-180" aria-hidden />
                   </button>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedById((prev) => ({ ...prev, [c.id]: false }))}
+                    className="flex w-full items-center justify-between gap-2 border-b border-amber-100 bg-amber-50/70 px-4 py-2.5 text-left text-sm font-medium text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+                  >
+                    <span className="flex items-center gap-2">Ikke håndteret · klik for at folde sammen</span>
+                    <ChevronDown className="h-4 w-4 rotate-180" aria-hidden />
+                  </button>
+                )}
 
                 <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-teal-200/70 bg-teal-50/50 px-5 py-3 dark:border-teal-900/40 dark:bg-teal-950/25">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">
