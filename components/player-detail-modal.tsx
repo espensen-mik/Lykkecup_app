@@ -41,6 +41,10 @@ type PlayerChangeLogRow = {
   changed_by_name: string | null;
 };
 
+function filterLegacyUnknownLogs(rows: PlayerChangeLogRow[]): PlayerChangeLogRow[] {
+  return rows.filter((row) => (row.changed_by_name?.trim() ?? "") !== "Ukendt");
+}
+
 const emptyDraft: PlayerDraft = {
   name: "",
   homeClub: "",
@@ -272,7 +276,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       setPlayer(detail);
       setDraft(toDraft(detail));
       setAssignedTeam(teamSummary);
-      setLogs((logsRes.data ?? []) as PlayerChangeLogRow[]);
+      setLogs(filterLegacyUnknownLogs((logsRes.data ?? []) as PlayerChangeLogRow[]));
       if (!metaRes.error) {
         const rows = (metaRes.data ?? []) as { home_club: string | null; gender: string | null; level: string | null }[];
         const levels = new Set<string>();
@@ -366,7 +370,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       .order("changed_at", { ascending: false })
       .limit(30);
     if (!logsRes.error) {
-      setLogs((logsRes.data ?? []) as PlayerChangeLogRow[]);
+      setLogs(filterLegacyUnknownLogs((logsRes.data ?? []) as PlayerChangeLogRow[]));
     }
   }
 

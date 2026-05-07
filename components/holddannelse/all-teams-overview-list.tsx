@@ -75,6 +75,13 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
     }
     return [...byKey.values()].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" }));
   }, [liveGroups]);
+  const querySuggestions = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("da");
+    if (!needle) return [];
+    return suggestions
+      .filter((name) => name.toLocaleLowerCase("da").includes(needle))
+      .slice(0, 8);
+  }, [suggestions, query]);
 
   const visibleGroups = useMemo(() => {
     const base = levelFilter === "all" ? liveGroups : liveGroups.filter((g) => g.levelKey === levelFilter);
@@ -136,18 +143,29 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
           </label>
           <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             Søg spiller/træner
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              list="alle-hold-name-suggestions"
-              placeholder="Fx Sofie eller Mads"
-              className="mt-1.5 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-            />
-            <datalist id="alle-hold-name-suggestions">
-              {suggestions.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
+            <div className="relative mt-1.5">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Fx Sofie eller Mads"
+                className="block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-1 focus:ring-[#14b8a6] dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+              />
+              {querySuggestions.length > 0 ? (
+                <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                  {querySuggestions.map((name) => (
+                    <li key={name}>
+                      <button
+                        type="button"
+                        onClick={() => setQuery(name)}
+                        className="block w-full px-3 py-1.5 text-left text-xs font-medium text-gray-700 hover:bg-teal-50 hover:text-[#0f766e] dark:text-gray-200 dark:hover:bg-teal-950/35 dark:hover:text-teal-200"
+                      >
+                        {name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           </label>
         </div>
       </div>
