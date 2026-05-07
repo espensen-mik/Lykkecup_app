@@ -163,7 +163,7 @@ export function PublicDashboardScreen() {
 
   const percent = data?.progress.percentAssigned ?? 0;
   const clampedPercent = Math.max(0, Math.min(100, percent));
-  const progressTextInside = clampedPercent >= 16;
+  const progressTextInside = clampedPercent >= 8;
   const clubBars = (data?.charts.clubBars ?? []).slice().reverse();
   const daysLeft = daysUntilLykkeCup2026();
   const levelDistribution = data?.charts.levelDistribution ?? [];
@@ -246,16 +246,20 @@ export function PublicDashboardScreen() {
             </div>
             <div className="h-12 w-full overflow-hidden rounded-full border border-white/10 bg-[#112B3C]">
               <div
-                className={`flex h-full items-center bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 text-sm font-extrabold transition-[width] duration-700 ease-out ${
-                  progressTextInside ? "justify-end pr-4 text-[#083344]" : "justify-start pl-0 text-transparent"
+                className={`flex h-full items-center bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 transition-[width] duration-700 ease-out ${
+                  progressTextInside ? "justify-end pr-3" : "justify-start pl-0"
                 }`}
                 style={{ width: `${clampedPercent}%` }}
               >
-                {progressTextInside ? `${percent.toFixed(1)}%` : ""}
+                {progressTextInside ? (
+                  <span className="rounded-full bg-[#083344]/20 px-2.5 py-0.5 text-lg font-black tracking-tight text-white/95 shadow-[0_2px_8px_rgba(8,51,68,0.35)]">
+                    {percent.toFixed(1)}%
+                  </span>
+                ) : null}
               </div>
             </div>
             {!progressTextInside ? (
-              <p className="mt-1 text-right text-xs font-bold text-teal-100">{percent.toFixed(1)}%</p>
+              <p className="mt-1 text-right text-sm font-black text-teal-100">{percent.toFixed(1)}%</p>
             ) : null}
             <p className="mt-2 text-right text-xs font-semibold uppercase tracking-[0.08em] text-teal-100/85">
               Procent færdig: {percent.toFixed(1)}%
