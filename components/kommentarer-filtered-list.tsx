@@ -55,7 +55,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return comments.filter((c) => {
+    const rows = comments.filter((c) => {
       const club = c.home_club?.trim() ?? "";
       if (clubKey !== ALL_CLUBS && club !== clubKey) return false;
       if (!needle) return true;
@@ -75,6 +75,12 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
         .join("\n")
         .toLowerCase();
       return blob.includes(needle);
+    });
+    return rows.sort((a, b) => {
+      const aHandled = Boolean(a.handled_at);
+      const bHandled = Boolean(b.handled_at);
+      if (aHandled !== bHandled) return aHandled ? 1 : -1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [comments, clubKey, query]);
 
