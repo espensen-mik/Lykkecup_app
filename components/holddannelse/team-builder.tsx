@@ -119,6 +119,18 @@ export function TeamBuilder({
     for (const t of teams) m.set(t.id, t);
     return m;
   }, [teams]);
+  const teamDisplayName = useCallback(
+    (team: TeamRow | null | undefined): string => {
+      if (!team) return "—";
+      const draft = nicknameDrafts[team.id];
+      const draftOrStored = draft !== undefined ? draft : (team.nickname ?? "");
+      const nextNick = draftOrStored.trim();
+      if (nextNick) return nextNick;
+      return publicTeamDisplayName(team);
+    },
+    [nicknameDrafts],
+  );
+  const activeTeamName = teamDisplayName(activeTeamId ? teamById.get(activeTeamId) : null);
 
   const membersByTeam = useMemo(() => {
     const m = new Map<string, TeamMemberRow[]>();
@@ -483,10 +495,15 @@ export function TeamBuilder({
               <p className="mt-1 shrink-0 text-xs text-gray-500 dark:text-gray-400">
                 Klik på en spiller for at tilføje til det aktive hold (
                 <span className="font-medium text-gray-700 dark:text-gray-300">
-                  {activeTeamId ? teamById.get(activeTeamId)?.name ?? "—" : "vælg hold"}
+                  {activeTeamId ? activeTeamName : "vælg hold"}
                 </span>
                 ).
               </p>
+              {activeTeamId ? (
+                <div className="mt-2 shrink-0 rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900 shadow-sm dark:border-teal-700 dark:bg-teal-950/40 dark:text-teal-100">
+                  Aktivt hold: {activeTeamName} · Spillere tilføjes her
+                </div>
+              ) : null}
 
               <div className="mt-4 shrink-0 space-y-3">
                 <div>
@@ -611,10 +628,10 @@ export function TeamBuilder({
                           ) : null}
                           {assignedHere ? (
                             <span
-                              title={`Spilleren er allerede på ${teamById.get(teamIdHere!)?.name ?? "dette hold"}.`}
+                              title={`Spilleren er allerede på ${teamDisplayName(teamById.get(teamIdHere!))}.`}
                               className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
                             >
-                              På {teamById.get(teamIdHere!)?.name ?? "hold"}
+                              På {teamDisplayName(teamById.get(teamIdHere!))}
                             </span>
                           ) : null}
                           {assignedOther ? (
@@ -649,10 +666,15 @@ export function TeamBuilder({
               <p className="mt-1 shrink-0 text-xs text-gray-500 dark:text-gray-400">
                 Klik på en træner for at tilføje til det aktive hold (
                 <span className="font-medium text-gray-700 dark:text-gray-300">
-                  {activeTeamId ? teamById.get(activeTeamId)?.name ?? "—" : "vælg hold"}
+                  {activeTeamId ? activeTeamName : "vælg hold"}
                 </span>
                 ).
               </p>
+              {activeTeamId ? (
+                <div className="mt-2 shrink-0 rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900 shadow-sm dark:border-teal-700 dark:bg-teal-950/40 dark:text-teal-100">
+                  Aktivt hold: {activeTeamName} · Trænere tilføjes her
+                </div>
+              ) : null}
 
               <div className="mt-4 shrink-0 space-y-3">
                 <div>
@@ -788,6 +810,11 @@ export function TeamBuilder({
               Opret hold
             </button>
           </div>
+          {activeTeamId ? (
+            <div className="shrink-0 rounded-xl border-2 border-teal-400 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-900 shadow-sm dark:border-teal-600 dark:bg-teal-950/40 dark:text-teal-100">
+              Valgt hold: {activeTeamName}
+            </div>
+          ) : null}
 
           {teams.length === 0 ? (
             <p className="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-4 py-10 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800/40 dark:text-gray-400">
@@ -862,10 +889,14 @@ export function TeamBuilder({
                 const outerLiClass = completed
                   ? `overflow-hidden rounded-xl border shadow-sm transition-colors dark:shadow-none ${
                       active
-                        ? "border-emerald-200 bg-white ring-2 ring-teal-500/30 dark:border-emerald-900/40 dark:bg-gray-900/35"
+                        ? "border-teal-500 bg-teal-50/60 ring-4 ring-teal-500/35 shadow-[0_0_0_2px_rgba(20,184,166,0.2)] dark:border-teal-500 dark:bg-teal-950/20"
                         : "border-emerald-200 bg-white dark:border-emerald-900/40 dark:bg-gray-900/35"
                     }`
-                  : `rounded-xl border bg-white p-3 shadow-sm transition-colors dark:bg-gray-900/35 sm:p-4 ${cardClass}`;
+                  : `rounded-xl border bg-white p-3 shadow-sm transition-colors dark:bg-gray-900/35 sm:p-4 ${cardClass} ${
+                      active
+                        ? "ring-4 ring-teal-500/35 shadow-[0_0_0_2px_rgba(20,184,166,0.2)]"
+                        : ""
+                    }`;
 
                 return (
                   <li key={t.id} className={outerLiClass}>
@@ -885,6 +916,11 @@ export function TeamBuilder({
                       </button>
                     ) : null}
                     <div className={completed ? "p-3 sm:p-4" : ""}>
+                      {active ? (
+                        <p className="mb-3 rounded-lg border border-teal-300 bg-teal-50 px-3 py-1.5 text-[0.7rem] font-bold uppercase tracking-wide text-teal-900 dark:border-teal-700 dark:bg-teal-950/45 dark:text-teal-100">
+                          Aktivt hold · Nye spillere/trænere placeres her
+                        </p>
+                      ) : null}
                       <div className="flex gap-1 sm:gap-2">
                         <button
                           type="button"
@@ -925,7 +961,7 @@ export function TeamBuilder({
                                     completed ? "text-emerald-950 dark:text-emerald-50" : "text-gray-900 dark:text-white"
                                   }`}
                                 >
-                                  {t.name}
+                                  {teamDisplayName(t)}
                                 </h3>
                               </div>
                               <p

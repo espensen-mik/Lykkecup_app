@@ -1,8 +1,9 @@
 "use client";
 
-import { CheckCircle2, ChevronDown } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { OpenPlayerRowButton } from "@/components/open-player";
+import { StyledSelect } from "@/components/ui/styled-select";
 import { UNKNOWN_CLUB_LABEL, groupPlayersByClub } from "@/lib/clubs";
 import { indexFeedbackByClub } from "@/lib/club-feedback";
 import { formatDaDateTime } from "@/lib/datetime";
@@ -32,6 +33,7 @@ export function ClubsLiveList({
   membersLoadError,
 }: Props) {
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
+  const [clubFilter, setClubFilter] = useState<string>("");
 
   useEffect(() => {
     setPlayers(initialPlayers);
@@ -59,6 +61,14 @@ export function ClubsLiveList({
   const feedbackByClub = useMemo(() => indexFeedbackByClub(comments), [comments]);
   const assignedPlayerIdSet = useMemo(() => new Set(assignedPlayerIds), [assignedPlayerIds]);
   const groups = useMemo(() => groupPlayersByClub(players), [players]);
+  const clubOptions = useMemo(
+    () => groups.map((g) => g.name).filter((name) => name !== UNKNOWN_CLUB_LABEL),
+    [groups],
+  );
+  const visibleGroups = useMemo(
+    () => (clubFilter ? groups.filter((g) => g.name === clubFilter) : groups),
+    [groups, clubFilter],
+  );
   const totalClubs = groups.filter((g) => g.name !== UNKNOWN_CLUB_LABEL).length;
   const unknownCount = groups.find((g) => g.name === UNKNOWN_CLUB_LABEL)?.players.length ?? 0;
 
@@ -100,12 +110,29 @@ export function ClubsLiveList({
           Holddannelse-fremdrift kunne ikke indlæses: {membersLoadError}
         </div>
       ) : null}
+      <div className="max-w-sm">
+        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          Filtrer klub
+        </label>
+        <StyledSelect
+          value={clubFilter}
+          onChange={(e) => setClubFilter(e.target.value)}
+          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+        >
+          <option value="">Alle klubber</option>
+          {clubOptions.map((club) => (
+            <option key={club} value={club}>
+              {club}
+            </option>
+          ))}
+        </StyledSelect>
+      </div>
 
-      {groups.length === 0 ? (
+      {visibleGroups.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">Ingen spillere at vise.</p>
       ) : (
         <ul className="grid gap-4 lg:grid-cols-2 lg:gap-5">
-          {groups.map((group) => {
+          {visibleGroups.map((group) => {
             const clubComments = feedbackByClub.get(group.name) ?? [];
             const totalPlayers = group.players.length;
             const assignedPlayers = group.players.reduce(
@@ -158,7 +185,18 @@ export function ClubsLiveList({
                           <span className="font-medium text-[#0d9488] underline-offset-4 hover:underline dark:text-teal-400">
                             {p.name}
                           </span>
-                          {lvl ? <span className={lv.badge}>Niveau {lvl}</span> : null}
+                          <span className="inline-flex items-center gap-2">
+                            {assignedPlayerIdSet.has(p.id) ? (
+                              <span
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                title="På hold"
+                                aria-label="På hold"
+                              >
+                                <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+                              </span>
+                            ) : null}
+                            {lvl ? <span className={lv.badge}>Niveau {lvl}</span> : null}
+                          </span>
                         </OpenPlayerRowButton>
                       </li>
                     );
