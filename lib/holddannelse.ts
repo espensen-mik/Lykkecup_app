@@ -353,7 +353,8 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
   coaches.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
 
   const allTeamCoachRows = (teamCoachesData ?? []) as TeamCoachRow[];
-  const teamCoaches = allTeamCoachRows.filter((r) => teamIds.has(r.team_id));
+  // Returnér event-wide coach-links, så UI kan vise "uden hold"-status uden refresh på tværs af niveauer.
+  const teamCoaches = allTeamCoachRows;
 
   players.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
 

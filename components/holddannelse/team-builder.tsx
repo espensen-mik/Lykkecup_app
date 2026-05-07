@@ -208,8 +208,8 @@ export function TeamBuilder({
     });
   }, [players, search, clubFilter, prefFilter, onlyUnassigned, playerToTeamInLevel]);
 
-  /** Trænere der allerede er knyttet til mindst ét hold på dette niveau. */
-  const coachIdsOnAnyTeamInLevel = useMemo(() => {
+  /** Trænere der allerede er knyttet til mindst ét hold i eventet. */
+  const coachIdsOnAnyTeamInEvent = useMemo(() => {
     const s = new Set<string>();
     for (const tc of teamCoachLinks) {
       s.add(tc.coach_id);
@@ -220,7 +220,7 @@ export function TeamBuilder({
   const filteredCoaches = useMemo(() => {
     const q = coachSearch.trim().toLowerCase();
     return coaches.filter((c) => {
-      if (onlyUnassignedCoaches && coachIdsOnAnyTeamInLevel.has(c.id)) return false;
+      if (onlyUnassignedCoaches && coachIdsOnAnyTeamInEvent.has(c.id)) return false;
       if (q && !c.name.toLowerCase().includes(q)) return false;
       if (coachClubFilter) {
         const club = c.home_club?.trim() ?? "";
@@ -228,7 +228,7 @@ export function TeamBuilder({
       }
       return true;
     });
-  }, [coaches, coachSearch, coachClubFilter, onlyUnassignedCoaches, coachIdsOnAnyTeamInLevel]);
+  }, [coaches, coachSearch, coachClubFilter, onlyUnassignedCoaches, coachIdsOnAnyTeamInEvent]);
 
   const addPlayerToActiveTeam = useCallback(
     async (playerId: string) => {
@@ -725,7 +725,8 @@ export function TeamBuilder({
                     const onActive =
                       Boolean(activeTeamId) &&
                       teamCoachLinks.some((tc) => tc.team_id === activeTeamId && tc.coach_id === c.id);
-                    const canClick = Boolean(activeTeamId) && !onActive && !busy;
+                    const assignedElsewhere = coachIdsOnAnyTeamInEvent.has(c.id) && !onActive;
+                    const canClick = Boolean(activeTeamId) && !onActive && !assignedElsewhere && !busy;
                     return (
                       <li key={c.id}>
                         <button
@@ -746,6 +747,14 @@ export function TeamBuilder({
                                 className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
                               >
                                 På dette hold
+                              </span>
+                            ) : null}
+                            {assignedElsewhere ? (
+                              <span
+                                title="Træneren er allerede tildelt et andet hold."
+                                className="rounded-full bg-gray-200 px-2 py-0.5 text-[0.6875rem] font-medium text-gray-800 dark:bg-gray-600 dark:text-gray-100"
+                              >
+                                Tildelt andet hold
                               </span>
                             ) : null}
                           </div>

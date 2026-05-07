@@ -347,8 +347,11 @@ export function PlayersAdmin({ players, fetchError, assignedPlayerIds }: Props) 
                   onSort={toggleSort}
                   sortDisabled={clubSortMode}
                 />
-                <th scope="col" className="px-5 py-3 text-left align-bottom">
-                  <span className="inline-flex max-w-full items-center rounded-md text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <th
+                  scope="col"
+                  className="border-l border-emerald-200/80 bg-emerald-50/70 px-5 py-3 text-left align-bottom dark:border-emerald-900/50 dark:bg-emerald-950/25"
+                >
+                  <span className="inline-flex max-w-full items-center rounded-md text-[0.6875rem] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
                     På hold
                   </span>
                 </th>
@@ -398,17 +401,20 @@ export function PlayersAdmin({ players, fetchError, assignedPlayerIds }: Props) 
                   <td className="px-5 py-3.5 font-mono text-xs text-gray-500 dark:text-gray-400">
                     {formatCell(p.ticket_id)}
                   </td>
-                  <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">
+                  <td className="border-l border-emerald-200/80 bg-emerald-50/45 px-5 py-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/15">
                     {isAssigned ? (
                       <span
-                        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-emerald-300 bg-emerald-500/15 text-emerald-700 shadow-sm dark:border-emerald-700 dark:bg-emerald-400/20 dark:text-emerald-200"
                         aria-label="På hold"
                         title="Spilleren er på hold"
                       >
-                        <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+                        <Check className="h-4 w-4" strokeWidth={3} aria-hidden />
                       </span>
                     ) : (
-                      <span className="text-gray-300 dark:text-gray-600" aria-hidden>
+                      <span
+                        className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-gray-300 bg-white/75 text-gray-400 dark:border-gray-600 dark:bg-gray-900/30 dark:text-gray-500"
+                        aria-hidden
+                      >
                         —
                       </span>
                     )}
