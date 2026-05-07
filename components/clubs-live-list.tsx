@@ -138,8 +138,8 @@ export function ClubsLiveList({
               På hold
             </span>
             <span className="inline-flex items-center gap-1.5" title="Spilleren er endnu ikke tildelt et hold.">
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500">
-                <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+              <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-500">
+                <span className="h-0.5 w-2.5 rounded-full bg-current" aria-hidden />
               </span>
               Ikke på hold
             </span>
@@ -206,7 +206,7 @@ export function ClubsLiveList({
                               className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
                                 assignedPlayerIdSet.has(p.id)
                                   ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                  : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                                  : "border border-gray-300 bg-gray-100 text-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-500"
                               }`}
                               title={
                                 assignedPlayerIdSet.has(p.id)
@@ -215,7 +215,11 @@ export function ClubsLiveList({
                               }
                               aria-label={assignedPlayerIdSet.has(p.id) ? "På hold" : "Ikke på hold"}
                             >
-                              <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+                              {assignedPlayerIdSet.has(p.id) ? (
+                                <Check className="h-3.5 w-3.5" strokeWidth={2.75} aria-hidden />
+                              ) : (
+                                <span className="h-0.5 w-2.5 rounded-full bg-current" aria-hidden />
+                              )}
                             </span>
                             <span className="truncate font-medium text-[#0d9488] underline-offset-4 hover:underline dark:text-teal-400">
                               {p.name}
