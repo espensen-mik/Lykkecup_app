@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, ChevronRight, Info, MapPinned, MessageSquareText, Newspaper } from "lucide-react";
 
@@ -25,6 +26,18 @@ export default function AppIndholdPage() {
           Rediger siderne i den offentlige LykkeCup26 app uden kodeændringer.
         </p>
       </header>
+
+      <section className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-900/40 dark:bg-gray-900/35">
+        <div className="relative aspect-[16/7] w-full">
+          <Image
+            src="/lykkecup_app_mockup.jpg"
+            alt="LykkeCup app mockup"
+            fill
+            priority
+            className="object-cover object-center"
+          />
+        </div>
+      </section>
 
       <ul className="grid gap-4 sm:grid-cols-2">
         {LINKS.map((item) => (

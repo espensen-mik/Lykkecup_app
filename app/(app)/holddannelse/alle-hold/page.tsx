@@ -86,7 +86,7 @@ export default async function AlleHoldPage() {
         <BackLink />
         <h1 className="mt-5 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Alle hold</h1>
         <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
-          Kunne ikke indlaese data: {error}
+          Kunne ikke indlæse data: {error}
         </div>
       </div>
     );

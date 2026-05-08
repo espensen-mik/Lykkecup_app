@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ComponentType } from "react";
-import { CalendarClock, ImageIcon, Info, MapPinned, Newspaper, Sparkles } from "lucide-react";
+import { CalendarClock, ExternalLink, Info, MapPinned, Newspaper } from "lucide-react";
 import { Lc26PageContentEditor } from "@/components/lc26-page-content-editor";
 import { fetchLc26PageContent, type Lc26PageKey } from "@/lib/lc26-page-content";
 
@@ -9,11 +9,11 @@ type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
-const slugToPageKey: Record<string, { key: Lc26PageKey; label: string }> = {
-  "dagens-program": { key: "program", label: "Dagens program" },
-  "find-rundt-i-mch": { key: "find-rundt", label: "Find rundt i MCH" },
-  "praktisk-info": { key: "praktisk-info", label: "Praktisk info" },
-  "nyt-fra-lykkeliga": { key: "nyt-fra-lykkeliga", label: "Nyt fra LykkeLiga" },
+const slugToPageKey: Record<string, { key: Lc26PageKey; label: string; previewHref: string }> = {
+  "dagens-program": { key: "program", label: "Dagens program", previewHref: "/lykkecup26/side-1" },
+  "find-rundt-i-mch": { key: "find-rundt", label: "Find rundt i MCH", previewHref: "/lykkecup26/side-2" },
+  "praktisk-info": { key: "praktisk-info", label: "Praktisk info", previewHref: "/lykkecup26/side-3" },
+  "nyt-fra-lykkeliga": { key: "nyt-fra-lykkeliga", label: "Nyt fra LykkeLiga", previewHref: "/lykkecup26/nyt-fra-lykkeliga" },
 };
 
 const pageVisuals: Record<Lc26PageKey, { icon: ComponentType<{ className?: string }>; style: string }> = {
@@ -43,19 +43,27 @@ export default async function AppIndholdEditPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      <header className={`max-w-3xl rounded-2xl border bg-gradient-to-r px-5 py-6 ${visual.style}`}>
-        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">App indhold</p>
-        <h1 className="mt-2 flex items-center gap-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-[2rem] dark:text-white">
-          <visual.icon className="h-7 w-7 text-[#0d9488] dark:text-teal-300" aria-hidden />
-          {cfg.label}
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-          Rediger tekst, billeder og struktur for siden. Gem for at publicere opdateringer i appen med det samme.
-        </p>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/40 dark:bg-gray-900/45 dark:text-emerald-300">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
-          CMS klar til redigering
-          <ImageIcon className="h-3.5 w-3.5" aria-hidden />
+      <header className={`rounded-2xl border bg-gradient-to-r px-5 py-6 ${visual.style}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">App indhold</p>
+            <h1 className="mt-2 flex items-center gap-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-[2rem] dark:text-white">
+              <visual.icon className="h-7 w-7 text-[#0d9488] dark:text-teal-300" aria-hidden />
+              {cfg.label}
+            </h1>
+            <p className="mt-3 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+              Rediger tekst, billeder og struktur for siden. Gem for at publicere opdateringer i appen med det samme.
+            </p>
+          </div>
+          <a
+            href={cfg.previewHref}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
+          >
+            Se frontend
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          </a>
         </div>
       </header>
 
@@ -65,7 +73,16 @@ export default async function AppIndholdEditPage({ params }: PageProps) {
         </div>
       ) : null}
 
-      <Lc26PageContentEditor pageKey={cfg.key} initialRow={row} />
+      <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/35">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Forhaandsvisning</p>
+        <iframe
+          title={`Forhaandsvisning af ${cfg.label}`}
+          src={cfg.previewHref}
+          className="h-[440px] w-full rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+        />
+      </div>
+
+      <Lc26PageContentEditor pageKey={cfg.key} initialRow={row} previewHref={cfg.previewHref} />
     </div>
   );
 }

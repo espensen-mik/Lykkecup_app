@@ -19,7 +19,7 @@ export default function BilletsalgPage() {
           Live billetsalg
         </h1>
         <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
-          Data hentes direkte fra WordPress API og opdateres automatisk hvert minut. Vaer opmaerksom paa, at det er
+          Data hentes direkte fra WordPress API og opdateres automatisk hvert minut. Vær opmærksom på, at det er
           raa data - derfor skal data soigneres inden vi tager dem endeligt i brug.
         </p>
       </header>

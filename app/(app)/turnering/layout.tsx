@@ -16,7 +16,7 @@ export default async function TurneringLayout({ children }: { children: React.Re
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-8 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
           <h1 className="text-2xl font-semibold tracking-tight">Ingen adgang</h1>
           <p className="mt-3 text-sm leading-relaxed text-amber-900/90 dark:text-amber-200/90">
-            Denne del af appen er kun tilgaengelig for administratorer.
+            Denne del af appen er kun tilgængelig for administratorer.
           </p>
           <p className="mt-2 text-sm leading-relaxed text-amber-900/90 dark:text-amber-200/90">
             Kontakt en administrator, hvis du mener, at du mangler de rette rettigheder.

@@ -212,7 +212,7 @@ export function PublicDashboardScreen() {
             />
             <KpiCard
               icon={<Mail className="h-5 w-5" />}
-              label="Kommentarer fra traenere"
+              label="Kommentarer fra trænere"
               value={data?.totals.commentsTotal ?? 0}
               cardClassName="border-cyan-300/35 bg-gradient-to-br from-cyan-400/16 via-teal-300/10 to-emerald-300/8 shadow-[0_14px_32px_rgba(34,211,238,0.20)]"
               iconClassName="animate-pulse [animation-duration:2.6s]"

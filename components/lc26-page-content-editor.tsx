@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarClock, FileJson, ImageIcon, Info, LayoutTemplate, MapPinned, Newspaper, Save, Sparkles } from "lucide-react";
+import { CalendarClock, ExternalLink, ImageIcon, Info, LayoutTemplate, MapPinned, Newspaper, Save, Sparkles } from "lucide-react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { LYKKECUP26_EVENT_ID } from "@/lib/lykkecup26-public";
 import type {
@@ -17,14 +17,13 @@ import { LC26_PAGE_CONTENT_IMAGE_BUCKET as CONTENT_IMG_BUCKET } from "@/lib/lc26
 type Props = {
   pageKey: Lc26PageKey;
   initialRow: Lc26PageContentRow;
+  previewHref?: string;
 };
 
-export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
+export function Lc26PageContentEditor({ pageKey, initialRow, previewHref }: Props) {
   const [title, setTitle] = useState(initialRow.title);
   const [intro, setIntro] = useState(initialRow.intro);
   const [heroImageUrl, setHeroImageUrl] = useState(initialRow.heroImageUrl ?? "");
-  const [contentText, setContentText] = useState(() => JSON.stringify(initialRow.content ?? {}, null, 2));
-  const [showAdvancedJson, setShowAdvancedJson] = useState(false);
   const [pendingHeroFile, setPendingHeroFile] = useState<File | null>(null);
   const [pendingFindCardFiles, setPendingFindCardFiles] = useState<Record<number, File | null>>({});
   const [pendingArticleFiles, setPendingArticleFiles] = useState<Record<number, File | null>>({});
@@ -123,48 +122,38 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
     setError(null);
     setNotice(null);
     let parsed: unknown;
-    if (showAdvancedJson) {
-      try {
-        parsed = JSON.parse(contentText);
-      } catch {
-        setError("Indhold JSON er ugyldig. Ret formatet før du gemmer.");
-        return;
+    if (pageKey === "program") parsed = programContent;
+    else if (pageKey === "find-rundt") {
+      let nextCards = [...findContent.cards];
+      const entries = Object.entries(pendingFindCardFiles).filter(([, f]) => Boolean(f));
+      for (const [idxText, file] of entries) {
+        const idx = Number(idxText);
+        if (!file || Number.isNaN(idx) || !nextCards[idx]) continue;
+        const uploaded = await uploadFindCardImage(idx, file);
+        if (!uploaded) return;
+        nextCards[idx] = { ...nextCards[idx], imageUrl: uploaded };
       }
-    } else {
-      if (pageKey === "program") parsed = programContent;
-      else if (pageKey === "find-rundt") {
-        let nextCards = [...findContent.cards];
-        const entries = Object.entries(pendingFindCardFiles).filter(([, f]) => Boolean(f));
-        for (const [idxText, file] of entries) {
-          const idx = Number(idxText);
-          if (!file || Number.isNaN(idx) || !nextCards[idx]) continue;
-          const uploaded = await uploadFindCardImage(idx, file);
-          if (!uploaded) return;
-          nextCards[idx] = { ...nextCards[idx], imageUrl: uploaded };
-        }
-        if (entries.length > 0) {
-          setFindContent((c) => ({ ...c, cards: nextCards }));
-          setPendingFindCardFiles({});
-        }
-        parsed = { ...findContent, cards: nextCards };
+      if (entries.length > 0) {
+        setFindContent((c) => ({ ...c, cards: nextCards }));
+        setPendingFindCardFiles({});
       }
-      else if (pageKey === "praktisk-info") parsed = praktiskContent;
-      else {
-        let nextArticles = [...nytContent.articles];
-        const entries = Object.entries(pendingArticleFiles).filter(([, f]) => Boolean(f));
-        for (const [idxText, file] of entries) {
-          const idx = Number(idxText);
-          if (!file || Number.isNaN(idx) || !nextArticles[idx]) continue;
-          const uploaded = await uploadArticleImage(idx, file);
-          if (!uploaded) return;
-          nextArticles[idx] = { ...nextArticles[idx], imageUrl: uploaded };
-        }
-        if (entries.length > 0) {
-          setNytContent((c) => ({ ...c, articles: nextArticles }));
-          setPendingArticleFiles({});
-        }
-        parsed = { ...nytContent, articles: nextArticles };
+      parsed = { ...findContent, cards: nextCards };
+    } else if (pageKey === "praktisk-info") parsed = praktiskContent;
+    else {
+      let nextArticles = [...nytContent.articles];
+      const entries = Object.entries(pendingArticleFiles).filter(([, f]) => Boolean(f));
+      for (const [idxText, file] of entries) {
+        const idx = Number(idxText);
+        if (!file || Number.isNaN(idx) || !nextArticles[idx]) continue;
+        const uploaded = await uploadArticleImage(idx, file);
+        if (!uploaded) return;
+        nextArticles[idx] = { ...nextArticles[idx], imageUrl: uploaded };
       }
+      if (entries.length > 0) {
+        setNytContent((c) => ({ ...c, articles: nextArticles }));
+        setPendingArticleFiles({});
+      }
+      parsed = { ...nytContent, articles: nextArticles };
     }
 
     let nextHeroImage = heroImageUrl.trim() || null;
@@ -205,15 +194,26 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
           <Sparkles className="h-4 w-4" aria-hidden />
           <p className="text-xs font-semibold uppercase tracking-wide">Indholdseditor</p>
         </div>
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Senest gemt: {updatedLabel}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Senest gemt: {updatedLabel}</p>
+          {previewHref ? (
+            <a
+              href={previewHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
+            >
+              Se frontend
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+            </a>
+          ) : null}
+        </div>
       </div>
 
       <div className="rounded-xl border border-emerald-100 bg-white/90 p-4 dark:border-emerald-900/40 dark:bg-gray-900/55">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
           <LayoutTemplate className="h-4 w-4" aria-hidden />
-          Sideopsaetning
+          Sideopsætning
         </div>
         <label className="block">
         <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Titel</span>
@@ -808,30 +808,6 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
           </button>
         </div>
       ) : null}
-
-      <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 dark:border-gray-700 dark:bg-gray-900/20">
-        <button
-          type="button"
-          onClick={() => setShowAdvancedJson((v) => !v)}
-          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-        >
-          <FileJson className="h-3.5 w-3.5" aria-hidden />
-          {showAdvancedJson ? "Skjul avanceret JSON" : "Vis avanceret JSON"}
-        </button>
-        {showAdvancedJson ? (
-          <label className="mt-2 block">
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Side-indhold (JSON)
-            </span>
-            <textarea
-              value={contentText}
-              onChange={(e) => setContentText(e.target.value)}
-              rows={18}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-xs text-gray-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-            />
-          </label>
-        ) : null}
-      </div>
 
       {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
       {notice ? <p className="text-xs text-emerald-700 dark:text-emerald-300">{notice}</p> : null}
