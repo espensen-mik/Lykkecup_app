@@ -8,7 +8,6 @@ import {
   preferencesTooltipText,
   type PreferenceBadgeLabel,
 } from "@/lib/player-preferences";
-import { publicTeamDisplayName } from "@/lib/team-public-display-name";
 import { supabase } from "@/lib/supabase";
 import type { HoldCoachRow, HoldPlayerRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 import { StyledSelect } from "@/components/ui/styled-select";
@@ -64,9 +63,16 @@ export function TeamBuilder({
   initialActiveTeamId,
 }: Props) {
   const canonical = normalizeLevelKey(levelKey);
+  const sortTeamsNewestFirst = useCallback(
+    (rows: TeamRow[]) =>
+      [...rows].sort(
+        (a, b) => b.sort_order - a.sort_order || b.name.localeCompare(a.name, "da"),
+      ),
+    [],
+  );
 
   const [players] = useState<HoldPlayerRow[]>(initialPlayers);
-  const [teams, setTeams] = useState<TeamRow[]>(initialTeams);
+  const [teams, setTeams] = useState<TeamRow[]>(() => sortTeamsNewestFirst(initialTeams));
   const [members, setMembers] = useState<TeamMemberRow[]>(initialMembers);
   const [assignedGlobally, setAssignedGlobally] = useState<Set<string>>(
     () => new Set(initialEventAssignedPlayerIds),
@@ -119,18 +125,19 @@ export function TeamBuilder({
     for (const t of teams) m.set(t.id, t);
     return m;
   }, [teams]);
-  const teamDisplayName = useCallback(
-    (team: TeamRow | null | undefined): string => {
-      if (!team) return "—";
+  const teamNickname = useCallback(
+    (team: TeamRow | null | undefined): string | null => {
+      if (!team) return null;
       const draft = nicknameDrafts[team.id];
       const draftOrStored = draft !== undefined ? draft : (team.nickname ?? "");
-      const nextNick = draftOrStored.trim();
-      if (nextNick) return nextNick;
-      return publicTeamDisplayName(team);
+      const nick = draftOrStored.trim();
+      return nick.length > 0 ? nick : null;
     },
     [nicknameDrafts],
   );
-  const activeTeamName = teamDisplayName(activeTeamId ? teamById.get(activeTeamId) : null);
+  const activeTeam = activeTeamId ? teamById.get(activeTeamId) : null;
+  const activeTeamName = activeTeam?.name ?? "—";
+  const activeTeamNickname = teamNickname(activeTeam);
 
   const membersByTeam = useMemo(() => {
     const m = new Map<string, TeamMemberRow[]>();
@@ -395,9 +402,7 @@ export function TeamBuilder({
       setActionError(error.message);
       return;
     }
-    setTeams((prev) =>
-      prev.map((x) => (x.id === team.id ? { ...x, is_completed: next } : x)),
-    );
+    setTeams((prev) => sortTeamsNewestFirst(prev.map((x) => (x.id === team.id ? { ...x, is_completed: next } : x))));
     setCollapsedTeamIds((prev) => {
       const s = new Set(prev);
       if (next) s.add(team.id);
@@ -433,9 +438,9 @@ export function TeamBuilder({
       return;
     }
     const t = data as TeamRow;
-    setTeams((prev) => [...prev, t].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "da")));
+    setTeams((prev) => sortTeamsNewestFirst([...prev, t]));
     setActiveTeamId(t.id);
-  }, [teams, canonical]);
+  }, [teams, canonical, sortTeamsNewestFirst]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-8">
@@ -502,6 +507,11 @@ export function TeamBuilder({
               {activeTeamId ? (
                 <div className="mt-2 shrink-0 rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900 shadow-sm dark:border-teal-700 dark:bg-teal-950/40 dark:text-teal-100">
                   Aktivt hold: {activeTeamName} · Spillere tilføjes her
+                  {activeTeamNickname ? (
+                    <span className="ml-1 font-medium text-teal-800/90 dark:text-teal-200/90">
+                      · Kaldenavn: {activeTeamNickname}
+                    </span>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -628,10 +638,10 @@ export function TeamBuilder({
                           ) : null}
                           {assignedHere ? (
                             <span
-                              title={`Spilleren er allerede på ${teamDisplayName(teamById.get(teamIdHere!))}.`}
+                              title={`Spilleren er allerede på ${teamById.get(teamIdHere!)?.name ?? "dette hold"}.`}
                               className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
                             >
-                              På {teamDisplayName(teamById.get(teamIdHere!))}
+                              På {teamById.get(teamIdHere!)?.name ?? "hold"}
                             </span>
                           ) : null}
                           {assignedOther ? (
@@ -673,6 +683,11 @@ export function TeamBuilder({
               {activeTeamId ? (
                 <div className="mt-2 shrink-0 rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900 shadow-sm dark:border-teal-700 dark:bg-teal-950/40 dark:text-teal-100">
                   Aktivt hold: {activeTeamName} · Trænere tilføjes her
+                  {activeTeamNickname ? (
+                    <span className="ml-1 font-medium text-teal-800/90 dark:text-teal-200/90">
+                      · Kaldenavn: {activeTeamNickname}
+                    </span>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -813,6 +828,11 @@ export function TeamBuilder({
           {activeTeamId ? (
             <div className="shrink-0 rounded-xl border-2 border-teal-400 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-900 shadow-sm dark:border-teal-600 dark:bg-teal-950/40 dark:text-teal-100">
               Valgt hold: {activeTeamName}
+              {activeTeamNickname ? (
+                <span className="ml-2 font-medium text-teal-800/90 dark:text-teal-200/90">
+                  (Kaldenavn: {activeTeamNickname})
+                </span>
+              ) : null}
             </div>
           ) : null}
 
@@ -851,6 +871,7 @@ export function TeamBuilder({
                 }
 
                 if (completed && !closedDetailOpen) {
+                  const nick = teamNickname(t);
                   return (
                     <li key={t.id}>
                       <button
@@ -866,8 +887,13 @@ export function TeamBuilder({
                           />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-base font-semibold text-emerald-950 dark:text-emerald-50">
-                              {publicTeamDisplayName(t)}
+                              {t.name}
                             </span>
+                            {nick ? (
+                              <span className="mt-0.5 block truncate text-xs text-emerald-800/90 dark:text-emerald-200/90">
+                                Kaldenavn: {nick}
+                              </span>
+                            ) : null}
                             <span className="mt-0.5 block text-xs tabular-nums text-emerald-800/90 dark:text-emerald-200/90">
                               {tMembers.length} {tMembers.length === 1 ? "spiller" : "spillere"}
                               {tCoaches.length > 0
@@ -961,9 +987,14 @@ export function TeamBuilder({
                                     completed ? "text-emerald-950 dark:text-emerald-50" : "text-gray-900 dark:text-white"
                                   }`}
                                 >
-                                  {teamDisplayName(t)}
+                                  {t.name}
                                 </h3>
                               </div>
+                              {teamNickname(t) ? (
+                                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                  Kaldenavn: {teamNickname(t)}
+                                </p>
+                              ) : null}
                               <p
                                 className={`mt-1 text-xs ${
                                   completed ? "text-emerald-800/90 dark:text-emerald-200/85" : "text-gray-500 dark:text-gray-400"

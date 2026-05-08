@@ -52,7 +52,7 @@ export type PlayerAssignedTeamSummary = {
   teamId: string;
   /** Niveau-nøgle til link til korrekt holddannelse-side. */
   levelKey: string;
-  /** Primær visning (kaldenavn hvis udfyldt, ellers officielt navn). */
+  /** Primær visning i KontrolCenter (officielt/autogenereret holdnavn). */
   displayName: string;
   /** Autogenereret holdnavn fra holddannelse. */
   officialName: string;
@@ -83,8 +83,7 @@ export async function fetchAssignedTeamForPlayer(
   const row = team as { id: string; name: string; nickname?: string | null; level: string | null };
   const officialName = row.name?.trim() ?? "";
   if (!officialName) return null;
-  const nick = row.nickname?.trim();
-  const displayName = nick && nick.length > 0 ? nick : officialName;
+  const displayName = officialName;
   const levelKey = row.level?.trim() || "Ukendt niveau";
   return { teamId: row.id, levelKey, displayName, officialName };
 }

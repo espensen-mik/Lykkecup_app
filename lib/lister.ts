@@ -1,7 +1,6 @@
 import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
-import { publicTeamDisplayName } from "@/lib/team-public-display-name";
 
 export type ListerTeamRow = {
   id: string;
@@ -79,7 +78,7 @@ export async function fetchListerExportData(): Promise<{
   const teams: ListerTeamRow[] = rawTeams.map((t) => {
     const officialName = t.name?.trim() ?? "";
     const nickname = t.nickname?.trim() ? t.nickname.trim() : null;
-    const displayName = publicTeamDisplayName({ name: officialName, nickname: t.nickname });
+    const displayName = officialName;
     return {
       id: t.id,
       levelKey: normalizeLevelKey(t.level),
