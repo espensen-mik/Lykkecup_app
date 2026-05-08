@@ -18,7 +18,7 @@ export type Lc26ProgramContent = {
 };
 
 export type Lc26FindRundtContent = {
-  cards: { title: string; body: string }[];
+  cards: { title: string; body: string; imageUrl?: string }[];
 };
 
 export type Lc26PraktiskInfoContent = {

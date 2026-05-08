@@ -50,10 +50,14 @@ export function Lykkecup26FindMchWithContent({
           {cards.map((item) => (
             <li key={item.title}>
               <div className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm">
-                <div className="flex aspect-[16/10] flex-col items-center justify-center gap-3 bg-gradient-to-br from-stone-100/95 to-stone-50 px-6 text-center sm:aspect-[2/1]">
-                  <MapPin className="h-10 w-10 text-lc26-teal/45" strokeWidth={1.5} aria-hidden />
-                  <p className="text-xs font-medium uppercase tracking-[0.1em] text-lc26-navy/40">Grafisk kort kommer</p>
-                </div>
+                {item.imageUrl ? (
+                  <img src={item.imageUrl} alt={item.title} className="aspect-[16/10] w-full object-cover sm:aspect-[2/1]" />
+                ) : (
+                  <div className="flex aspect-[16/10] flex-col items-center justify-center gap-3 bg-gradient-to-br from-stone-100/95 to-stone-50 px-6 text-center sm:aspect-[2/1]">
+                    <MapPin className="h-10 w-10 text-lc26-teal/45" strokeWidth={1.5} aria-hidden />
+                    <p className="text-xs font-medium uppercase tracking-[0.1em] text-lc26-navy/40">Grafisk kort kommer</p>
+                  </div>
+                )}
                 <div className="border-t border-stone-100 p-5 sm:p-6">
                   <h2 className="text-base font-semibold text-lc26-navy">{item.title}</h2>
                   <p className="mt-2 text-sm leading-snug text-lc26-navy/55">{item.body}</p>
