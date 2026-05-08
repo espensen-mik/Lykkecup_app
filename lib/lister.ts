@@ -29,6 +29,7 @@ export type ListerCoachRow = {
   name: string;
   home_club: string | null;
   age: number | null;
+  tshirt_size: string | null;
 };
 
 /**
@@ -59,7 +60,7 @@ export async function fetchListerExportData(): Promise<{
       .select("id, name, home_club, level, age, gender")
       .eq("event_id", eventId),
     supabase.from("team_members").select("team_id, player_id").eq("event_id", eventId),
-    supabase.from("coaches").select("id, name, home_club, age").eq("event_id", eventId),
+    supabase.from("coaches").select("id, name, home_club, age, tshirt_size").eq("event_id", eventId),
   ]);
 
   if (tErr) return { teams: [], players: [], coaches: [], error: tErr.message };
@@ -141,6 +142,7 @@ export async function fetchListerExportData(): Promise<{
     name: string;
     home_club: string | null;
     age: number | null;
+    tshirt_size: string | null;
   }[];
 
   const coaches: ListerCoachRow[] = rawCoaches.map((c) => ({
@@ -148,6 +150,7 @@ export async function fetchListerExportData(): Promise<{
     name: c.name?.trim() || "—",
     home_club: c.home_club?.trim() ? c.home_club.trim() : null,
     age: c.age,
+    tshirt_size: c.tshirt_size?.trim() ? c.tshirt_size.trim() : null,
   }));
   coaches.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
 

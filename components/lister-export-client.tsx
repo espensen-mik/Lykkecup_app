@@ -15,7 +15,7 @@ type Props = {
   fetchError: string | null;
 };
 
-type PrintKind = "clubNames" | "clubDetails" | "alpha" | "playersByClub" | "mixedByClub" | "singleClub" | null;
+type PrintKind = "clubNames" | "clubDetails" | "alpha" | "playersByClub" | "mixedByClub" | "singleClub" | "coachTshirtByClub" | null;
 
 function csvSlug(s: string): string {
   return s
@@ -34,6 +34,25 @@ function sortClubLabels(named: string[], includeIngen: boolean): string[] {
 
 function clubLabelForPerson(home: string | null): string {
   return home && home.trim() ? home.trim() : INGEN_KLUB;
+}
+
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? "";
+}
+
+function normalizeTshirtSize(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase().replace(/\s+/g, "");
+  if (upper === "XS") return "XS";
+  if (upper === "S") return "S";
+  if (upper === "M") return "M";
+  if (upper === "L") return "L";
+  if (upper === "XL" || upper === "1XL") return "XL";
+  if (upper === "XXL" || upper === "2XL") return "2XL";
+  if (upper === "XXXL" || upper === "3XL") return "3XL";
+  if (upper === "XXXXL" || upper === "4XL") return "4XL";
+  return upper;
 }
 
 const rowBtnClass =
@@ -176,6 +195,33 @@ export function ListerExportClient({ teams, players, coaches, fetchError }: Prop
     }
     downloadCsv(`lister-spillere-og-traenere-${slug}.csv`, rows);
   }, [players, coaches, selectedClub]);
+
+  const sortedCoachTshirtRows = useMemo(
+    () =>
+      coaches
+        .map((c) => ({
+          id: c.id,
+          club: clubLabelForPerson(c.home_club),
+          name: c.name,
+          tshirt: normalizeTshirtSize(c.tshirt_size),
+        }))
+        .sort((a, b) => {
+          const byClub = a.club.localeCompare(b.club, "da", { sensitivity: "base" });
+          if (byClub !== 0) return byClub;
+          const byFirst = firstName(a.name).localeCompare(firstName(b.name), "da", { sensitivity: "base" });
+          if (byFirst !== 0) return byFirst;
+          return a.name.localeCompare(b.name, "da", { sensitivity: "base" });
+        }),
+    [coaches],
+  );
+
+  const downloadCoachTshirtByClub = useCallback(() => {
+    const rows: (string | number | null | undefined)[][] = [
+      ["Klub", "Træner navn", "T-shirt størrelse"],
+      ...sortedCoachTshirtRows.map((row) => [row.club, row.name, row.tshirt]),
+    ];
+    downloadCsv("lister-t-shirt-liste-traenere.csv", rows);
+  }, [sortedCoachTshirtRows]);
 
   const playersForPrintClub = useCallback(
     (klub: string) =>
@@ -329,6 +375,20 @@ export function ListerExportClient({ teams, players, coaches, fetchError }: Prop
                 Udskriv
               </button>
               <button type="button" className={rowBtnClass} onClick={downloadMixedByClub}>
+                <Download className="h-3.5 w-3.5" aria-hidden />
+                CSV
+              </button>
+            </div>
+          </li>
+
+          <li className="flex flex-col gap-3 rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-gray-900 dark:text-white">T-shirt liste - trænere</span>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={rowBtnClass} onClick={() => runPrint("coachTshirtByClub")}>
+                <Printer className="h-3.5 w-3.5" aria-hidden />
+                Udskriv
+              </button>
+              <button type="button" className={rowBtnClass} onClick={downloadCoachTshirtByClub}>
                 <Download className="h-3.5 w-3.5" aria-hidden />
                 CSV
               </button>
@@ -615,6 +675,34 @@ export function ListerExportClient({ teams, players, coaches, fetchError }: Prop
                     <tr key={c.id}>
                       <td className={td}>{c.name}</td>
                       <td className={td}>{c.age != null ? String(c.age) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ) : null}
+
+        {printKind === "coachTshirtByClub" ? (
+          <div className="text-black">
+            <h1 className="mb-6 text-xl font-bold">T-shirt liste - trænere</h1>
+            {sortedCoachTshirtRows.length === 0 ? (
+              <p className="text-sm text-neutral-600">Ingen trænere i data.</p>
+            ) : (
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className={th}>Klub</th>
+                    <th className={th}>Træner navn</th>
+                    <th className={th}>T-shirt størrelse</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedCoachTshirtRows.map((row) => (
+                    <tr key={row.id}>
+                      <td className={td}>{row.club}</td>
+                      <td className={td}>{row.name}</td>
+                      <td className={td}>{row.tshirt || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

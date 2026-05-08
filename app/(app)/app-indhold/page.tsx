@@ -19,7 +19,7 @@ const LINKS = [
 export default function AppIndholdPage() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8">
-      <header className="max-w-3xl rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-white px-5 py-6 dark:border-emerald-900/40 dark:from-emerald-950/20 dark:via-teal-950/10 dark:to-transparent">
+      <header className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-white px-5 py-6 dark:border-emerald-900/40 dark:from-emerald-950/20 dark:via-teal-950/10 dark:to-transparent">
         <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">LykkeCup 26</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-[2rem] dark:text-white">App indhold</h1>
         <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
