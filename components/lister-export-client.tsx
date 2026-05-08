@@ -43,7 +43,9 @@ function firstName(name: string): string {
 function normalizeTshirtSize(value: string | null | undefined): string {
   const raw = (value ?? "").trim();
   if (!raw) return "";
-  const upper = raw.toUpperCase().replace(/\s+/g, "");
+  const cleaned = raw.toUpperCase().replace(/\s+/g, "");
+  const base = cleaned.split("(")[0] ?? cleaned;
+  const upper = base.replace(/[^A-Z0-9]/g, "");
   if (upper === "XS") return "XS";
   if (upper === "S") return "S";
   if (upper === "M") return "M";
