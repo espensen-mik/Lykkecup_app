@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
+import { sortLevelKeysForNav } from "@/lib/holddannelse";
 import type { ListerPlayerRow, ListerTeamRow } from "@/lib/lister";
 
 type Props = {
@@ -32,10 +33,12 @@ export function AllTeamsExport({
   }, []);
 
   const playersPerTeam = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, ListerPlayerRow[]>();
     for (const p of players) {
       if (!p.team_id) continue;
-      map.set(p.team_id, (map.get(p.team_id) ?? 0) + 1);
+      const list = map.get(p.team_id) ?? [];
+      list.push(p);
+      map.set(p.team_id, list);
     }
     return map;
   }, [players]);
@@ -43,20 +46,49 @@ export function AllTeamsExport({
   const levelGroups = useMemo(() => {
     const byLevel = new Map<
       string,
-      { id: string; displayName: string; officialName: string; nickname: string | null; playerCount: number }[]
+      {
+        id: string;
+        levelKey: string;
+        officialName: string;
+        nickname: string | null;
+        playerCount: number;
+        averageAge: number | null;
+        members: { name: string; club: string }[];
+      }[]
     >();
     for (const t of teams) {
+      const members = [...(playersPerTeam.get(t.id) ?? [])]
+        .map((p) => ({
+          name: p.name,
+          club: p.home_club?.trim() || "Ingen klub",
+        }))
+        .sort((a, b) => {
+          const byClub = a.club.localeCompare(b.club, "da", { sensitivity: "base" });
+          if (byClub !== 0) return byClub;
+          return a.name.localeCompare(b.name, "da", { sensitivity: "base" });
+        });
+
+      const ages = (playersPerTeam.get(t.id) ?? [])
+        .map((p) => p.age)
+        .filter((age): age is number => typeof age === "number" && Number.isFinite(age));
+      const averageAge = ages.length > 0 ? Number((ages.reduce((sum, age) => sum + age, 0) / ages.length).toFixed(1)) : null;
+
       const list = byLevel.get(t.levelKey) ?? [];
       list.push({
         id: t.id,
-        displayName: t.displayName,
+        levelKey: t.levelKey,
         officialName: t.officialName,
         nickname: t.nickname,
-        playerCount: playersPerTeam.get(t.id) ?? 0,
+        playerCount: members.length,
+        averageAge,
+        members,
       });
       byLevel.set(t.levelKey, list);
     }
-    return [...byLevel.entries()].map(([levelKey, levelTeams]) => ({ levelKey, teams: levelTeams }));
+    return sortLevelKeysForNav([...byLevel.keys()]).map((levelKey) => ({
+      levelKey,
+      teams: byLevel.get(levelKey) ?? [],
+    }));
   }, [teams, playersPerTeam]);
 
   function runPrint() {
@@ -66,11 +98,17 @@ export function AllTeamsExport({
 
   function runCsv() {
     const rows: (string | number | null | undefined)[][] = [
-      ["Niveau", "Hold", "Officielt holdnavn", "Kaldenavn", "Antal spillere"],
+      ["Niveau", "Hold (auto)", "Kaldenavn", "Gennemsnitsalder", "Antal spillere", "Klub", "Spiller"],
     ];
     for (const g of levelGroups) {
       for (const t of g.teams) {
-        rows.push([g.levelKey, t.displayName, t.officialName, t.nickname ?? "", t.playerCount]);
+        if (t.members.length === 0) {
+          rows.push([g.levelKey, t.officialName, t.nickname ?? "", t.averageAge ?? "", t.playerCount, "", ""]);
+          continue;
+        }
+        for (const m of t.members) {
+          rows.push([g.levelKey, t.officialName, t.nickname ?? "", t.averageAge ?? "", t.playerCount, m.club, m.name]);
+        }
       }
     }
     downloadCsv(csvFilename, rows);
@@ -109,24 +147,31 @@ export function AllTeamsExport({
                           Hold
                         </th>
                         <th className="border-b border-black px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide">
-                          Officielt holdnavn
-                        </th>
-                        <th className="border-b border-black px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide">
-                          Kaldenavn
+                          Gns. alder
                         </th>
                         <th className="border-b border-black px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide">
                           Spillere
+                        </th>
+                        <th className="border-b border-black px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide">
+                          Medlemmer (sorteret på klub)
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {group.teams.map((team) => (
                         <tr key={team.id}>
-                          <td className="border-b border-neutral-300 px-2 py-1.5 text-sm">{team.displayName}</td>
-                          <td className="border-b border-neutral-300 px-2 py-1.5 text-sm">{team.officialName}</td>
-                          <td className="border-b border-neutral-300 px-2 py-1.5 text-sm">{team.nickname ?? "—"}</td>
+                          <td className="border-b border-neutral-300 px-2 py-1.5 text-sm">
+                            <p className="font-semibold">{team.officialName}</p>
+                            <p className="text-xs text-neutral-600">Kaldenavn: {team.nickname ?? "—"}</p>
+                          </td>
+                          <td className="border-b border-neutral-300 px-2 py-1.5 text-sm tabular-nums">
+                            {team.averageAge != null ? String(team.averageAge).replace(".", ",") : "—"}
+                          </td>
                           <td className="border-b border-neutral-300 px-2 py-1.5 text-sm tabular-nums">
                             {team.playerCount}
+                          </td>
+                          <td className="border-b border-neutral-300 px-2 py-1.5 text-sm">
+                            {team.members.length > 0 ? team.members.map((m) => `${m.club}: ${m.name}`).join(", ") : "—"}
                           </td>
                         </tr>
                       ))}
