@@ -597,6 +597,18 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
             Analyse
           </Link>
+          <Link
+            href="/billetsalg"
+            onClick={() => setMobileOpen(false)}
+            className={`inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${
+              isActive("/billetsalg") ? "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
+            }`}
+            aria-current={isActive("/billetsalg") ? "page" : undefined}
+            title="Live billetsalg fra WordPress"
+          >
+            <Ticket className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            Billetsalg
+          </Link>
           <KontrolcenterHelp />
           <button
             type="button"
