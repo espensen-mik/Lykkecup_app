@@ -98,6 +98,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   const [turneringOpen, setTurneringOpen] = useState(() => pathname.startsWith("/turnering"));
   const [puljerOpen, setPuljerOpen] = useState(() => pathname.startsWith("/turnering/puljer"));
   const [planOpen, setPlanOpen] = useState(() => pathname.startsWith("/turnering/plan"));
+  const [appIndholdOpen, setAppIndholdOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,6 +143,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     if (pathname.startsWith("/turnering")) setTurneringOpen(true);
     if (pathname.startsWith("/turnering/puljer")) setPuljerOpen(true);
     if (pathname.startsWith("/turnering/plan")) setPlanOpen(true);
+    if (pathname.startsWith("/app-indhold")) setAppIndholdOpen(true);
   }, [pathname]);
 
   function isActive(href: string) {
@@ -530,49 +532,62 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
         </div>
       </nav>
       <div className="shrink-0 border-t border-lc-border bg-white p-3 dark:border-gray-700 dark:bg-gray-900 lg:p-4">
-        <p className="mb-2 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-lc-muted dark:text-gray-500">App indhold</p>
-        <div className="space-y-0.5">
-          <Link
-            href="/app-indhold"
-            onClick={() => setMobileOpen(false)}
-            className={`flex items-center gap-3 rounded-md py-2 pr-3 text-[0.86rem] font-medium transition-colors border-l-2 ${
-              isActive("/app-indhold")
-                ? "border-[#14b8a6] bg-teal-50/90 pl-[10px] text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
-                : "border-transparent pl-3 text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-white"
-            }`}
+        <div className="flex items-center justify-between gap-2 px-3">
+          <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-lc-muted dark:text-gray-500">App indhold</p>
+          <button
+            type="button"
+            onClick={() => setAppIndholdOpen((v) => !v)}
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+            aria-label={appIndholdOpen ? "Skjul App indhold" : "Vis App indhold"}
+            aria-expanded={appIndholdOpen}
           >
-            <MessageSquareText className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-            <span className="truncate">App indhold (oversigt)</span>
-          </Link>
-          <Link href="/app-indhold/dagens-program" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
-            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Dagens program
-          </Link>
-          <Link href="/app-indhold/find-rundt-i-mch" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
-            <MapPinned className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Find rundt i MCH
-          </Link>
-          <Link href="/app-indhold/praktisk-info" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
-            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Praktisk info
-          </Link>
-          <Link href="/app-indhold/nyt-fra-lykkeliga" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
-            <Newspaper className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Nyt fra LykkeLiga
-          </Link>
-          <Link
-            href="/beskeder"
-            onClick={() => setMobileOpen(false)}
-            className={`flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] transition-colors ${
-              isActive("/beskeder")
-                ? "bg-[rgb(223_103_99/0.08)] text-[#b84e4a] dark:bg-[rgb(223_103_99/0.12)] dark:text-[#e8a09c]"
-                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
-            }`}
-          >
-            <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Beskeder
-          </Link>
+            <ChevronDown className={`h-4 w-4 transition-transform ${appIndholdOpen ? "" : "-rotate-90"}`} aria-hidden />
+          </button>
         </div>
+        {appIndholdOpen ? (
+          <div className="mt-2 space-y-0.5">
+            <Link
+              href="/app-indhold"
+              onClick={() => setMobileOpen(false)}
+              className={`flex items-center gap-3 rounded-md py-2 pr-3 text-[0.86rem] font-medium transition-colors border-l-2 ${
+                isActive("/app-indhold")
+                  ? "border-[#14b8a6] bg-teal-50/90 pl-[10px] text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                  : "border-transparent pl-3 text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-white"
+              }`}
+            >
+              <MessageSquareText className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+              <span className="truncate">App indhold (oversigt)</span>
+            </Link>
+            <Link href="/app-indhold/dagens-program" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
+              <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Dagens program
+            </Link>
+            <Link href="/app-indhold/find-rundt-i-mch" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
+              <MapPinned className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Find rundt i MCH
+            </Link>
+            <Link href="/app-indhold/praktisk-info" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
+              <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Praktisk info
+            </Link>
+            <Link href="/app-indhold/nyt-fra-lykkeliga" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
+              <Newspaper className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Nyt fra LykkeLiga
+            </Link>
+            <Link
+              href="/beskeder"
+              onClick={() => setMobileOpen(false)}
+              className={`flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] transition-colors ${
+                isActive("/beskeder")
+                  ? "bg-[rgb(223_103_99/0.08)] text-[#b84e4a] dark:bg-[rgb(223_103_99/0.12)] dark:text-[#e8a09c]"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+              }`}
+            >
+              <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Beskeder
+            </Link>
+          </div>
+        ) : null}
       </div>
     </>
   );

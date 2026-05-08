@@ -11,6 +11,7 @@ import type {
   Lc26PraktiskInfoContent,
   Lc26ProgramContent,
 } from "@/lib/lc26-page-content";
+import { LC26_PAGE_CONTENT_IMAGE_BUCKET as CONTENT_IMG_BUCKET } from "@/lib/lc26-page-content";
 
 type Props = {
   pageKey: Lc26PageKey;
@@ -23,6 +24,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
   const [heroImageUrl, setHeroImageUrl] = useState(initialRow.heroImageUrl ?? "");
   const [contentText, setContentText] = useState(() => JSON.stringify(initialRow.content ?? {}, null, 2));
   const [showAdvancedJson, setShowAdvancedJson] = useState(false);
+  const [pendingHeroFile, setPendingHeroFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -65,6 +67,25 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
     return next;
   }
 
+  function safeFileName(name: string): string {
+    return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "image";
+  }
+
+  async function uploadHeroImage(file: File): Promise<string | null> {
+    const supabase = getAuthBrowserClient();
+    const path = `${LYKKECUP26_EVENT_ID}/${pageKey}/${Date.now()}-${safeFileName(file.name)}`;
+    const { error: upErr } = await supabase.storage.from(CONTENT_IMG_BUCKET).upload(path, file, {
+      upsert: true,
+      contentType: file.type || undefined,
+    });
+    if (upErr) {
+      setError(upErr.message);
+      return null;
+    }
+    const { data: pub } = supabase.storage.from(CONTENT_IMG_BUCKET).getPublicUrl(path);
+    return pub.publicUrl ?? null;
+  }
+
   async function save() {
     setError(null);
     setNotice(null);
@@ -83,6 +104,15 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
       else parsed = nytContent;
     }
 
+    let nextHeroImage = heroImageUrl.trim() || null;
+    if (pendingHeroFile) {
+      const uploaded = await uploadHeroImage(pendingHeroFile);
+      if (!uploaded) return;
+      nextHeroImage = uploaded;
+      setHeroImageUrl(uploaded);
+      setPendingHeroFile(null);
+    }
+
     setBusy(true);
     const supabase = getAuthBrowserClient();
     const { error: saveError } = await supabase.from("lc26_page_content").upsert(
@@ -91,7 +121,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
         page_key: pageKey,
         title: title.trim(),
         intro: intro.trim(),
-        hero_image_url: heroImageUrl.trim() || null,
+        hero_image_url: nextHeroImage,
         content: parsed,
       },
       { onConflict: "event_id,page_key" },
@@ -142,6 +172,29 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
           placeholder="/mumle.jpg"
           className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
         />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setPendingHeroFile(e.target.files?.[0] ?? null)}
+            className="block w-full max-w-xs text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-800 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-800 dark:file:text-gray-100"
+          />
+          {pendingHeroFile ? (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Ny fil valgt: {pendingHeroFile.name} (gem for upload)
+            </span>
+          ) : null}
+        </div>
+        {heroImageUrl.trim() ? (
+          <div className="mt-2">
+            <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">Nuværende billede</p>
+            <img
+              src={heroImageUrl}
+              alt=""
+              className="h-24 w-auto rounded-lg border border-gray-200 object-cover dark:border-gray-700"
+            />
+          </div>
+        ) : null}
       </label>
 
       {pageKey === "program" ? (

@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { LYKKECUP26_EVENT_ID } from "@/lib/lykkecup26-public";
 
+export const LC26_PAGE_CONTENT_IMAGE_BUCKET = "lc26_page_content_images";
+
 export type Lc26PageKey = "program" | "find-rundt" | "praktisk-info" | "nyt-fra-lykkeliga";
 
 export type Lc26ProgramScheduleItem = {
