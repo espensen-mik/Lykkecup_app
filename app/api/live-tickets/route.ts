@@ -15,22 +15,21 @@ type WpBreakdownResponse = {
 };
 
 export async function GET() {
-  const baseUrl = process.env.LL_WP_BASE_URL?.trim();
-  const key = process.env.LL_WP_TICKETS_KEY?.trim();
+  // Fallbacks gør siden brugbar lokalt med det samme.
+  const baseUrl = (process.env.LL_WP_BASE_URL?.trim() || "https://lykkeliga.dk").replace(/\/+$/, "");
+  const key = process.env.LL_WP_TICKETS_KEY?.trim() || "lykkecup26_key";
   const eventId = (process.env.LL_WP_EVENT_ID?.trim() || "16899").replace(/\D+/g, "");
 
-  if (!baseUrl || !key || !eventId) {
+  if (!key || !eventId) {
     return NextResponse.json(
       {
-        error:
-          "Manglende konfiguration. Sæt LL_WP_BASE_URL, LL_WP_TICKETS_KEY og evt. LL_WP_EVENT_ID i miljøvariabler.",
+        error: "Manglende konfiguration. Sæt LL_WP_TICKETS_KEY og evt. LL_WP_EVENT_ID i miljøvariabler.",
       },
       { status: 500 },
     );
   }
 
-  const normalizedBase = baseUrl.replace(/\/+$/, "");
-  const url = `${normalizedBase}/wp-json/lykkeliga/v1/tickets-breakdown/${eventId}?key=${encodeURIComponent(key)}`;
+  const url = `${baseUrl}/wp-json/lykkeliga/v1/tickets-breakdown/${eventId}?key=${encodeURIComponent(key)}`;
 
   try {
     const res = await fetch(url, { cache: "no-store" });
