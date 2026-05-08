@@ -12,6 +12,9 @@ import {
   Menu,
   MessageSquare,
   MessageSquareText,
+  Newspaper,
+  MapPinned,
+  Info,
   Ticket,
   Users,
   UsersRound,
@@ -37,7 +40,6 @@ const nav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/traenere", label: "Trænere", icon: UsersRound },
   { href: "/klubber", label: "Klubber", icon: Building2 },
   { href: "/kommentarer", label: "Kommentarer", icon: MessageSquareText },
-  { href: "/billetsalg", label: "Billetsalg", icon: Ticket },
 ];
 
 function pathLevelKeyFromPathname(pathname: string, basePath: string): string | null {
@@ -152,6 +154,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       return pathname === "/turnering/plan" || pathname.startsWith("/turnering/plan/");
     if (href === "/admin") return pathname === "/admin" || pathname === "/dashboard";
     if (href === "/beskeder") return pathname === "/beskeder";
+    if (href === "/app-indhold") return pathname === "/app-indhold" || pathname.startsWith("/app-indhold/");
     if (href === "/analyse") return pathname === "/analyse";
     if (href === "/lister") return pathname === "/lister";
     return pathname === href;
@@ -527,27 +530,49 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
         </div>
       </nav>
       <div className="shrink-0 border-t border-lc-border bg-white p-3 dark:border-gray-700 dark:bg-gray-900 lg:p-4">
-        <Link
-          href="/beskeder"
-          onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-3 rounded-md py-2.5 pr-3 text-[0.9375rem] font-medium transition-colors border-l-2 ${
-            isActive("/beskeder")
-              ? "border-[#df6763] bg-[rgb(223_103_99/0.08)] pl-[10px] text-[#b84e4a] dark:border-[#e89590] dark:bg-[rgb(223_103_99/0.12)] dark:text-[#e8a09c]"
-              : "border-transparent pl-3 text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-white"
-          }`}
-        >
-          <MessageSquare
-            className={`h-4 w-4 shrink-0 ${isActive("/beskeder") ? "text-[#df6763] dark:text-[#e89590]" : "text-[#df6763]/55 dark:text-[#df6763]/45"}`}
-            strokeWidth={2}
-            aria-hidden
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate">Beskeder</span>
-            <span className="mt-0.5 block truncate text-[0.6875rem] font-normal leading-snug text-gray-500 dark:text-gray-500">
-              Planlæg indbakken i LykkeCup-appen
-            </span>
-          </span>
-        </Link>
+        <p className="mb-2 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-lc-muted dark:text-gray-500">App indhold</p>
+        <div className="space-y-0.5">
+          <Link
+            href="/app-indhold"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 rounded-md py-2 pr-3 text-[0.86rem] font-medium transition-colors border-l-2 ${
+              isActive("/app-indhold")
+                ? "border-[#14b8a6] bg-teal-50/90 pl-[10px] text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                : "border-transparent pl-3 text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-white"
+            }`}
+          >
+            <MessageSquareText className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            <span className="truncate">App indhold (oversigt)</span>
+          </Link>
+          <Link href="/app-indhold/dagens-program" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Dagens program
+          </Link>
+          <Link href="/app-indhold/find-rundt-i-mch" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
+            <MapPinned className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Find rundt i MCH
+          </Link>
+          <Link href="/app-indhold/praktisk-info" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
+            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Praktisk info
+          </Link>
+          <Link href="/app-indhold/nyt-fra-lykkeliga" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
+            <Newspaper className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Nyt fra LykkeLiga
+          </Link>
+          <Link
+            href="/beskeder"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] transition-colors ${
+              isActive("/beskeder")
+                ? "bg-[rgb(223_103_99/0.08)] text-[#b84e4a] dark:bg-[rgb(223_103_99/0.12)] dark:text-[#e8a09c]"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+            }`}
+          >
+            <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Beskeder
+          </Link>
+        </div>
       </div>
     </>
   );

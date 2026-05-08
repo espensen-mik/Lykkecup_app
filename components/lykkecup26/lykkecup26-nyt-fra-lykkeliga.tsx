@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { Lc26NytContent } from "@/lib/lc26-page-content";
 
 type Article = {
   tag: string;
@@ -73,20 +74,35 @@ const ARTICLES: Article[] = [
 ];
 
 export function Lykkecup26NytFraLykkeliga() {
+  return <Lykkecup26NytFraLykkeligaWithContent />;
+}
+
+export function Lykkecup26NytFraLykkeligaWithContent({
+  title = "Nyt fra LykkeLiga",
+  intro = "Seneste nyt, reportager og praktiske historier fra LykkeLiga og LykkeCup. Artiklerne nedenfor er pladsholdere — udskift tekst og billeder, når indholdet er klar.",
+  heroImageUrl = "/musik.jpg",
+  content,
+}: {
+  title?: string;
+  intro?: string;
+  heroImageUrl?: string | null;
+  content?: Lc26NytContent;
+}) {
+  const articles = content?.articles?.length ? content.articles : ARTICLES;
   return (
     <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-12 pt-8 sm:max-w-2xl sm:px-6 sm:pb-16 sm:pt-10">
       <header className="border-b border-stone-200/90 pb-8 text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lc26-teal">LykkeCup 26</p>
         <h1 className="mt-2 text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.75rem]">
-          Nyt fra LykkeLiga
+          {title}
         </h1>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-snug text-lc26-navy/55">
-          Seneste nyt, reportager og praktiske historier fra LykkeLiga og LykkeCup. Artiklerne nedenfor er pladsholdere — udskift tekst og billeder, når indholdet er klar.
+          {intro}
         </p>
       </header>
 
       <div className="mt-10 space-y-12 sm:space-y-14">
-        {ARTICLES.map((article) => (
+        {articles.map((article) => (
           <article
             key={article.title}
             className="overflow-hidden border border-stone-200/90 bg-white shadow-[0_16px_48px_-28px_rgb(22_51_88/0.22)]"
@@ -94,7 +110,7 @@ export function Lykkecup26NytFraLykkeliga() {
             <figure className="m-0">
               <div className="relative aspect-[16/10] w-full sm:aspect-[2/1]">
                 <Image
-                  src="/musik.jpg"
+                  src={heroImageUrl || "/musik.jpg"}
                   alt=""
                   fill
                   className="object-cover object-center"

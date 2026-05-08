@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Lc26GuestExperienceCta } from "@/components/lykkecup26/lc26-guest-experience-cta";
+import type { Lc26ProgramContent } from "@/lib/lc26-page-content";
 
 const CAPTION =
   "Glæd dig til at Mumle spiller medaljekoncert kl. 16.30 i Boxen";
@@ -22,12 +23,29 @@ const SCHEDULE: { time: string; title: string; note?: string; highlight?: boolea
 ];
 
 export function Lykkecup26ProgramDag() {
+  return <Lykkecup26ProgramDagWithContent />;
+}
+
+export function Lykkecup26ProgramDagWithContent({
+  title = "Dagens program",
+  intro = "Fra kl. 9.00 til 21.00 — tiderne kan justeres, når det endelige program foreligger.",
+  heroImageUrl = "/mumle.jpg",
+  content,
+}: {
+  title?: string;
+  intro?: string;
+  heroImageUrl?: string | null;
+  content?: Lc26ProgramContent;
+}) {
+  const schedule = content?.schedule?.length ? content.schedule : SCHEDULE;
+  const caption = content?.caption ?? CAPTION;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <figure className="w-full shrink-0">
         <div className="relative h-44 w-full overflow-hidden sm:h-52">
           <Image
-            src="/mumle.jpg"
+            src={heroImageUrl || "/mumle.jpg"}
             alt=""
             fill
             className="object-cover object-center"
@@ -37,7 +55,7 @@ export function Lykkecup26ProgramDag() {
         </div>
         <figcaption className="border-b border-stone-200/90 bg-white px-4 py-4 text-center sm:px-6">
           <p className="mx-auto max-w-xl text-sm font-medium leading-snug text-lc26-navy/80 sm:text-[0.9375rem]">
-            {CAPTION}
+            {caption}
           </p>
         </figcaption>
       </figure>
@@ -46,16 +64,16 @@ export function Lykkecup26ProgramDag() {
         <header className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lc26-teal">LykkeCup 26</p>
           <h1 className="mt-2 text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.65rem]">
-            Dagens program
+            {title}
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm leading-snug text-lc26-navy/50">
-            Fra kl. 9.00 til 21.00 — tiderne kan justeres, når det endelige program foreligger.
+            {intro}
           </p>
         </header>
 
         <div className="mt-10">
           <ol className="space-y-3 sm:space-y-4">
-            {SCHEDULE.map((item) => (
+            {schedule.map((item) => (
               <li key={item.time + item.title}>
                 <div
                   className={`relative flex gap-3 rounded-2xl border p-4 shadow-sm transition sm:gap-5 sm:p-5 ${

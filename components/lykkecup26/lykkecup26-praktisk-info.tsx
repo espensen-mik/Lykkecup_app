@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { Lc26GuestExperienceCta } from "@/components/lykkecup26/lc26-guest-experience-cta";
 import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero";
+import type { Lc26PraktiskInfoContent } from "@/lib/lc26-page-content";
 
 const SECTIONS: { title: string; body: string }[] = [
   {
@@ -57,6 +58,20 @@ const FAQ: { q: string; a: string }[] = [
 ];
 
 export function Lykkecup26PraktiskInfo() {
+  return <Lykkecup26PraktiskInfoWithContent />;
+}
+
+export function Lykkecup26PraktiskInfoWithContent({
+  title = "Praktisk info",
+  intro = "Korte pladsholdere til praktiske emner. Erstat teksterne med endeligt indhold, når det er klar.",
+  content,
+}: {
+  title?: string;
+  intro?: string;
+  content?: Lc26PraktiskInfoContent;
+}) {
+  const sections = content?.sections?.length ? content.sections : SECTIONS;
+  const faq = content?.faq?.length ? content.faq : FAQ;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Lykkecup26PageHero />
@@ -65,15 +80,15 @@ export function Lykkecup26PraktiskInfo() {
         <header className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lc26-teal">LykkeCup 26</p>
           <h1 className="mt-2 text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.65rem]">
-            Praktisk info
+            {title}
           </h1>
           <p className="mx-auto mt-3 max-w-lg text-sm leading-snug text-lc26-navy/55">
-            Korte pladsholdere til praktiske emner. Erstat teksterne med endeligt indhold, når det er klar.
+            {intro}
           </p>
         </header>
 
         <div className="mt-10 space-y-8">
-          {SECTIONS.map((s) => (
+          {sections.map((s) => (
             <section key={s.title} className="scroll-mt-24">
               <h2 className="text-lg font-semibold tracking-tight text-lc26-navy">{s.title}</h2>
               <p className="mt-2 text-sm leading-snug text-lc26-navy/60">{s.body}</p>
@@ -94,7 +109,7 @@ export function Lykkecup26PraktiskInfo() {
           </p>
 
           <div className="mt-8 space-y-3">
-            {FAQ.map((item) => (
+            {faq.map((item) => (
               <details
                 key={item.q}
                 className="group rounded-2xl border border-stone-200/90 bg-white shadow-sm open:border-lc26-teal/25 open:shadow-[0_12px_40px_-24px_rgb(22_51_88/0.35)]"

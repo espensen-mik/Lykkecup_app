@@ -1,5 +1,6 @@
 import { MapPin } from "lucide-react";
 import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero";
+import type { Lc26FindRundtContent } from "@/lib/lc26-page-content";
 
 const PLACEHOLDER_MAPS = [
   {
@@ -17,6 +18,19 @@ const PLACEHOLDER_MAPS = [
 ] as const;
 
 export function Lykkecup26FindMch() {
+  return <Lykkecup26FindMchWithContent />;
+}
+
+export function Lykkecup26FindMchWithContent({
+  title = "Find rundt i MCH",
+  intro = "Her finder du snart kort og oversigter, så spillere og familier nemt kan orientere sig i Messecenter Herning. Teksten og grafikken nedenfor er pladsholdere.",
+  content,
+}: {
+  title?: string;
+  intro?: string;
+  content?: Lc26FindRundtContent;
+}) {
+  const cards = content?.cards?.length ? content.cards : PLACEHOLDER_MAPS;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Lykkecup26PageHero />
@@ -25,16 +39,15 @@ export function Lykkecup26FindMch() {
         <header className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lc26-teal">LykkeCup 26</p>
           <h1 className="mt-2 text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.65rem]">
-            Find rundt i MCH
+            {title}
           </h1>
           <p className="mx-auto mt-3 max-w-lg text-sm leading-snug text-lc26-navy/55">
-            Her finder du snart kort og oversigter, så spillere og familier nemt kan orientere sig i Messecenter Herning. Teksten
-            og grafikken nedenfor er pladsholdere.
+            {intro}
           </p>
         </header>
 
         <ul className="mt-10 space-y-5">
-          {PLACEHOLDER_MAPS.map((item) => (
+          {cards.map((item) => (
             <li key={item.title}>
               <div className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm">
                 <div className="flex aspect-[16/10] flex-col items-center justify-center gap-3 bg-gradient-to-br from-stone-100/95 to-stone-50 px-6 text-center sm:aspect-[2/1]">
