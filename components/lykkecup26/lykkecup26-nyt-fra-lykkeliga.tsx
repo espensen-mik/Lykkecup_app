@@ -8,6 +8,7 @@ type Article = {
   dateIso: string;
   title: string;
   paragraphs: string[];
+  imageUrl?: string;
   /** Vises under hero-billedet, typisk til første artikel. */
   imageCaption?: string;
 };
@@ -19,6 +20,7 @@ const ARTICLES: Article[] = [
     date: "12. april 2026",
     dateIso: "2026-04-12",
     title: "LykkeLiga udgiver 10 nye musikhits",
+    imageUrl: "/musik.jpg",
     imageCaption:
       "Spillere fra Vordingborg i koncentreret process med at lave lykkelig musik i efteråret 2025.",
     paragraphs: [
@@ -110,7 +112,7 @@ export function Lykkecup26NytFraLykkeligaWithContent({
             <figure className="m-0">
               <div className="relative aspect-[16/10] w-full sm:aspect-[2/1]">
                 <Image
-                  src={heroImageUrl || "/musik.jpg"}
+                  src={article.imageUrl || heroImageUrl || "/musik.jpg"}
                   alt=""
                   fill
                   className="object-cover object-center"

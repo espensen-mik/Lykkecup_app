@@ -33,6 +33,7 @@ export type Lc26NytArticle = {
   dateIso: string;
   title: string;
   paragraphs: string[];
+  imageUrl?: string;
   imageCaption?: string;
 };
 
@@ -124,6 +125,7 @@ const defaults: Record<
           date: "12. april 2026",
           dateIso: "2026-04-12",
           title: "LykkeLiga udgiver 10 nye musikhits",
+          imageUrl: "/musik.jpg",
           imageCaption: "Spillere fra Vordingborg i koncentreret process med at lave lykkelig musik i efteråret 2025.",
           paragraphs: [
             "Så kan du godt skrue op, for der er ny LykkeLiga-musik til din håndboldtræning.",

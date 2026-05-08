@@ -25,6 +25,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
   const [contentText, setContentText] = useState(() => JSON.stringify(initialRow.content ?? {}, null, 2));
   const [showAdvancedJson, setShowAdvancedJson] = useState(false);
   const [pendingHeroFile, setPendingHeroFile] = useState<File | null>(null);
+  const [pendingArticleFiles, setPendingArticleFiles] = useState<Record<number, File | null>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -86,6 +87,21 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
     return pub.publicUrl ?? null;
   }
 
+  async function uploadArticleImage(articleIndex: number, file: File): Promise<string | null> {
+    const supabase = getAuthBrowserClient();
+    const path = `${LYKKECUP26_EVENT_ID}/${pageKey}/articles/${articleIndex}-${Date.now()}-${safeFileName(file.name)}`;
+    const { error: upErr } = await supabase.storage.from(CONTENT_IMG_BUCKET).upload(path, file, {
+      upsert: true,
+      contentType: file.type || undefined,
+    });
+    if (upErr) {
+      setError(upErr.message);
+      return null;
+    }
+    const { data: pub } = supabase.storage.from(CONTENT_IMG_BUCKET).getPublicUrl(path);
+    return pub.publicUrl ?? null;
+  }
+
   async function save() {
     setError(null);
     setNotice(null);
@@ -101,7 +117,22 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
       if (pageKey === "program") parsed = programContent;
       else if (pageKey === "find-rundt") parsed = findContent;
       else if (pageKey === "praktisk-info") parsed = praktiskContent;
-      else parsed = nytContent;
+      else {
+        let nextArticles = [...nytContent.articles];
+        const entries = Object.entries(pendingArticleFiles).filter(([, f]) => Boolean(f));
+        for (const [idxText, file] of entries) {
+          const idx = Number(idxText);
+          if (!file || Number.isNaN(idx) || !nextArticles[idx]) continue;
+          const uploaded = await uploadArticleImage(idx, file);
+          if (!uploaded) return;
+          nextArticles[idx] = { ...nextArticles[idx], imageUrl: uploaded };
+        }
+        if (entries.length > 0) {
+          setNytContent((c) => ({ ...c, articles: nextArticles }));
+          setPendingArticleFiles({});
+        }
+        parsed = { ...nytContent, articles: nextArticles };
+      }
     }
 
     let nextHeroImage = heroImageUrl.trim() || null;
@@ -576,6 +607,43 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                 placeholder="Titel"
                 className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
+              <input
+                value={article.imageUrl ?? ""}
+                onChange={(e) =>
+                  setNytContent((c) => {
+                    const next = [...c.articles];
+                    next[idx] = { ...next[idx], imageUrl: e.target.value };
+                    return { ...c, articles: next };
+                  })
+                }
+                placeholder="Billede URL (for denne artikel)"
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setPendingArticleFiles((prev) => ({
+                      ...prev,
+                      [idx]: e.target.files?.[0] ?? null,
+                    }))
+                  }
+                  className="block w-full max-w-xs text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-800 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-800 dark:file:text-gray-100"
+                />
+                {pendingArticleFiles[idx] ? (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Ny fil valgt: {pendingArticleFiles[idx]!.name} (gem for upload)
+                  </span>
+                ) : null}
+              </div>
+              {article.imageUrl ? (
+                <img
+                  src={article.imageUrl}
+                  alt=""
+                  className="h-20 w-auto rounded-lg border border-gray-200 object-cover dark:border-gray-700"
+                />
+              ) : null}
               <textarea
                 value={(article.paragraphs ?? []).join("\n\n")}
                 onChange={(e) =>
@@ -639,7 +707,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                 ...c,
                 articles: [
                   ...c.articles,
-                  { tag: "", tagClass: "bg-lc26-teal text-white shadow-sm", date: "", dateIso: "", title: "", paragraphs: [] },
+                  { tag: "", tagClass: "bg-lc26-teal text-white shadow-sm", date: "", dateIso: "", title: "", imageUrl: "", paragraphs: [] },
                 ],
               }))
             }

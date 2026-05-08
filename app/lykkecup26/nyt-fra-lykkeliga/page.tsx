@@ -1,6 +1,8 @@
 import { Lykkecup26NytFraLykkeligaWithContent } from "@/components/lykkecup26/lykkecup26-nyt-fra-lykkeliga";
 import { fetchLc26PageContent } from "@/lib/lc26-page-content";
 
+export const dynamic = "force-dynamic";
+
 export default async function NytFraLykkeligaPage() {
   const { row } = await fetchLc26PageContent("nyt-fra-lykkeliga");
   return (
@@ -17,6 +19,7 @@ export default async function NytFraLykkeligaPage() {
             dateIso: string;
             title: string;
             paragraphs: string[];
+            imageUrl?: string;
             imageCaption?: string;
           }[];
         }
