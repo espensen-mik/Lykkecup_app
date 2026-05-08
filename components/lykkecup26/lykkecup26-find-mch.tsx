@@ -2,7 +2,7 @@ import { MapPin } from "lucide-react";
 import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero";
 import type { Lc26FindRundtContent } from "@/lib/lc26-page-content";
 
-const PLACEHOLDER_MAPS = [
+const PLACEHOLDER_MAPS: Lc26FindRundtContent["cards"] = [
   {
     title: "Oversigtskort — MCH",
     body: "Her kommer et samlet kort over Messecenter Herning med indgange, hallområder og fælles faciliteter.",
@@ -15,7 +15,7 @@ const PLACEHOLDER_MAPS = [
     title: "Parkering & ankomst",
     body: "Pladsholder til p-pladser, cykelparkering og vejvisning fra motorvejen.",
   },
-] as const;
+];
 
 export function Lykkecup26FindMch() {
   return <Lykkecup26FindMchWithContent />;
