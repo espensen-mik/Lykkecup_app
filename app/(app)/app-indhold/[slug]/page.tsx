@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ComponentType } from "react";
-import { CalendarClock, ExternalLink, Info, MapPinned, Newspaper } from "lucide-react";
+import { CalendarClock, Info, MapPinned, Newspaper } from "lucide-react";
 import { Lc26PageContentEditor } from "@/components/lc26-page-content-editor";
+import { PhonePreviewButton } from "@/components/phone-preview-button";
 import { fetchLc26PageContent, type Lc26PageKey } from "@/lib/lc26-page-content";
 
 type PageProps = {
@@ -55,15 +56,7 @@ export default async function AppIndholdEditPage({ params }: PageProps) {
               Rediger tekst, billeder og struktur for siden. Gem for at publicere opdateringer i appen med det samme.
             </p>
           </div>
-          <a
-            href={cfg.previewHref}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
-          >
-            Se frontend
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-          </a>
+          <PhonePreviewButton href={cfg.previewHref} label="Se frontend (telefonformat)" />
         </div>
       </header>
 
@@ -73,16 +66,7 @@ export default async function AppIndholdEditPage({ params }: PageProps) {
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/35">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Forhaandsvisning</p>
-        <iframe
-          title={`Forhaandsvisning af ${cfg.label}`}
-          src={cfg.previewHref}
-          className="h-[440px] w-full rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-        />
-      </div>
-
-      <Lc26PageContentEditor pageKey={cfg.key} initialRow={row} previewHref={cfg.previewHref} />
+      <Lc26PageContentEditor pageKey={cfg.key} initialRow={row} />
     </div>
   );
 }

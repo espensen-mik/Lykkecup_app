@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarClock, ExternalLink, ImageIcon, Info, LayoutTemplate, MapPinned, Newspaper, Save, Sparkles } from "lucide-react";
+import { CalendarClock, ImageIcon, Info, LayoutTemplate, MapPinned, Newspaper, Save, Sparkles } from "lucide-react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { LYKKECUP26_EVENT_ID } from "@/lib/lykkecup26-public";
 import type {
@@ -17,10 +17,9 @@ import { LC26_PAGE_CONTENT_IMAGE_BUCKET as CONTENT_IMG_BUCKET } from "@/lib/lc26
 type Props = {
   pageKey: Lc26PageKey;
   initialRow: Lc26PageContentRow;
-  previewHref?: string;
 };
 
-export function Lc26PageContentEditor({ pageKey, initialRow, previewHref }: Props) {
+export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
   const [title, setTitle] = useState(initialRow.title);
   const [intro, setIntro] = useState(initialRow.intro);
   const [heroImageUrl, setHeroImageUrl] = useState(initialRow.heroImageUrl ?? "");
@@ -194,20 +193,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow, previewHref }: Prop
           <Sparkles className="h-4 w-4" aria-hidden />
           <p className="text-xs font-semibold uppercase tracking-wide">Indholdseditor</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Senest gemt: {updatedLabel}</p>
-          {previewHref ? (
-            <a
-              href={previewHref}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
-            >
-              Se frontend
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-            </a>
-          ) : null}
-        </div>
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Senest gemt: {updatedLabel}</p>
       </div>
 
       <div className="rounded-xl border border-emerald-100 bg-white/90 p-4 dark:border-emerald-900/40 dark:bg-gray-900/55">
