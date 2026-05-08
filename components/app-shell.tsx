@@ -12,6 +12,7 @@ import {
   Menu,
   MessageSquare,
   MessageSquareText,
+  Ticket,
   Users,
   UsersRound,
   type LucideIcon,
@@ -36,6 +37,7 @@ const nav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/traenere", label: "Trænere", icon: UsersRound },
   { href: "/klubber", label: "Klubber", icon: Building2 },
   { href: "/kommentarer", label: "Kommentarer", icon: MessageSquareText },
+  { href: "/billetsalg", label: "Billetsalg", icon: Ticket },
 ];
 
 function pathLevelKeyFromPathname(pathname: string, basePath: string): string | null {
