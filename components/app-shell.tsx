@@ -531,8 +531,8 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           ) : null}
         </div>
       </nav>
-      <div className="shrink-0 border-t border-lc-border bg-white p-3 dark:border-gray-700 dark:bg-gray-900 lg:p-4">
-        <div className="flex items-center justify-between gap-2 px-3">
+      <div className="shrink-0 border-t border-teal-200/80 bg-teal-50/35 p-3 dark:border-teal-900/40 dark:bg-teal-950/12 lg:p-4">
+        <div className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-3 py-1.5 dark:bg-gray-900/40">
           <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-lc-muted dark:text-gray-500">App indhold</p>
           <button
             type="button"
