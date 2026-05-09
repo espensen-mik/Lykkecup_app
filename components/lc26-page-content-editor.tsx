@@ -276,7 +276,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
             />
           </label>
           {programContent.schedule.map((item, idx) => (
-            <div key={`${item.time}-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
+            <div key={`program-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <input
                   value={item.time}
@@ -391,7 +391,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
             Kort-sektioner
           </p>
           {findContent.cards.map((card, idx) => (
-            <div key={`${card.title}-${idx}`} className="space-y-2 rounded-lg border border-violet-200/70 bg-white p-3 shadow-sm dark:border-violet-900/40 dark:bg-gray-900/40">
+            <div key={`find-card-${idx}`} className="space-y-2 rounded-lg border border-violet-200/70 bg-white p-3 shadow-sm dark:border-violet-900/40 dark:bg-gray-900/40">
               <input
                 value={card.title}
                 onChange={(e) =>
@@ -504,7 +504,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
             Praktiske sektioner
           </p>
           {praktiskContent.sections.map((section, idx) => (
-            <div key={`${section.title}-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
+            <div key={`praktisk-section-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
               <input
                 value={section.title}
                 onChange={(e) =>
@@ -572,7 +572,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
 
           <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">FAQ</p>
           {praktiskContent.faq.map((item, idx) => (
-            <div key={`${item.q}-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
+            <div key={`praktisk-faq-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
               <input
                 value={item.q}
                 onChange={(e) =>
@@ -645,7 +645,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
             Artikler
           </p>
           {nytContent.articles.map((article, idx) => (
-            <div key={`${article.title}-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
+            <div key={`nyt-article-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <input
                   value={article.tag}
