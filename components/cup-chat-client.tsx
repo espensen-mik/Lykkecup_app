@@ -206,7 +206,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
   return (
     <div className="mx-auto w-full max-w-2xl space-y-8">
       <header>
-        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-violet-600 dark:text-violet-400">
+        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">
           KontrolCenter
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">CupChat</h1>
@@ -229,15 +229,15 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
       ) : null}
 
       {currentUser ? (
-        <section className="rounded-xl border-2 border-violet-200 bg-gradient-to-b from-violet-50/90 to-white p-4 shadow-md dark:border-violet-500/35 dark:from-violet-950/40 dark:to-gray-900/40 dark:shadow-none">
+        <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Ny besked</h2>
           <div className="mt-3 flex gap-3">
             <div className="shrink-0 pt-0.5">
               <Avatar name={currentUser.fullName} avatarUrl={currentUser.avatarUrl} sizeClass="h-11 w-11" />
             </div>
             <div className="min-w-0 flex-1 space-y-2">
-              <p className="text-sm font-medium text-violet-900 dark:text-violet-200">
-                Du skriver som <span className="text-gray-900 dark:text-white">{currentUser.fullName}</span>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Du skriver som <span className="font-medium text-gray-900 dark:text-white">{currentUser.fullName}</span>
               </p>
               <label className="block">
                 <span className="sr-only">Ny besked til alle</span>
@@ -247,7 +247,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
                   rows={3}
                   placeholder="Fx: Jeg sidder med U12-pigerne i sal 2 …"
                   disabled={busy}
-                  className="w-full rounded-lg border border-violet-200/80 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 disabled:opacity-60 dark:border-violet-800/60 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-violet-400"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                 />
               </label>
             </div>
@@ -257,7 +257,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
               type="button"
               disabled={busy}
               onClick={() => void insertMessage(topDraft, null)}
-              className="rounded-md border border-violet-300 bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-60 dark:border-violet-400/40 dark:bg-violet-600 dark:hover:bg-violet-500"
+              className="rounded-md border border-emerald-400/30 bg-gradient-to-r from-emerald-500 to-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:from-emerald-600 hover:to-teal-700 disabled:opacity-60 dark:border-emerald-500/20 dark:from-emerald-600 dark:to-teal-600 dark:hover:from-emerald-500 dark:hover:to-teal-500"
             >
               {busy ? "Sender…" : "Send"}
             </button>
@@ -308,7 +308,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
                         type="button"
                         disabled={busy}
                         onClick={() => void insertMessage(replyDraftByParentId[top.id] ?? "", top.id)}
-                        className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                        className="rounded-md border border-emerald-400/30 bg-gradient-to-r from-emerald-500 to-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:from-emerald-600 hover:to-teal-700 disabled:opacity-60 dark:border-emerald-500/20 dark:from-emerald-600 dark:to-teal-600 dark:hover:from-emerald-500 dark:hover:to-teal-500"
                       >
                         {busy ? "Sender…" : "Svar"}
                       </button>
