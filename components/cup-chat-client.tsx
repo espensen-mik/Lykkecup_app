@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ThumbsUp } from "lucide-react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { formatDaDateTime } from "@/lib/datetime";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
@@ -26,6 +27,10 @@ type Thread = {
   top: ChatRow;
   replies: ChatRow[];
 };
+
+type LikeSummary = { count: number; likedByMe: boolean };
+
+const emptyLikeSummary = (): LikeSummary => ({ count: 0, likedByMe: false });
 
 function initialsFromName(name: string): string {
   const parts = name
@@ -66,7 +71,18 @@ function Avatar({
   );
 }
 
-function MessageBlock({ row }: { row: ChatRow }) {
+function MessageBlock({
+  row,
+  likeSummary,
+  likeDisabled,
+  onToggleLike,
+}: {
+  row: ChatRow;
+  likeSummary: LikeSummary;
+  likeDisabled: boolean;
+  onToggleLike: () => void;
+}) {
+  const { count, likedByMe } = likeSummary;
   return (
     <div className="flex gap-3">
       <Avatar name={row.author_name} avatarUrl={row.author_avatar_url} />
@@ -74,6 +90,28 @@ function MessageBlock({ row }: { row: ChatRow }) {
         <p className="text-sm font-medium text-gray-900 dark:text-white">{row.author_name}</p>
         <p className="text-xs text-gray-500 dark:text-gray-400">{formatDaDateTime(row.created_at)}</p>
         <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{row.body}</p>
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={onToggleLike}
+            disabled={likeDisabled}
+            aria-pressed={likedByMe}
+            aria-label={likedByMe ? "Fjern synes godt om" : "Synes godt om"}
+            title={likedByMe ? "Fjern synes godt om" : "Synes godt om"}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              likedByMe
+                ? "border-teal-400/60 bg-teal-50 text-teal-800 dark:border-teal-500/40 dark:bg-teal-950/50 dark:text-teal-100"
+                : "border-gray-200 bg-white text-gray-600 hover:border-teal-200 hover:bg-teal-50/60 hover:text-teal-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-teal-800 dark:hover:bg-teal-950/30 dark:hover:text-teal-100"
+            }`}
+          >
+            <ThumbsUp
+              className={`h-3.5 w-3.5 shrink-0 ${likedByMe ? "fill-teal-600 text-teal-600 dark:fill-teal-400 dark:text-teal-400" : ""}`}
+              strokeWidth={2}
+              aria-hidden
+            />
+            <span>{count}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -81,8 +119,10 @@ function MessageBlock({ row }: { row: ChatRow }) {
 
 export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser | null }) {
   const [rows, setRows] = useState<ChatRow[]>([]);
+  const [likesByMessageId, setLikesByMessageId] = useState<Record<string, LikeSummary>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [likeBusyMessageId, setLikeBusyMessageId] = useState<string | null>(null);
   const [topDraft, setTopDraft] = useState("");
   const [replyDraftByParentId, setReplyDraftByParentId] = useState<Record<string, string>>({});
   const [postError, setPostError] = useState<string | null>(null);
@@ -102,11 +142,35 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
           : error.message;
       setLoadError(hint);
       setRows([]);
+      setLikesByMessageId({});
       return;
     }
     setLoadError(null);
-    setRows((data ?? []) as ChatRow[]);
-  }, []);
+    const list = (data ?? []) as ChatRow[];
+    setRows(list);
+
+    const ids = list.map((r) => r.id);
+    const uid = currentUser?.id ?? null;
+    const likesMap: Record<string, LikeSummary> = {};
+    for (const id of ids) likesMap[id] = emptyLikeSummary();
+
+    if (ids.length > 0) {
+      const { data: likesData, error: likesError } = await supabase
+        .from("holddannelse_chat_message_likes")
+        .select("message_id, user_id")
+        .in("message_id", ids);
+
+      if (!likesError && likesData) {
+        for (const row of likesData as { message_id: string; user_id: string }[]) {
+          const cur = likesMap[row.message_id] ?? emptyLikeSummary();
+          cur.count += 1;
+          if (uid && row.user_id === uid) cur.likedByMe = true;
+          likesMap[row.message_id] = cur;
+        }
+      }
+    }
+    setLikesByMessageId(likesMap);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     void load();
@@ -124,6 +188,20 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
           table: "holddannelse_chat_messages",
           filter: `event_id=eq.${LYKKECUP_EVENT_ID}`,
         },
+        () => {
+          void load();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "holddannelse_chat_message_likes" },
+        () => {
+          void load();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "holddannelse_chat_message_likes" },
         () => {
           void load();
         },
@@ -203,6 +281,45 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
     await load();
   }
 
+  async function toggleLike(messageId: string) {
+    if (!currentUser) return;
+    const summary = likesByMessageId[messageId] ?? emptyLikeSummary();
+    setLikeBusyMessageId(messageId);
+    setPostError(null);
+    const supabase = getAuthBrowserClient();
+    if (summary.likedByMe) {
+      const { error } = await supabase
+        .from("holddannelse_chat_message_likes")
+        .delete()
+        .eq("message_id", messageId)
+        .eq("user_id", currentUser.id);
+      setLikeBusyMessageId(null);
+      if (error) {
+        const hint =
+          error.message.includes("relation") || error.message.includes("does not exist")
+            ? "Kør migration for synes godt om (holddannelse_chat_message_likes) i Supabase."
+            : error.message;
+        setPostError(hint);
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("holddannelse_chat_message_likes").insert({
+        message_id: messageId,
+        user_id: currentUser.id,
+      });
+      setLikeBusyMessageId(null);
+      if (error) {
+        const hint =
+          error.message.includes("relation") || error.message.includes("does not exist")
+            ? "Kør migration for synes godt om (holddannelse_chat_message_likes) i Supabase."
+            : error.message;
+        setPostError(hint);
+        return;
+      }
+    }
+    await load();
+  }
+
   return (
     <div className="mx-auto w-full max-w-2xl space-y-8">
       <header>
@@ -245,7 +362,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
                   value={topDraft}
                   onChange={(e) => setTopDraft(e.target.value)}
                   rows={3}
-                  placeholder="Fx: Jeg sidder med U12-pigerne i sal 2 …"
+                  placeholder="Skriv en lykkelig besked..."
                   disabled={busy}
                   className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                 />
@@ -278,12 +395,22 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
                 key={top.id}
                 className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40"
               >
-                <MessageBlock row={top} />
+                <MessageBlock
+                  row={top}
+                  likeSummary={likesByMessageId[top.id] ?? emptyLikeSummary()}
+                  likeDisabled={!currentUser || likeBusyMessageId === top.id || busy}
+                  onToggleLike={() => void toggleLike(top.id)}
+                />
                 {replies.length > 0 ? (
                   <ul className="mt-4 space-y-3 border-l-2 border-teal-100 pl-4 dark:border-teal-900/40">
                     {replies.map((r) => (
                       <li key={r.id} className="rounded-lg bg-gray-50/80 p-3 dark:bg-gray-800/50">
-                        <MessageBlock row={r} />
+                        <MessageBlock
+                          row={r}
+                          likeSummary={likesByMessageId[r.id] ?? emptyLikeSummary()}
+                          likeDisabled={!currentUser || likeBusyMessageId === r.id || busy}
+                          onToggleLike={() => void toggleLike(r.id)}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -298,7 +425,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
                           setReplyDraftByParentId((d) => ({ ...d, [top.id]: e.target.value }))
                         }
                         rows={2}
-                        placeholder="Svar …"
+                        placeholder="Skriv en lykkelig besked..."
                         disabled={busy}
                         className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                       />
