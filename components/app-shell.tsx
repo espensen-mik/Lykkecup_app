@@ -620,22 +620,18 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           ) : null}
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 shrink-0 pb-1">
           <Link
             href="/cup-chat"
             onClick={() => setMobileOpen(false)}
             aria-current={isActive("/cup-chat") ? "page" : undefined}
-            className={`flex items-center gap-3 rounded-md py-2.5 pr-3 text-[0.9375rem] font-medium transition-colors border-l-2 ${
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[0.9375rem] font-semibold text-white shadow-md transition-[box-shadow,transform,filter] hover:brightness-105 active:scale-[0.99] active:brightness-95 ${
               isActive("/cup-chat")
-                ? "border-[#14b8a6] bg-teal-50/90 pl-[10px] text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
-                : "border-transparent pl-3 text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-white"
+                ? "bg-[#c8534f] ring-2 ring-[#df6763] ring-offset-2 ring-offset-white dark:bg-[#c8534f] dark:ring-offset-gray-900"
+                : "bg-[#df6763] hover:shadow-lg"
             }`}
           >
-            <MessagesSquare
-              className={`h-4 w-4 shrink-0 ${isActive("/cup-chat") ? "text-[#0f766e] dark:text-teal-300" : "text-gray-400 dark:text-gray-500"}`}
-              strokeWidth={2}
-              aria-hidden
-            />
+            <MessagesSquare className="h-4 w-4 shrink-0 text-white" strokeWidth={2.25} aria-hidden />
             <span className="min-w-0 flex-1 truncate">CupChat</span>
           </Link>
         </div>
