@@ -620,15 +620,15 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           ) : null}
         </div>
 
-        <div className="mt-4 shrink-0 pb-1">
+        <div className="mt-auto shrink-0 pb-1 pt-4">
           <Link
             href="/cup-chat"
             onClick={() => setMobileOpen(false)}
             aria-current={isActive("/cup-chat") ? "page" : undefined}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[0.9375rem] font-semibold text-white shadow-md transition-[box-shadow,transform,filter] hover:brightness-105 active:scale-[0.99] active:brightness-95 ${
+            className={`flex items-center gap-3 rounded-xl border border-white/30 px-3 py-2.5 text-[0.9375rem] font-semibold text-white shadow-md transition-[box-shadow,transform,filter] hover:shadow-lg hover:brightness-105 active:scale-[0.99] active:brightness-95 ${
               isActive("/cup-chat")
-                ? "bg-[#c8534f] ring-2 ring-[#df6763] ring-offset-2 ring-offset-white dark:bg-[#c8534f] dark:ring-offset-gray-900"
-                : "bg-[#df6763] hover:shadow-lg"
+                ? "bg-gradient-to-r from-[#c95c58] to-[#4f9d95] ring-2 ring-[#df6763]/70 ring-offset-2 ring-offset-white dark:ring-offset-gray-900"
+                : "bg-gradient-to-r from-[#df6763] to-[#5dafA8]"
             }`}
           >
             <MessagesSquare className="h-4 w-4 shrink-0 text-white" strokeWidth={2.25} aria-hidden />
