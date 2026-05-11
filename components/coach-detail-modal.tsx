@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { Coach } from "@/types/coach";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
-import { supabase } from "@/lib/supabase";
+import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { CoachDetailContent } from "@/components/coach-detail-content";
 
 type Props = {
@@ -32,6 +32,14 @@ type CoachChangeLogRow = {
   changed_at: string;
   changed_by_name: string | null;
 };
+
+function filterLegacyUnknownLogs(rows: CoachChangeLogRow[]): CoachChangeLogRow[] {
+  return rows.filter((row) => {
+    const actor = row.changed_by_name?.trim() ?? "";
+    if (!actor) return true;
+    return !actor.toLocaleLowerCase("da").startsWith("ukendt");
+  });
+}
 
 const emptyCoachDraft: CoachDraft = {
   name: "",
@@ -84,6 +92,7 @@ function printValue(value: string | null): string {
 }
 
 export function CoachDetailModal({ coachId, onClose }: Props) {
+  const supabase = getAuthBrowserClient();
   const [coach, setCoach] = useState<Coach | null>(null);
   const [logs, setLogs] = useState<CoachChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -148,7 +157,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
       const detail = data as Coach;
       setCoach(detail);
       setDraft(toCoachDraft(detail));
-      setLogs((logsRes.data ?? []) as CoachChangeLogRow[]);
+      setLogs(filterLegacyUnknownLogs((logsRes.data ?? []) as CoachChangeLogRow[]));
       setLoading(false);
     })();
 
@@ -197,7 +206,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
       .order("changed_at", { ascending: false })
       .limit(30);
     if (!logsRes.error) {
-      setLogs((logsRes.data ?? []) as CoachChangeLogRow[]);
+      setLogs(filterLegacyUnknownLogs((logsRes.data ?? []) as CoachChangeLogRow[]));
     }
   }
 
