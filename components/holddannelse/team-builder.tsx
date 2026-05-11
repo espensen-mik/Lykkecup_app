@@ -34,6 +34,9 @@ function teamIsCompleted(t: TeamRow): boolean {
   return Boolean(t.is_completed);
 }
 
+const ERR_CLOSED_TEAM_PLAYER = "Du kan ikke sætte spilleren på et hold, der er lukket.";
+const ERR_CLOSED_TEAM_COACH = "Du kan ikke sætte træneren på et hold, der er lukket.";
+
 function teamStatsForMembers(
   memberPlayerIds: string[],
   playerById: Map<string, HoldPlayerRow>,
@@ -63,16 +66,17 @@ export function TeamBuilder({
   initialActiveTeamId,
 }: Props) {
   const canonical = normalizeLevelKey(levelKey);
-  const sortTeamsNewestFirst = useCallback(
-    (rows: TeamRow[]) =>
-      [...rows].sort(
-        (a, b) => b.sort_order - a.sort_order || b.name.localeCompare(a.name, "da"),
-      ),
-    [],
-  );
+  /** Åbne hold først (øverst), lukkede hold sidst — inden for hver gruppe nyeste `sort_order` først. */
+  const sortTeamsForDisplay = useCallback((rows: TeamRow[]) => {
+    const open = rows.filter((t) => !teamIsCompleted(t));
+    const closed = rows.filter((t) => teamIsCompleted(t));
+    const cmp = (a: TeamRow, b: TeamRow) =>
+      b.sort_order - a.sort_order || b.name.localeCompare(a.name, "da");
+    return [...open].sort(cmp).concat([...closed].sort(cmp));
+  }, []);
 
   const [players] = useState<HoldPlayerRow[]>(initialPlayers);
-  const [teams, setTeams] = useState<TeamRow[]>(() => sortTeamsNewestFirst(initialTeams));
+  const [teams, setTeams] = useState<TeamRow[]>(() => sortTeamsForDisplay(initialTeams));
   const [members, setMembers] = useState<TeamMemberRow[]>(initialMembers);
   const [assignedGlobally, setAssignedGlobally] = useState<Set<string>>(
     () => new Set(initialEventAssignedPlayerIds),
@@ -125,6 +129,14 @@ export function TeamBuilder({
     for (const t of teams) m.set(t.id, t);
     return m;
   }, [teams]);
+
+  const openTeams = useMemo(() => teams.filter((t) => !teamIsCompleted(t)), [teams]);
+  const closedTeams = useMemo(() => teams.filter((t) => teamIsCompleted(t)), [teams]);
+
+  const activeTeamIsClosed = useMemo(() => {
+    const t = teams.find((x) => x.id === activeTeamId);
+    return t ? teamIsCompleted(t) : false;
+  }, [teams, activeTeamId]);
   const teamNickname = useCallback(
     (team: TeamRow | null | undefined): string | null => {
       if (!team) return null;
@@ -255,6 +267,11 @@ export function TeamBuilder({
         setActionError("Vælg et hold til højre før du tilføjer spillere.");
         return;
       }
+      const targetTeam = teamById.get(activeTeamId);
+      if (targetTeam && teamIsCompleted(targetTeam)) {
+        setActionError(ERR_CLOSED_TEAM_PLAYER);
+        return;
+      }
       if (assignedGlobally.has(playerId)) {
         setActionError("Spilleren er allerede tildelt et hold.");
         return;
@@ -281,7 +298,7 @@ export function TeamBuilder({
       setMembers((prev) => [...prev, row]);
       setAssignedGlobally((prev) => new Set(prev).add(playerId));
     },
-    [activeTeamId, assignedGlobally],
+    [activeTeamId, assignedGlobally, teamById],
   );
 
   const removeMember = useCallback(async (member: TeamMemberRow) => {
@@ -306,6 +323,11 @@ export function TeamBuilder({
       setActionError(null);
       if (!activeTeamId) {
         setActionError("Vælg et hold til højre før du tilføjer trænere.");
+        return;
+      }
+      const targetTeam = teamById.get(activeTeamId);
+      if (targetTeam && teamIsCompleted(targetTeam)) {
+        setActionError(ERR_CLOSED_TEAM_COACH);
         return;
       }
       if (teamCoachLinks.some((tc) => tc.team_id === activeTeamId && tc.coach_id === coachId)) {
@@ -336,7 +358,7 @@ export function TeamBuilder({
       const row = data as TeamCoachRow;
       setTeamCoachLinks((prev) => [...prev, row]);
     },
-    [activeTeamId, teamCoachLinks],
+    [activeTeamId, teamCoachLinks, teamById],
   );
 
   const removeTeamCoach = useCallback(async (link: TeamCoachRow) => {
@@ -402,7 +424,7 @@ export function TeamBuilder({
       setActionError(error.message);
       return;
     }
-    setTeams((prev) => sortTeamsNewestFirst(prev.map((x) => (x.id === team.id ? { ...x, is_completed: next } : x))));
+    setTeams((prev) => sortTeamsForDisplay(prev.map((x) => (x.id === team.id ? { ...x, is_completed: next } : x))));
     setCollapsedTeamIds((prev) => {
       const s = new Set(prev);
       if (next) s.add(team.id);
@@ -438,9 +460,22 @@ export function TeamBuilder({
       return;
     }
     const t = data as TeamRow;
-    setTeams((prev) => sortTeamsNewestFirst([...prev, t]));
+    setTeams((prev) => sortTeamsForDisplay([...prev, t]));
     setActiveTeamId(t.id);
-  }, [teams, canonical, sortTeamsNewestFirst]);
+  }, [teams, canonical, sortTeamsForDisplay]);
+
+  type TeamListItem = { kind: "team"; team: TeamRow } | { kind: "header" };
+
+  const teamListItems = useMemo((): TeamListItem[] => {
+    const items: TeamListItem[] = openTeams.map((team) => ({ kind: "team", team }));
+    if (closedTeams.length > 0) {
+      items.push({ kind: "header" });
+      for (const team of closedTeams) {
+        items.push({ kind: "team", team });
+      }
+    }
+    return items;
+  }, [openTeams, closedTeams]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-8">
@@ -610,7 +645,10 @@ export function TeamBuilder({
                 const badge = derivePreferenceBadge(p.preferences);
                 const tip = preferencesTooltipText(p.preferences);
                 const canClick =
-                  Boolean(activeTeamId) && !assignedGlobally.has(p.id) && !busy;
+                  Boolean(activeTeamId) &&
+                  !assignedGlobally.has(p.id) &&
+                  !busy &&
+                  !activeTeamIsClosed;
 
                 return (
                   <li key={p.id}>
@@ -762,7 +800,12 @@ export function TeamBuilder({
                       Boolean(activeTeamId) &&
                       teamCoachLinks.some((tc) => tc.team_id === activeTeamId && tc.coach_id === c.id);
                     const assignedElsewhere = coachIdsOnAnyTeamInEvent.has(c.id) && !onActive;
-                    const canClick = Boolean(activeTeamId) && !onActive && !assignedElsewhere && !busy;
+                    const canClick =
+                      Boolean(activeTeamId) &&
+                      !onActive &&
+                      !assignedElsewhere &&
+                      !busy &&
+                      !activeTeamIsClosed;
                     return (
                       <li key={c.id}>
                         <button
@@ -842,7 +885,17 @@ export function TeamBuilder({
             </p>
           ) : (
             <ul className="space-y-3">
-              {teams.map((t) => {
+              {teamListItems.map((item) => {
+                if (item.kind === "header") {
+                  return (
+                    <li key="_lukkede-hold-header" className="list-none pt-1">
+                      <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Lukkede Hold
+                      </p>
+                    </li>
+                  );
+                }
+                const t = item.team;
                 const tMembers = membersByTeam.get(t.id) ?? [];
                 const tCoaches = coachesByTeam.get(t.id) ?? [];
                 const ids = tMembers.map((m) => m.player_id);

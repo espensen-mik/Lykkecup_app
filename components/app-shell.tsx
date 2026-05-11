@@ -24,7 +24,7 @@ import {
 import Link from "next/link";
 import type { AuthAppUser } from "@/lib/auth-server";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { KontrolcenterHelp } from "@/components/kontrolcenter-help";
@@ -34,6 +34,26 @@ import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
 
 const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
+
+const CUPCHAT_LAST_SEEN_KEY = "lc26_cupchat_last_seen_at";
+
+function readCupChatLastSeen(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = window.localStorage.getItem(CUPCHAT_LAST_SEEN_KEY);
+    return v?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCupChatLastSeen(iso: string) {
+  try {
+    window.localStorage.setItem(CUPCHAT_LAST_SEEN_KEY, iso);
+  } catch {
+    /* ignore */
+  }
+}
 
 const nav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/admin", label: "Overblik", icon: LayoutDashboard },
@@ -91,7 +111,10 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   }
 
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [cupChatHasNew, setCupChatHasNew] = useState(false);
   const [holdLevels, setHoldLevels] = useState<string[]>([]);
   const [turneringLevels, setTurneringLevels] = useState<string[]>([]);
   const [kommentarerNyeCount, setKommentarerNyeCount] = useState(0);
@@ -147,6 +170,92 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     if (pathname.startsWith("/turnering/plan")) setPlanOpen(true);
     if (pathname.startsWith("/app-indhold")) setAppIndholdOpen(true);
     if (["/lister", "/analyse", "/billetsalg"].some((href) => pathname.startsWith(href))) setMereOpen(true);
+  }, [pathname]);
+
+  useEffect(() => {
+    const client = getAuthBrowserClient();
+    let cancelled = false;
+
+    async function refreshCupChatUnread() {
+      const { data, error } = await client
+        .from("holddannelse_chat_messages")
+        .select("created_at")
+        .eq("event_id", LYKKECUP_EVENT_ID)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (error) {
+        setCupChatHasNew(false);
+        return;
+      }
+      const latest = (data as { created_at?: string } | null)?.created_at;
+      if (!latest) {
+        setCupChatHasNew(false);
+        return;
+      }
+      const onCupChat = pathnameRef.current === "/cup-chat";
+      if (onCupChat) {
+        writeCupChatLastSeen(latest);
+        setCupChatHasNew(false);
+        return;
+      }
+      const lastSeen = readCupChatLastSeen();
+      if (!lastSeen) {
+        setCupChatHasNew(true);
+        return;
+      }
+      const latestMs = new Date(latest).getTime();
+      const seenMs = new Date(lastSeen).getTime();
+      setCupChatHasNew(Number.isFinite(latestMs) && Number.isFinite(seenMs) && latestMs > seenMs);
+    }
+
+    void refreshCupChatUnread();
+
+    const channel = client
+      .channel("app-shell-cupchat-unread")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "holddannelse_chat_messages",
+          filter: `event_id=eq.${LYKKECUP_EVENT_ID}`,
+        },
+        () => {
+          void refreshCupChatUnread();
+        },
+      )
+      .subscribe();
+
+    const poll = window.setInterval(() => {
+      void refreshCupChatUnread();
+    }, 45_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+      void client.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pathname !== "/cup-chat") return;
+    const client = getAuthBrowserClient();
+    (async () => {
+      const { data } = await client
+        .from("holddannelse_chat_messages")
+        .select("created_at")
+        .eq("event_id", LYKKECUP_EVENT_ID)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const latest = (data as { created_at?: string } | null)?.created_at;
+      if (latest) writeCupChatLastSeen(latest);
+      else writeCupChatLastSeen(new Date().toISOString());
+      setCupChatHasNew(false);
+    })();
   }, [pathname]);
 
   function isActive(href: string) {
@@ -625,17 +734,29 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             href="/cup-chat"
             onClick={() => setMobileOpen(false)}
             aria-current={isActive("/cup-chat") ? "page" : undefined}
+            aria-label={
+              cupChatHasNew && !isActive("/cup-chat") ? "CupChat — nye beskeder" : "CupChat"
+            }
             className={`flex items-center gap-3 rounded-md border-l-2 px-3 py-2.5 text-[0.9375rem] font-semibold transition-colors ${
               isActive("/cup-chat")
                 ? "border-[#163358] bg-[#163358] text-white"
                 : "border-transparent text-[#163358] hover:bg-[#163358]/10 hover:text-[#163358] dark:text-[#8fb0d8] dark:hover:bg-[#163358]/25 dark:hover:text-[#b8cdea]"
             }`}
           >
-            <MessagesSquare
-              className={`h-4 w-4 shrink-0 ${isActive("/cup-chat") ? "text-white" : "text-[#163358] dark:text-[#8fb0d8]"}`}
-              strokeWidth={2.25}
-              aria-hidden
-            />
+            <span className="relative shrink-0">
+              <MessagesSquare
+                className={`h-4 w-4 shrink-0 ${isActive("/cup-chat") ? "text-white" : "text-[#163358] dark:text-[#8fb0d8]"}`}
+                strokeWidth={2.25}
+                aria-hidden
+              />
+              {cupChatHasNew && !isActive("/cup-chat") ? (
+                <span
+                  className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-gray-900"
+                  title="Nye beskeder i CupChat"
+                  aria-hidden
+                />
+              ) : null}
+            </span>
             <span className="min-w-0 flex-1 truncate">CupChat</span>
           </Link>
         </div>
