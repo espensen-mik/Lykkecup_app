@@ -22,8 +22,11 @@ type CoachRow = {
   home_club: string | null;
 };
 
-const INTRO_MESSAGE =
-  "Hej trænere. Vi glæder os helt vildt til at se jer til LykkeCup. Herunder kan I skrive kommentarer til jeres hold og spillere. Vi kan desværre ikke imødekomme alle ønsker og forholder os primært til kommentarer, der vedrører spillerens niveau, ønsker til holdsammensætning og træner/spiller kombination. Vi kommer ikke til at kommentere herunder, men du kan se, når vi har set og forholdt os til kommentaren";
+/** Når sand: nye kommentarer kan ikke sendes; eksisterende vises stadig med håndteret-status. */
+const COMMENTS_CLOSED = true;
+
+const CLOSED_BROADCAST_MESSAGE =
+  "Tidsfristen er nået, og kommentarfeltet til LykkeCup-hold er nu lukket. Nu begynder det store puslespil med at skabe en fantastisk og lykkelig sæsonfinale for alle 938 spillere. Vi glæder os helt vildt til at se jer!";
 
 /** Kolonner der må hentes/vises på den offentlige side (ingen telefon i svaret). */
 const PUBLIC_CLUB_FEEDBACK_SELECT =
@@ -149,6 +152,7 @@ export default function CoachFeedbackPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (COMMENTS_CLOSED) return;
     setSubmitError(null);
     setSuccessMsg(null);
 
@@ -230,8 +234,9 @@ export default function CoachFeedbackPage() {
             Kommentarer fra trænere
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-gray-600 lg:mx-0">
-            Nu nærmer tiden sig for LykkeCup 2026. For at sikre den bedste oplevelse for alle har du nu mulighed
-            for at skrive kommentarer til dit hold og dine spillere før vi laver turneringsplanen.
+            {COMMENTS_CLOSED
+              ? "Her kan du stadig se dine klubs tilmeldte spillere og trænere samt tidligere kommentarer og om de er håndteret af LykkeLiga. Nye kommentarer kan ikke længere sendes."
+              : "Nu nærmer tiden sig for LykkeCup 2026. For at sikre den bedste oplevelse for alle har du nu mulighed for at skrive kommentarer til dit hold og dine spillere før vi laver turneringsplanen."}
           </p>
         </div>
       </header>
@@ -344,13 +349,13 @@ export default function CoachFeedbackPage() {
                 <div className="flex items-start gap-3">
                   <img
                     src="/Frede.jpg"
-                    alt="Frederikke"
+                    alt="LykkeLiga"
                     className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-sky-200"
                   />
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">Frederikke</p>
+                    <p className="text-sm font-semibold text-gray-900">LykkeLiga</p>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                      {INTRO_MESSAGE}
+                      {CLOSED_BROADCAST_MESSAGE}
                     </p>
                   </div>
                 </div>
@@ -388,79 +393,93 @@ export default function CoachFeedbackPage() {
             </ul>
             {comments.length === 0 ? (
               <p className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-4 py-6 text-center text-sm text-gray-500">
-                Der er endnu ingen kommentarer fra jeres klub. Skriv den første nedenfor.
+                Der er endnu ingen kommentarer fra jeres klub.
               </p>
             ) : null}
           </section>
 
-          <section className="rounded-2xl border border-gray-200/95 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-base font-semibold text-gray-900">Skriv en kommentar</h2>
+          <section
+            className={`rounded-2xl border border-gray-200/95 bg-white p-5 shadow-sm sm:p-6 ${
+              COMMENTS_CLOSED ? "border-gray-300 bg-gray-50/80" : ""
+            }`}
+            aria-labelledby="comment-heading"
+          >
+            <h2 id="comment-heading" className="text-base font-semibold text-gray-900">
+              Skriv en kommentar
+            </h2>
+            {COMMENTS_CLOSED ? (
+              <p className="mt-3 rounded-lg border border-gray-200 bg-gray-100/90 px-3 py-2.5 text-sm font-medium text-gray-700">
+                Kommentarfeltet er lukket — nye beskeder kan ikke sendes.
+              </p>
+            ) : null}
             <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
-              <div>
-                <label htmlFor="author" className="block text-sm font-medium text-gray-800">
-                  Dit navn
-                </label>
-                <input
-                  id="author"
-                  type="text"
-                  autoComplete="name"
-                  className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-[15px] shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4"
-                  value={authorName}
-                  onChange={(e) => setAuthorName(e.target.value)}
-                  disabled={submitting}
-                />
-              </div>
-              <div>
-                <label htmlFor="author-phone" className="block text-sm font-medium text-gray-800">
-                  Telefonnummer <span className="font-normal text-gray-500">(valgfrit)</span>
-                </label>
-                <input
-                  id="author-phone"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="fx 12 34 56 78"
-                  className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-[15px] shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4"
-                  value={authorPhone}
-                  onChange={(e) => setAuthorPhone(e.target.value)}
-                  disabled={submitting}
-                />
-                <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
-                  Vises ikke her på siden — kun internt i LykkeLigas KontrolCenter, så vi kan kontakte dig ved behov.
-                </p>
-              </div>
-              <div>
-                <label htmlFor="comment" className="block text-sm font-medium text-gray-800">
-                  Kommentar
-                </label>
-                <textarea
-                  id="comment"
-                  rows={5}
-                  className="mt-1.5 w-full resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-[15px] leading-relaxed shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  disabled={submitting}
-                />
-              </div>
+              <fieldset className="space-y-4 border-0 p-0" disabled={COMMENTS_CLOSED || submitting}>
+                <div>
+                  <label htmlFor="author" className="block text-sm font-medium text-gray-800">
+                    Dit navn
+                  </label>
+                  <input
+                    id="author"
+                    type="text"
+                    autoComplete="name"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[15px] shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4 disabled:bg-gray-100 disabled:text-gray-500"
+                    value={authorName}
+                    onChange={(e) => setAuthorName(e.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="author-phone" className="block text-sm font-medium text-gray-800">
+                    Telefonnummer <span className="font-normal text-gray-500">(valgfrit)</span>
+                  </label>
+                  <input
+                    id="author-phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="fx 12 34 56 78"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[15px] shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4 disabled:bg-gray-100 disabled:text-gray-500"
+                    value={authorPhone}
+                    onChange={(e) => setAuthorPhone(e.target.value)}
+                    disabled={submitting}
+                  />
+                  <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
+                    Vises ikke her på siden — kun internt i LykkeLigas KontrolCenter, så vi kan kontakte dig ved behov.
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="comment" className="block text-sm font-medium text-gray-800">
+                    Kommentar
+                  </label>
+                  <textarea
+                    id="comment"
+                    rows={5}
+                    className="mt-1.5 w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[15px] leading-relaxed shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4 disabled:bg-gray-100 disabled:text-gray-500"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
 
-              {submitError ? (
-                <p className="text-sm text-red-700" role="alert">
-                  {submitError}
-                </p>
-              ) : null}
-              {successMsg ? (
-                <p className="text-sm font-medium text-teal-800" role="status">
-                  {successMsg}
-                </p>
-              ) : null}
+                {submitError ? (
+                  <p className="text-sm text-red-700" role="alert">
+                    {submitError}
+                  </p>
+                ) : null}
+                {successMsg ? (
+                  <p className="text-sm font-medium text-teal-800" role="status">
+                    {successMsg}
+                  </p>
+                ) : null}
 
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[160px]"
-                disabled={submitting || !selectedClub}
-              >
-                {submitting ? "Sender …" : "Send kommentar"}
-              </button>
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[160px]"
+                  disabled={submitting || !selectedClub || COMMENTS_CLOSED}
+                >
+                  {submitting ? "Sender …" : "Send kommentar"}
+                </button>
+              </fieldset>
             </form>
           </section>
         </>
