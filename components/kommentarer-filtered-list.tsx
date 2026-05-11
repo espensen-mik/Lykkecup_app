@@ -2,7 +2,7 @@
 
 import { CheckCircle2, ChevronDown, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { formatDaDateTime } from "@/lib/datetime";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
@@ -46,6 +46,30 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
   const [expandedById, setExpandedById] = useState<Record<string, boolean>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorById, setErrorById] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    const supabase = getAuthBrowserClient();
+    const channel = supabase
+      .channel("kommentarer-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "club_feedback", filter: `event_id=eq.${LYKKECUP_EVENT_ID}` },
+        () => router.refresh(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "club_feedback_internal_messages", filter: `event_id=eq.${LYKKECUP_EVENT_ID}` },
+        () => router.refresh(),
+      )
+      .subscribe();
+    const intervalId = window.setInterval(() => {
+      router.refresh();
+    }, 20000);
+    return () => {
+      window.clearInterval(intervalId);
+      void supabase.removeChannel(channel);
+    };
+  }, [router]);
 
   const clubs = useMemo(() => {
     const set = new Set<string>();
@@ -145,6 +169,10 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       .update({
         handled_at: now,
         handled_by: currentUser.id,
+        working_on_user_id: null,
+        working_on_name: null,
+        working_on_avatar_url: null,
+        working_on_at: null,
       })
       .eq("id", commentId)
       .eq("event_id", LYKKECUP_EVENT_ID);
@@ -187,6 +215,56 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       return;
     }
     setExpandedById((prev) => ({ ...prev, [commentId]: false }));
+    router.refresh();
+  }
+
+  async function setWorkingOn(comment: ClubFeedbackRow, take: boolean) {
+    if (!currentUser) {
+      setErrorById((e) => ({ ...e, [comment.id]: "Du skal være logget ind." }));
+      return;
+    }
+    setErrorById((e) => ({ ...e, [comment.id]: null }));
+    setBusyId(comment.id);
+    const supabase = getAuthBrowserClient();
+    const res = take
+      ? await supabase
+          .from("club_feedback")
+          .update({
+            working_on_user_id: currentUser.id,
+            working_on_name: currentUser.fullName,
+            working_on_avatar_url: currentUser.avatarUrl,
+            working_on_at: new Date().toISOString(),
+          })
+          .eq("id", comment.id)
+          .eq("event_id", LYKKECUP_EVENT_ID)
+          .or(`working_on_user_id.is.null,working_on_user_id.eq.${currentUser.id}`)
+          .select("id")
+      : await supabase
+          .from("club_feedback")
+          .update({
+            working_on_user_id: null,
+            working_on_name: null,
+            working_on_avatar_url: null,
+            working_on_at: null,
+          })
+          .eq("id", comment.id)
+          .eq("event_id", LYKKECUP_EVENT_ID)
+          .eq("working_on_user_id", currentUser.id)
+          .select("id");
+
+    setBusyId(null);
+    if (res.error) {
+      setErrorById((e) => ({ ...e, [comment.id]: res.error?.message ?? "Kunne ikke opdatere status." }));
+      return;
+    }
+    if ((res.data?.length ?? 0) === 0) {
+      setErrorById((e) => ({
+        ...e,
+        [comment.id]: take ? "En anden arbejder allerede på denne." : "Kun den, der arbejder på den, kan fjerne markeringen.",
+      }));
+      router.refresh();
+      return;
+    }
     router.refresh();
   }
 
@@ -329,6 +407,10 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
           {filtered.map((c) => {
             const handled = Boolean(c.handled_at);
             const expanded = expandedById[c.id] === true;
+            const workingOnName = c.working_on_name?.trim() || null;
+            const workingOnUserId = c.working_on_user_id ?? null;
+            const isWorkedByMe = Boolean(currentUser && workingOnUserId === currentUser.id);
+            const isWorkedByOther = Boolean(workingOnUserId && currentUser && workingOnUserId !== currentUser.id);
 
             if (!expanded) {
               return (
@@ -371,6 +453,24 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                       >
                         · {c.home_club?.trim() || "—"}
                       </span>
+                      {workingOnName ? (
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
+                            handled
+                              ? "bg-white/80 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100"
+                              : "bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200"
+                          }`}
+                        >
+                          {c.working_on_avatar_url ? (
+                            <img src={c.working_on_avatar_url} alt="" className="h-4 w-4 rounded-full object-cover" />
+                          ) : (
+                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/70 text-[0.58rem] font-bold">
+                              {initialsFromName(workingOnName)}
+                            </span>
+                          )}
+                          {workingOnName} arbejder på denne
+                        </span>
+                      ) : null}
                     </span>
                     <ChevronDown
                       className={`h-4 w-4 shrink-0 ${handled ? "text-emerald-700 dark:text-emerald-300" : "text-gray-500 dark:text-gray-400"}`}
@@ -424,6 +524,23 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                     {formatDaDateTime(c.created_at)}
                   </time>
                 </div>
+                {workingOnName ? (
+                  <div className="flex items-center gap-2 border-b border-blue-100 bg-blue-50/70 px-5 py-2 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-100">
+                    {c.working_on_avatar_url ? (
+                      <img src={c.working_on_avatar_url} alt="" className="h-5 w-5 rounded-full object-cover" />
+                    ) : (
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-200/70 text-[0.62rem] font-bold text-blue-900 dark:bg-blue-800/50 dark:text-blue-100">
+                        {initialsFromName(workingOnName)}
+                      </span>
+                    )}
+                    <span className="font-medium">{workingOnName} arbejder på denne</span>
+                    {c.working_on_at ? (
+                      <time className="text-[0.7rem] text-blue-700/80 dark:text-blue-200/80" dateTime={c.working_on_at}>
+                        · {formatDaDateTime(c.working_on_at)}
+                      </time>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="border-b border-teal-100 bg-gradient-to-b from-teal-50/40 to-white px-5 py-4 dark:border-teal-900/30 dark:from-teal-950/20 dark:to-gray-900/20">
                   <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     Kommentar indsendt af:
@@ -539,6 +656,20 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
                           </button>
                         </div>
                         <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+                          {!handled ? (
+                            <button
+                              type="button"
+                              disabled={busyId === c.id || isWorkedByOther}
+                              onClick={() => void setWorkingOn(c, !isWorkedByMe)}
+                              className={`rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-60 ${
+                                isWorkedByMe
+                                  ? "border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200"
+                                  : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200"
+                              }`}
+                            >
+                              {isWorkedByMe ? "Frigiv (arbejder ikke længere)" : "Arbejder på denne"}
+                            </button>
+                          ) : null}
                           {!handled ? (
                             <button
                               type="button"

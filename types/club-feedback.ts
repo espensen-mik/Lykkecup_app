@@ -26,6 +26,10 @@ export type ClubFeedbackRow = {
   ll_status_author_avatar_url?: string | null;
   handled_at?: string | null;
   handled_by?: string | null;
+  working_on_user_id?: string | null;
+  working_on_name?: string | null;
+  working_on_avatar_url?: string | null;
+  working_on_at?: string | null;
   /** Fyldes kun i KontrolCenter-fetch (indlogget session). */
   internal_thread?: ClubFeedbackInternalMessage[];
 };

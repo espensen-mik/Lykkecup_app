@@ -21,6 +21,10 @@ function normalizeClubFeedbackRow(r: ClubFeedbackRow): ClubFeedbackRow {
     ll_status_author_avatar_url: r.ll_status_author_avatar_url ?? null,
     handled_at: r.handled_at ?? null,
     handled_by: r.handled_by ?? null,
+    working_on_user_id: r.working_on_user_id ?? null,
+    working_on_name: r.working_on_name ?? null,
+    working_on_avatar_url: r.working_on_avatar_url ?? null,
+    working_on_at: r.working_on_at ?? null,
   };
 }
 
@@ -31,7 +35,7 @@ export async function fetchClubFeedbackForEvent(): Promise<{
   const { data, error } = await supabase
     .from("club_feedback")
     .select(
-      "id, event_id, home_club, author_name, author_phone, comment_text, created_at, ll_status_text, ll_status_created_at, ll_status_author_id, ll_status_author_name, ll_status_author_avatar_url, handled_at, handled_by",
+      "id, event_id, home_club, author_name, author_phone, comment_text, created_at, ll_status_text, ll_status_created_at, ll_status_author_id, ll_status_author_name, ll_status_author_avatar_url, handled_at, handled_by, working_on_user_id, working_on_name, working_on_avatar_url, working_on_at",
     )
     .eq("event_id", LYKKECUP_EVENT_ID)
     .order("created_at", { ascending: false });
@@ -58,7 +62,7 @@ export async function fetchClubFeedbackForKontrolcenter(client: SupabaseClient):
   const { data, error } = await client
     .from("club_feedback")
     .select(
-      "id, event_id, home_club, author_name, author_phone, comment_text, created_at, ll_status_text, ll_status_created_at, ll_status_author_id, ll_status_author_name, ll_status_author_avatar_url, handled_at, handled_by",
+      "id, event_id, home_club, author_name, author_phone, comment_text, created_at, ll_status_text, ll_status_created_at, ll_status_author_id, ll_status_author_name, ll_status_author_avatar_url, handled_at, handled_by, working_on_user_id, working_on_name, working_on_avatar_url, working_on_at",
     )
     .eq("event_id", LYKKECUP_EVENT_ID)
     .order("created_at", { ascending: false });
