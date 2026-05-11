@@ -22,9 +22,6 @@ type CoachRow = {
   home_club: string | null;
 };
 
-/** Når sand: nye kommentarer kan ikke sendes; eksisterende vises stadig med håndteret-status. */
-const COMMENTS_CLOSED = true;
-
 const CLOSED_BROADCAST_MESSAGE =
   "Tidsfristen er nået, og kommentarfeltet til LykkeCup-hold er nu lukket. Nu begynder det store puslespil med at skabe en fantastisk og lykkelig sæsonfinale for alle 938 spillere. Vi glæder os helt vildt til at se jer!";
 
@@ -71,12 +68,6 @@ export default function CoachFeedbackPage() {
   const [loadingBootstrap, setLoadingBootstrap] = useState(true);
 
   const [selectedClub, setSelectedClub] = useState<string>("");
-  const [authorName, setAuthorName] = useState("");
-  const [authorPhone, setAuthorPhone] = useState("");
-  const [commentText, setCommentText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const clubs = useMemo(() => uniqueClubsFromPlayersAndCoaches(players, coaches), [players, coaches]);
   const filteredPlayers = useMemo(
@@ -150,62 +141,6 @@ export default function CoachFeedbackPage() {
     };
   }, [loadFeedbackForEvent]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (COMMENTS_CLOSED) return;
-    setSubmitError(null);
-    setSuccessMsg(null);
-
-    const club = selectedClub.trim();
-    const name = authorName.trim();
-    const phone = authorPhone.trim();
-    const text = commentText.trim();
-
-    if (!club) {
-      setSubmitError("Vælg en klub først.");
-      return;
-    }
-    if (!text) {
-      setSubmitError("Skriv en kommentar før du sender.");
-      return;
-    }
-    if (!name) {
-      setSubmitError("Udfyld dit navn.");
-      return;
-    }
-
-    setSubmitting(true);
-    const { data, error } = await supabase
-      .from("club_feedback")
-      .insert({
-        event_id: LYKKECUP_EVENT_ID,
-        home_club: club,
-        author_name: name,
-        author_phone: phone || null,
-        comment_text: text,
-      })
-      .select(PUBLIC_CLUB_FEEDBACK_SELECT)
-      .single();
-
-    setSubmitting(false);
-
-    if (error) {
-      setSubmitError(error.message);
-      return;
-    }
-
-    setCommentText("");
-    setAuthorPhone("");
-    setSuccessMsg("Tak — din kommentar er gemt.");
-    window.setTimeout(() => setSuccessMsg(null), 5000);
-
-    if (data) {
-      setFeedbackByEvent((prev) => [data as ClubFeedbackRow, ...prev]);
-    } else {
-      await loadFeedbackForEvent();
-    }
-  }
-
   return (
     <main className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4 py-10 pb-8 sm:px-6 sm:py-14">
       <header className="mb-10 sm:mb-12">
@@ -234,9 +169,8 @@ export default function CoachFeedbackPage() {
             Kommentarer fra trænere
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-gray-600 lg:mx-0">
-            {COMMENTS_CLOSED
-              ? "Her kan du stadig se dine klubs tilmeldte spillere og trænere samt tidligere kommentarer og om de er håndteret af LykkeLiga. Nye kommentarer kan ikke længere sendes."
-              : "Nu nærmer tiden sig for LykkeCup 2026. For at sikre den bedste oplevelse for alle har du nu mulighed for at skrive kommentarer til dit hold og dine spillere før vi laver turneringsplanen."}
+            Her kan du se dine klubs tilmeldte spillere og trænere samt tidligere kommentarer og om de er håndteret af
+            LykkeLiga. Det er ikke længere muligt at sende nye kommentarer fra denne side.
           </p>
         </div>
       </header>
@@ -396,91 +330,6 @@ export default function CoachFeedbackPage() {
                 Der er endnu ingen kommentarer fra jeres klub.
               </p>
             ) : null}
-          </section>
-
-          <section
-            className={`rounded-2xl border border-gray-200/95 bg-white p-5 shadow-sm sm:p-6 ${
-              COMMENTS_CLOSED ? "border-gray-300 bg-gray-50/80" : ""
-            }`}
-            aria-labelledby="comment-heading"
-          >
-            <h2 id="comment-heading" className="text-base font-semibold text-gray-900">
-              Skriv en kommentar
-            </h2>
-            {COMMENTS_CLOSED ? (
-              <p className="mt-3 rounded-lg border border-gray-200 bg-gray-100/90 px-3 py-2.5 text-sm font-medium text-gray-700">
-                Kommentarfeltet er lukket — nye beskeder kan ikke sendes.
-              </p>
-            ) : null}
-            <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
-              <fieldset className="space-y-4 border-0 p-0" disabled={COMMENTS_CLOSED || submitting}>
-                <div>
-                  <label htmlFor="author" className="block text-sm font-medium text-gray-800">
-                    Dit navn
-                  </label>
-                  <input
-                    id="author"
-                    type="text"
-                    autoComplete="name"
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[15px] shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4 disabled:bg-gray-100 disabled:text-gray-500"
-                    value={authorName}
-                    onChange={(e) => setAuthorName(e.target.value)}
-                    disabled={submitting}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="author-phone" className="block text-sm font-medium text-gray-800">
-                    Telefonnummer <span className="font-normal text-gray-500">(valgfrit)</span>
-                  </label>
-                  <input
-                    id="author-phone"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    placeholder="fx 12 34 56 78"
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[15px] shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4 disabled:bg-gray-100 disabled:text-gray-500"
-                    value={authorPhone}
-                    onChange={(e) => setAuthorPhone(e.target.value)}
-                    disabled={submitting}
-                  />
-                  <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
-                    Vises ikke her på siden — kun internt i LykkeLigas KontrolCenter, så vi kan kontakte dig ved behov.
-                  </p>
-                </div>
-                <div>
-                  <label htmlFor="comment" className="block text-sm font-medium text-gray-800">
-                    Kommentar
-                  </label>
-                  <textarea
-                    id="comment"
-                    rows={5}
-                    className="mt-1.5 w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[15px] leading-relaxed shadow-sm outline-none ring-teal-500/20 focus:border-teal-500 focus:ring-4 disabled:bg-gray-100 disabled:text-gray-500"
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    disabled={submitting}
-                  />
-                </div>
-
-                {submitError ? (
-                  <p className="text-sm text-red-700" role="alert">
-                    {submitError}
-                  </p>
-                ) : null}
-                {successMsg ? (
-                  <p className="text-sm font-medium text-teal-800" role="status">
-                    {successMsg}
-                  </p>
-                ) : null}
-
-                <button
-                  type="submit"
-                  className="w-full rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[160px]"
-                  disabled={submitting || !selectedClub || COMMENTS_CLOSED}
-                >
-                  {submitting ? "Sender …" : "Send kommentar"}
-                </button>
-              </fieldset>
-            </form>
           </section>
         </>
       ) : null}
