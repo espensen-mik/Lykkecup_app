@@ -1,4 +1,4 @@
--- HoldChat: intern kort chat under Holddannelse (KontrolCenter). Top-level beskeder + svar (kun ét niveau under hver tråd).
+-- CupChat (holddannelse_chat_messages): intern kort chat i KontrolCenter. Top-level beskeder + svar (kun ét niveau under hver tråd).
 create table if not exists public.holddannelse_chat_messages (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null,
@@ -18,7 +18,7 @@ create index if not exists holddannelse_chat_messages_event_top_created_idx
   on public.holddannelse_chat_messages (event_id, created_at desc)
   where parent_id is null;
 
-comment on table public.holddannelse_chat_messages is 'Intern HoldChat i KontrolCenter; nyeste top-level først, svar under hver tråd.';
+comment on table public.holddannelse_chat_messages is 'Intern CupChat i KontrolCenter; nyeste top-level først, svar under hver tråd.';
 
 grant select, insert on table public.holddannelse_chat_messages to authenticated;
 

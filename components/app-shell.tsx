@@ -162,6 +162,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     if (href === "/app-indhold") return pathname === "/app-indhold" || pathname.startsWith("/app-indhold/");
     if (href === "/analyse") return pathname === "/analyse";
     if (href === "/lister") return pathname === "/lister";
+    if (href === "/cup-chat") return pathname === "/cup-chat";
     return pathname === href;
   }
 
@@ -220,6 +221,20 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             </Link>
           );
         })}
+
+        <Link
+          href="/cup-chat"
+          onClick={() => setMobileOpen(false)}
+          aria-current={pathname === "/cup-chat" ? "page" : undefined}
+          className={`mt-2 flex items-center gap-3 rounded-lg border-2 py-2.5 pl-[10px] pr-3 text-[0.9375rem] font-semibold shadow-md transition-colors ${
+            pathname === "/cup-chat"
+              ? "border-violet-700 bg-violet-700 text-white shadow-lg ring-2 ring-violet-400/50 ring-offset-2 ring-offset-white dark:border-violet-400 dark:bg-violet-600 dark:text-white dark:ring-violet-300/40 dark:ring-offset-gray-900"
+              : "border-violet-500 bg-gradient-to-r from-violet-600 via-violet-600 to-fuchsia-600 text-white hover:from-violet-700 hover:via-violet-700 hover:to-fuchsia-700 dark:border-violet-400/80 dark:from-violet-500 dark:via-violet-600 dark:to-fuchsia-600 dark:hover:from-violet-400 dark:hover:via-violet-500 dark:hover:to-fuchsia-500"
+          }`}
+        >
+          <MessagesSquare className="h-5 w-5 shrink-0 text-white" strokeWidth={2.25} aria-hidden />
+          <span className="min-w-0 flex-1 truncate">CupChat</span>
+        </Link>
 
         <div className="mt-1 space-y-0.5">
           {/* Kun mobil: samme links som top-pills — skjules på lg+ hvor pillene vises */}
@@ -372,20 +387,6 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                 >
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   <span className="truncate">Alle hold</span>
-                </Link>
-              </li>
-              <li key="hold-holdchat">
-                <Link
-                  href="/holddannelse/hold-chat"
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex max-w-[13rem] items-center gap-1.5 truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
-                    pathname === "/holddannelse/hold-chat"
-                      ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
-                  }`}
-                >
-                  <MessagesSquare className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="truncate">HoldChat</span>
                 </Link>
               </li>
             </ul>
@@ -715,6 +716,18 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           </span>
         </Link>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <Link
+            href="/cup-chat"
+            onClick={() => setMobileOpen(false)}
+            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full border-2 border-white/40 bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 text-xs font-bold text-white shadow-md outline-none transition hover:from-violet-700 hover:to-fuchsia-700 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-white/70 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
+              pathname === "/cup-chat" ? "ring-2 ring-amber-200 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
+            }`}
+            aria-current={pathname === "/cup-chat" ? "page" : undefined}
+            title="Intern CupChat — koordinering på tværs af lokationer"
+          >
+            <MessagesSquare className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
+            CupChat
+          </Link>
           <Link
             href="/lister"
             onClick={() => setMobileOpen(false)}

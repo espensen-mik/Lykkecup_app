@@ -44,11 +44,11 @@ export default async function HolddannelsePage() {
         </header>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           <Link
-            href="/holddannelse/hold-chat"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-teal-300/80 hover:text-[#0f766e] dark:border-gray-600 dark:bg-gray-900/35 dark:text-gray-200 dark:hover:border-teal-700/60 dark:hover:text-teal-300"
+            href="/cup-chat"
+            className="inline-flex items-center gap-2 rounded-lg border-2 border-violet-500 bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2 text-sm font-semibold text-white shadow-md transition-colors hover:from-violet-700 hover:to-fuchsia-700 dark:border-violet-400/80 dark:from-violet-500 dark:to-fuchsia-600 dark:hover:from-violet-400 dark:hover:to-fuchsia-500"
           >
-            <MessagesSquare className="h-4 w-4 shrink-0 text-[#0d9488] dark:text-teal-400" aria-hidden />
-            HoldChat
+            <MessagesSquare className="h-4 w-4 shrink-0 text-white" aria-hidden />
+            CupChat
           </Link>
           <PrintTeamsLinkIcon href="/print/teams" title="Print alle hold" />
         </div>

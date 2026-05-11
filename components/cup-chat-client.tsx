@@ -5,7 +5,7 @@ import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { formatDaDateTime } from "@/lib/datetime";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 
-export type HoldChatCurrentUser = {
+export type CupChatCurrentUser = {
   id: string;
   fullName: string;
   avatarUrl: string | null;
@@ -79,7 +79,7 @@ function MessageBlock({ row }: { row: ChatRow }) {
   );
 }
 
-export function HoldChatClient({ currentUser }: { currentUser: HoldChatCurrentUser | null }) {
+export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser | null }) {
   const [rows, setRows] = useState<ChatRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -115,7 +115,7 @@ export function HoldChatClient({ currentUser }: { currentUser: HoldChatCurrentUs
   useEffect(() => {
     const supabase = getAuthBrowserClient();
     const channel = supabase
-      .channel("holddannelse-chat")
+      .channel("cup-chat")
       .on(
         "postgres_changes",
         {
@@ -206,10 +206,10 @@ export function HoldChatClient({ currentUser }: { currentUser: HoldChatCurrentUs
   return (
     <div className="mx-auto w-full max-w-2xl space-y-8">
       <header>
-        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">
-          Holddannelse
+        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-violet-600 dark:text-violet-400">
+          KontrolCenter
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">HoldChat</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">CupChat</h1>
         <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
           Kort intern chat for dem, der sidder forskellige steder: skriv f.eks. hvilket niveau eller hold du arbejder
           på. Nyeste besked øverst; du kan svare under hver tråd.
@@ -229,32 +229,42 @@ export function HoldChatClient({ currentUser }: { currentUser: HoldChatCurrentUs
       ) : null}
 
       {currentUser ? (
-        <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
+        <section className="rounded-xl border-2 border-violet-200 bg-gradient-to-b from-violet-50/90 to-white p-4 shadow-md dark:border-violet-500/35 dark:from-violet-950/40 dark:to-gray-900/40 dark:shadow-none">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Ny besked</h2>
-          <label className="mt-3 block">
-            <span className="sr-only">Ny besked til alle</span>
-            <textarea
-              value={topDraft}
-              onChange={(e) => setTopDraft(e.target.value)}
-              rows={3}
-              placeholder="Fx: Jeg sidder med U12-pigerne i sal 2 …"
-              disabled={busy}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            />
-          </label>
+          <div className="mt-3 flex gap-3">
+            <div className="shrink-0 pt-0.5">
+              <Avatar name={currentUser.fullName} avatarUrl={currentUser.avatarUrl} sizeClass="h-11 w-11" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="text-sm font-medium text-violet-900 dark:text-violet-200">
+                Du skriver som <span className="text-gray-900 dark:text-white">{currentUser.fullName}</span>
+              </p>
+              <label className="block">
+                <span className="sr-only">Ny besked til alle</span>
+                <textarea
+                  value={topDraft}
+                  onChange={(e) => setTopDraft(e.target.value)}
+                  rows={3}
+                  placeholder="Fx: Jeg sidder med U12-pigerne i sal 2 …"
+                  disabled={busy}
+                  className="w-full rounded-lg border border-violet-200/80 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 disabled:opacity-60 dark:border-violet-800/60 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-violet-400"
+                />
+              </label>
+            </div>
+          </div>
           <div className="mt-3 flex justify-end">
             <button
               type="button"
               disabled={busy}
               onClick={() => void insertMessage(topDraft, null)}
-              className="rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-200"
+              className="rounded-md border border-violet-300 bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-60 dark:border-violet-400/40 dark:bg-violet-600 dark:hover:bg-violet-500"
             >
               {busy ? "Sender…" : "Send"}
             </button>
           </div>
         </section>
       ) : (
-        <p className="text-sm text-gray-500 dark:text-gray-400">Log ind for at skrive i HoldChat.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Log ind for at skrive i CupChat.</p>
       )}
 
       <section aria-label="Beskeder">
