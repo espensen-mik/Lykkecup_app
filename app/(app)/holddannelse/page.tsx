@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MessagesSquare } from "lucide-react";
 import Link from "next/link";
 import { PrintTeamsLinkIcon } from "@/components/holddannelse/print-teams-link-icon";
 import { fetchHolddannelseOverview, levelPathSegment } from "@/lib/holddannelse";
@@ -42,7 +42,16 @@ export default async function HolddannelsePage() {
             spillere.
           </p>
         </header>
-        <PrintTeamsLinkIcon href="/print/teams" title="Print alle hold" />
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <Link
+            href="/holddannelse/hold-chat"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-teal-300/80 hover:text-[#0f766e] dark:border-gray-600 dark:bg-gray-900/35 dark:text-gray-200 dark:hover:border-teal-700/60 dark:hover:text-teal-300"
+          >
+            <MessagesSquare className="h-4 w-4 shrink-0 text-[#0d9488] dark:text-teal-400" aria-hidden />
+            HoldChat
+          </Link>
+          <PrintTeamsLinkIcon href="/print/teams" title="Print alle hold" />
+        </div>
       </div>
 
       {levels.length === 0 ? (

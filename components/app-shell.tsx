@@ -14,6 +14,7 @@ import {
   MessageSquareText,
   Newspaper,
   MapPinned,
+  MessagesSquare,
   Info,
   Ticket,
   Users,
@@ -221,87 +222,90 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
         })}
 
         <div className="mt-1 space-y-0.5">
-          <div
-            className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
-              isActive("/lister") || isActive("/analyse") || isActive("/billetsalg")
-                ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
-                : "border-transparent text-gray-700 dark:text-gray-300"
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => setMereOpen((v) => !v)}
-              className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 pr-1 text-left text-[0.9375rem] font-medium"
-              aria-label={mereOpen ? "Skjul Mere-menu" : "Vis Mere-menu"}
-              aria-expanded={mereOpen}
+          {/* Kun mobil: samme links som top-pills — skjules på lg+ hvor pillene vises */}
+          <div className="lg:hidden">
+            <div
+              className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
+                isActive("/lister") || isActive("/analyse") || isActive("/billetsalg")
+                  ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                  : "border-transparent text-gray-700 dark:text-gray-300"
+              }`}
             >
-              <Menu
-                className={`h-4 w-4 shrink-0 ${
-                  isActive("/lister") || isActive("/analyse") || isActive("/billetsalg")
-                    ? "text-[#0f766e] dark:text-teal-300"
-                    : "text-gray-400 dark:text-gray-500"
-                }`}
-                strokeWidth={2}
-                aria-hidden
-              />
-              <span className="truncate">Mere</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMereOpen((v) => !v)}
-              className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-              aria-label={mereOpen ? "Skjul Mere-menu" : "Vis Mere-menu"}
-              aria-expanded={mereOpen}
-            >
-              <ChevronDown className={`h-4 w-4 transition-transform ${mereOpen ? "" : "-rotate-90"}`} aria-hidden />
-            </button>
+              <button
+                type="button"
+                onClick={() => setMereOpen((v) => !v)}
+                className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 pr-1 text-left text-[0.9375rem] font-medium"
+                aria-label={mereOpen ? "Skjul Mere-menu" : "Vis Mere-menu"}
+                aria-expanded={mereOpen}
+              >
+                <Menu
+                  className={`h-4 w-4 shrink-0 ${
+                    isActive("/lister") || isActive("/analyse") || isActive("/billetsalg")
+                      ? "text-[#0f766e] dark:text-teal-300"
+                      : "text-gray-400 dark:text-gray-500"
+                  }`}
+                  strokeWidth={2}
+                  aria-hidden
+                />
+                <span className="truncate">Mere</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMereOpen((v) => !v)}
+                className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                aria-label={mereOpen ? "Skjul Mere-menu" : "Vis Mere-menu"}
+                aria-expanded={mereOpen}
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${mereOpen ? "" : "-rotate-90"}`} aria-hidden />
+              </button>
+            </div>
+            {mereOpen ? (
+              <ul className="ml-6 space-y-0.5 border-l border-gray-200 py-0.5 pl-3 dark:border-gray-700" aria-label="Mere-menu">
+                <li>
+                  <Link
+                    href="/lister"
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex max-w-[13rem] items-center gap-2 truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
+                      isActive("/lister")
+                        ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    <ClipboardList className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Lister
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/analyse"
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex max-w-[13rem] items-center gap-2 truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
+                      isActive("/analyse")
+                        ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    <BarChart3 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Analyse
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/billetsalg"
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex max-w-[13rem] items-center gap-2 truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
+                      isActive("/billetsalg")
+                        ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    <Ticket className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Billetsalg
+                  </Link>
+                </li>
+              </ul>
+            ) : null}
           </div>
-          {mereOpen ? (
-            <ul className="ml-6 space-y-0.5 border-l border-gray-200 py-0.5 pl-3 dark:border-gray-700" aria-label="Mere-menu">
-              <li>
-                <Link
-                  href="/lister"
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex max-w-[13rem] items-center gap-2 truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
-                    isActive("/lister")
-                      ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
-                  }`}
-                >
-                  <ClipboardList className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Lister
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/analyse"
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex max-w-[13rem] items-center gap-2 truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
-                    isActive("/analyse")
-                      ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
-                  }`}
-                >
-                  <BarChart3 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Analyse
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/billetsalg"
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex max-w-[13rem] items-center gap-2 truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
-                    isActive("/billetsalg")
-                      ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
-                  }`}
-                >
-                  <Ticket className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  Billetsalg
-                </Link>
-              </li>
-            </ul>
-          ) : null}
 
           <div
             className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
@@ -368,6 +372,20 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                 >
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   <span className="truncate">Alle hold</span>
+                </Link>
+              </li>
+              <li key="hold-holdchat">
+                <Link
+                  href="/holddannelse/hold-chat"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex max-w-[13rem] items-center gap-1.5 truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
+                    pathname === "/holddannelse/hold-chat"
+                      ? "bg-teal-50 text-[#0f766e] dark:bg-teal-950/50 dark:text-teal-200"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+                  }`}
+                >
+                  <MessagesSquare className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">HoldChat</span>
                 </Link>
               </li>
             </ul>
@@ -700,7 +718,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           <Link
             href="/lister"
             onClick={() => setMobileOpen(false)}
-            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:inline-flex sm:px-4 sm:py-2 sm:text-sm ${
+            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
               isActive("/lister") ? "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
             }`}
             aria-current={isActive("/lister") ? "page" : undefined}
@@ -712,7 +730,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           <Link
             href="/analyse"
             onClick={() => setMobileOpen(false)}
-            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:inline-flex sm:px-4 sm:py-2 sm:text-sm ${
+            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
               isActive("/analyse") ? "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
             }`}
             aria-current={isActive("/analyse") ? "page" : undefined}
@@ -724,7 +742,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           <Link
             href="/billetsalg"
             onClick={() => setMobileOpen(false)}
-            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:inline-flex sm:px-4 sm:py-2 sm:text-sm ${
+            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
               isActive("/billetsalg") ? "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
             }`}
             aria-current={isActive("/billetsalg") ? "page" : undefined}

@@ -1,0 +1,315 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { getAuthBrowserClient } from "@/lib/auth-browser";
+import { formatDaDateTime } from "@/lib/datetime";
+import { LYKKECUP_EVENT_ID } from "@/lib/players";
+
+export type HoldChatCurrentUser = {
+  id: string;
+  fullName: string;
+  avatarUrl: string | null;
+};
+
+type ChatRow = {
+  id: string;
+  event_id: string;
+  parent_id: string | null;
+  body: string;
+  author_id: string;
+  author_name: string;
+  author_avatar_url: string | null;
+  created_at: string;
+};
+
+type Thread = {
+  top: ChatRow;
+  replies: ChatRow[];
+};
+
+function initialsFromName(name: string): string {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function Avatar({
+  name,
+  avatarUrl,
+  sizeClass = "h-9 w-9",
+}: {
+  name: string;
+  avatarUrl: string | null;
+  sizeClass?: string;
+}) {
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt=""
+        className={`${sizeClass} shrink-0 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-600`}
+      />
+    );
+  }
+  return (
+    <span
+      className={`inline-flex ${sizeClass} shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-800 dark:bg-teal-900/50 dark:text-teal-200`}
+    >
+      {initialsFromName(name)}
+    </span>
+  );
+}
+
+function MessageBlock({ row }: { row: ChatRow }) {
+  return (
+    <div className="flex gap-3">
+      <Avatar name={row.author_name} avatarUrl={row.author_avatar_url} />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-gray-900 dark:text-white">{row.author_name}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDaDateTime(row.created_at)}</p>
+        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{row.body}</p>
+      </div>
+    </div>
+  );
+}
+
+export function HoldChatClient({ currentUser }: { currentUser: HoldChatCurrentUser | null }) {
+  const [rows, setRows] = useState<ChatRow[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [topDraft, setTopDraft] = useState("");
+  const [replyDraftByParentId, setReplyDraftByParentId] = useState<Record<string, string>>({});
+  const [postError, setPostError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const supabase = getAuthBrowserClient();
+    const { data, error } = await supabase
+      .from("holddannelse_chat_messages")
+      .select("id, event_id, parent_id, body, author_id, author_name, author_avatar_url, created_at")
+      .eq("event_id", LYKKECUP_EVENT_ID)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      const hint =
+        error.message.includes("relation") || error.message.includes("does not exist")
+          ? "Kør migration holddannelse_chat_messages i Supabase."
+          : error.message;
+      setLoadError(hint);
+      setRows([]);
+      return;
+    }
+    setLoadError(null);
+    setRows((data ?? []) as ChatRow[]);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    const supabase = getAuthBrowserClient();
+    const channel = supabase
+      .channel("holddannelse-chat")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "holddannelse_chat_messages",
+          filter: `event_id=eq.${LYKKECUP_EVENT_ID}`,
+        },
+        () => {
+          void load();
+        },
+      )
+      .subscribe();
+
+    const id = window.setInterval(() => {
+      void load();
+    }, 25_000);
+
+    const onVis = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      void supabase.removeChannel(channel);
+    };
+  }, [load]);
+
+  const threads = useMemo((): Thread[] => {
+    const tops = rows
+      .filter((r) => r.parent_id === null)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const repliesByParent = new Map<string, ChatRow[]>();
+    for (const r of rows) {
+      if (r.parent_id === null) continue;
+      const list = repliesByParent.get(r.parent_id) ?? [];
+      list.push(r);
+      repliesByParent.set(r.parent_id, list);
+    }
+    for (const [, list] of repliesByParent) {
+      list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    }
+
+    return tops.map((top) => ({
+      top,
+      replies: repliesByParent.get(top.id) ?? [],
+    }));
+  }, [rows]);
+
+  async function insertMessage(body: string, parentId: string | null) {
+    const text = body.trim();
+    if (!text) {
+      setPostError("Skriv en besked før du sender.");
+      return;
+    }
+    if (!currentUser) {
+      setPostError("Du skal være logget ind.");
+      return;
+    }
+    setPostError(null);
+    setBusy(true);
+    const supabase = getAuthBrowserClient();
+    const { error } = await supabase.from("holddannelse_chat_messages").insert({
+      event_id: LYKKECUP_EVENT_ID,
+      parent_id: parentId,
+      body: text,
+      author_id: currentUser.id,
+      author_name: currentUser.fullName,
+      author_avatar_url: currentUser.avatarUrl,
+    });
+    setBusy(false);
+    if (error) {
+      const hint =
+        error.message.includes("relation") || error.message.includes("does not exist")
+          ? "Kør migration holddannelse_chat_messages i Supabase."
+          : error.message;
+      setPostError(hint);
+      return;
+    }
+    if (parentId === null) setTopDraft("");
+    else setReplyDraftByParentId((d) => ({ ...d, [parentId]: "" }));
+    await load();
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-2xl space-y-8">
+      <header>
+        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">
+          Holddannelse
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">HoldChat</h1>
+        <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
+          Kort intern chat for dem, der sidder forskellige steder: skriv f.eks. hvilket niveau eller hold du arbejder
+          på. Nyeste besked øverst; du kan svare under hver tråd.
+        </p>
+      </header>
+
+      {loadError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+          {loadError}
+        </div>
+      ) : null}
+
+      {postError ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+          {postError}
+        </div>
+      ) : null}
+
+      {currentUser ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Ny besked</h2>
+          <label className="mt-3 block">
+            <span className="sr-only">Ny besked til alle</span>
+            <textarea
+              value={topDraft}
+              onChange={(e) => setTopDraft(e.target.value)}
+              rows={3}
+              placeholder="Fx: Jeg sidder med U12-pigerne i sal 2 …"
+              disabled={busy}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            />
+          </label>
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void insertMessage(topDraft, null)}
+              className="rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-200"
+            >
+              {busy ? "Sender…" : "Send"}
+            </button>
+          </div>
+        </section>
+      ) : (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Log ind for at skrive i HoldChat.</p>
+      )}
+
+      <section aria-label="Beskeder">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Samtale</h2>
+        {threads.length === 0 && !loadError ? (
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Ingen beskeder endnu.</p>
+        ) : (
+          <ul className="mt-4 space-y-6">
+            {threads.map(({ top, replies }) => (
+              <li
+                key={top.id}
+                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40"
+              >
+                <MessageBlock row={top} />
+                {replies.length > 0 ? (
+                  <ul className="mt-4 space-y-3 border-l-2 border-teal-100 pl-4 dark:border-teal-900/40">
+                    {replies.map((r) => (
+                      <li key={r.id} className="rounded-lg bg-gray-50/80 p-3 dark:bg-gray-800/50">
+                        <MessageBlock row={r} />
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {currentUser ? (
+                  <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-700/80">
+                    <label className="block">
+                      <span className="sr-only">Svar i tråden</span>
+                      <textarea
+                        value={replyDraftByParentId[top.id] ?? ""}
+                        onChange={(e) =>
+                          setReplyDraftByParentId((d) => ({ ...d, [top.id]: e.target.value }))
+                        }
+                        rows={2}
+                        placeholder="Svar …"
+                        disabled={busy}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                      />
+                    </label>
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void insertMessage(replyDraftByParentId[top.id] ?? "", top.id)}
+                        className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                      >
+                        {busy ? "Sender…" : "Svar"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
