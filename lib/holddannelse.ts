@@ -10,6 +10,26 @@ export function normalizeLevelKey(level: string | null | undefined): string {
   return t && t.length > 0 ? t : "Ukendt niveau";
 }
 
+/**
+ * Ét stabilt niveau-navn til Baner, Regnemaskine og DB-opslag: fjerner stjerne-markeringer
+ * (fx holddannelse) og normaliserer mellemrum, så "TurboStars (4-17 år)" og "TurboStars (4-17 år) ****"
+ * behandles som samme niveau (jf. turneringsplan fase 2).
+ */
+export function canonicalBanerLevelLabel(level: string | null | undefined): string {
+  const n = normalizeLevelKey(level);
+  if (n === "Ukendt niveau") return n;
+  return n.replace(/\*+/g, "").replace(/\s+/g, " ").trim();
+}
+
+/** Kort visning i tabeller (fx Spillere): kun første ord — uden alder og stjerner. */
+export function formatLevelShortLabel(level: string | null | undefined): string {
+  const n = normalizeLevelKey(level);
+  if (n === "Ukendt niveau") return n;
+  const cleaned = n.replace(/\*+/g, "").replace(/\s+/g, " ").trim();
+  const first = cleaned.match(/^([^\s(]+)/)?.[1];
+  return first ?? cleaned;
+}
+
 export function levelPathSegment(levelKey: string): string {
   return encodeURIComponent(levelKey);
 }

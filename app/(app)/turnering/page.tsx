@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { levelPathSegment } from "@/lib/holddannelse";
-import { fetchTurneringDashboardOverview } from "@/lib/turnering";
+import { fetchTurneringDashboardOverview } from "@/lib/turnering-server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default async function TurneringDashboardPage() {
-  const { levels, totals, error } = await fetchTurneringDashboardOverview();
+  const overview = await fetchTurneringDashboardOverview();
+  const { levels, totals, error } = overview;
 
   if (error) {
     return (
@@ -38,7 +39,11 @@ export default async function TurneringDashboardPage() {
           Turneringsdashboard
         </h1>
         <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-          Overblik over puljer og kampe pr. niveau. Tids- og baneplanlægning kommer i næste trin.
+          Overblik over puljer og kampe pr. niveau. Kapacitet og kampebehov planlægges under{" "}
+          <Link href="/turnering/baner" className="font-medium text-[#0d9488] underline-offset-4 hover:underline dark:text-teal-400">
+            Opsætning → Kampe
+          </Link>
+          .
         </p>
       </header>
 

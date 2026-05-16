@@ -3,8 +3,8 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PoolAssignmentWorkspace } from "@/components/turnering/puljer-workspace";
-import { normalizeLevelKey } from "@/lib/holddannelse";
-import { fetchTurneringLevelData } from "@/lib/turnering";
+import { canonicalBanerLevelLabel, normalizeLevelKey } from "@/lib/holddannelse";
+import { fetchTurneringLevelData } from "@/lib/turnering-server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ function decodeLevelParam(segment: string): string {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { level } = await params;
-  const levelKey = normalizeLevelKey(decodeLevelParam(level));
+  const levelKey = canonicalBanerLevelLabel(normalizeLevelKey(decodeLevelParam(level)));
   return {
     title: `${levelKey} — Puljer`,
     description: `Fordel hold på puljer for niveau ${levelKey}`,
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function TurneringPuljerLevelPage({ params }: PageProps) {
   const { level } = await params;
-  const levelKey = normalizeLevelKey(decodeLevelParam(level));
+  const levelKey = canonicalBanerLevelLabel(normalizeLevelKey(decodeLevelParam(level)));
   const bundle = await fetchTurneringLevelData(levelKey);
 
   if (bundle.error) {
@@ -49,7 +49,7 @@ export default async function TurneringPuljerLevelPage({ params }: PageProps) {
   if (bundle.teams.length === 0 && bundle.pools.length === 0) notFound();
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8">
+    <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-8">
       <div>
         <BackLink />
         <header className="mt-4 max-w-3xl">
@@ -60,7 +60,8 @@ export default async function TurneringPuljerLevelPage({ params }: PageProps) {
             {levelKey}
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Tildel hold til puljer og finjuster fordelingen før selve turneringsplanen laves.
+            Vælg en aktiv pulje til højre og klik på hold til venstre for at tilføje dem — som i Holddannelse.
+            Puljer kan lukkes når fordelingen er klar.
           </p>
         </header>
       </div>
@@ -68,9 +69,12 @@ export default async function TurneringPuljerLevelPage({ params }: PageProps) {
       <PoolAssignmentWorkspace
         levelKey={levelKey}
         initialTeams={bundle.teams}
-        initialPools={bundle.pools}
+        initialPools={bundle.pools.map((p) => ({ ...p, is_closed: p.is_closed ?? false }))}
         initialMembers={bundle.members}
         initialPlayers={bundle.players}
+        initialCoaches={bundle.coaches}
+        initialTeamCoaches={bundle.teamCoaches}
+        planMatchesPerTeam={bundle.planMatchesPerTeam}
       />
     </div>
   );

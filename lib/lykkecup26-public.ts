@@ -304,10 +304,15 @@ export async function fetchLykkecup26PlayerPage(playerId: string): Promise<Lc26P
     .from("matches")
     .select("id, team_a_id, team_b_id, court_id, start_time, end_time")
     .eq("event_id", eventId)
-    .or(`team_a_id.eq.${teamId},team_b_id.eq.${teamId}`);
+    .or(`team_a_id.eq.${teamId},team_b_id.eq.${teamId}`)
+    .not("court_id", "is", null)
+    .not("start_time", "is", null);
 
   let matches: Lc26PublicMatch[] = [];
-  if (!matchErr && matchRows?.length) {
+  if (matchErr) {
+    return { player, team, teammates, coaches, matches: [], error: matchErr.message };
+  }
+  if (matchRows?.length) {
     const { data: allTeams } = await supabase
       .from("teams")
       .select("id, name, nickname")
@@ -343,25 +348,28 @@ export async function fetchLykkecup26PlayerPage(playerId: string): Promise<Lc26P
       court_id: string | null;
       start_time: string | null;
       end_time: string | null;
-    }[]).map((row) => {
-      const oppId = row.team_a_id === teamId ? row.team_b_id : row.team_a_id;
-      const opponentTeamName = nameById.get(oppId) ?? "Hold";
-      let courtName: string | null = null;
-      let venueName: string | null = null;
-      if (row.court_id && courtMap.has(row.court_id)) {
-        const c = courtMap.get(row.court_id)!;
-        courtName = c.name;
-        venueName = venueMap.get(c.venue_id) ?? null;
-      }
-      return {
-        id: row.id,
-        opponentTeamName,
-        startTime: row.start_time,
-        endTime: row.end_time,
-        venueName,
-        courtName,
-      };
-    });
+    }[])
+      .map((row) => {
+        const oppId = row.team_a_id === teamId ? row.team_b_id : row.team_a_id;
+        const opponentTeamName = nameById.get(oppId);
+        if (!opponentTeamName) return null;
+        let courtName: string | null = null;
+        let venueName: string | null = null;
+        if (row.court_id && courtMap.has(row.court_id)) {
+          const c = courtMap.get(row.court_id)!;
+          courtName = c.name;
+          venueName = venueMap.get(c.venue_id) ?? null;
+        }
+        return {
+          id: row.id,
+          opponentTeamName,
+          startTime: row.start_time,
+          endTime: row.end_time,
+          venueName,
+          courtName,
+        };
+      })
+      .filter((m): m is Lc26PublicMatch => m !== null);
 
     matches.sort((a, b) => {
       const ta = a.startTime ? new Date(a.startTime).getTime() : 0;

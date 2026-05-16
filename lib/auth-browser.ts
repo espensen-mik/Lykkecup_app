@@ -12,6 +12,6 @@ export function getAuthBrowserClient(): SupabaseClient {
   if (!url || !key) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
-  browserClient = createBrowserClient(url, key);
+  browserClient = createBrowserClient(url, key, { isSingleton: true });
   return browserClient;
 }

@@ -4,6 +4,8 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { usePlayerModal } from "@/components/player-modal-context";
 import { StyledSelect } from "@/components/ui/styled-select";
+import { formatLevelShortLabel } from "@/lib/holddannelse";
+import { resolvePlanMatchesPerTeam } from "@/lib/lykkecup-regnemaskine";
 import { getLevelVisualClasses } from "@/lib/level-colors";
 import { subscribePlayerUpdated } from "@/lib/player-updates";
 import type { Player } from "@/types/player";
@@ -12,6 +14,8 @@ type Props = {
   players: Player[];
   fetchError: string | null;
   assignedPlayerIds: string[];
+  matchCountByPlayerId: Record<string, number>;
+  planMatchesByLevel: Record<string, number>;
 };
 
 function formatCell(value: string | number | null): string {
@@ -19,7 +23,7 @@ function formatCell(value: string | number | null): string {
   return String(value);
 }
 
-type SortKey = "name" | "home_club" | "level" | "age" | "ticket_id";
+type SortKey = "name" | "home_club" | "level" | "age";
 type SortDir = "asc" | "desc";
 
 function sortKeyForEmptyString(v: string | null | undefined): string {
@@ -58,11 +62,6 @@ function comparePlayers(a: Player, b: Player, key: SortKey, dir: SortDir): numbe
       if (nb == null) return -1;
       return mul * (na - nb);
     }
-    case "ticket_id": {
-      const va = sortKeyForEmptyString(a.ticket_id);
-      const vb = sortKeyForEmptyString(b.ticket_id);
-      return mul * va.localeCompare(vb, "da", { numeric: true });
-    }
     default:
       return 0;
   }
@@ -78,8 +77,6 @@ function sortColumnLabel(key: SortKey): string {
       return "niveau";
     case "age":
       return "alder";
-    case "ticket_id":
-      return "billet-ID";
     default:
       return "";
   }
@@ -153,7 +150,13 @@ function SortableTh({
   );
 }
 
-export function PlayersAdmin({ players, fetchError, assignedPlayerIds }: Props) {
+export function PlayersAdmin({
+  players,
+  fetchError,
+  assignedPlayerIds,
+  matchCountByPlayerId,
+  planMatchesByLevel,
+}: Props) {
   const { openPlayer } = usePlayerModal();
   const [rows, setRows] = useState<Player[]>(players);
   const [search, setSearch] = useState("");
@@ -339,20 +342,21 @@ export function PlayersAdmin({ players, fetchError, assignedPlayerIds }: Props) 
                   onSort={toggleSort}
                   sortDisabled={clubSortMode}
                 />
-                <SortableTh
-                  label="Billet-ID"
-                  columnKey="ticket_id"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  sortDisabled={clubSortMode}
-                />
                 <th
                   scope="col"
                   className="border-l border-emerald-200/80 bg-emerald-50/70 px-5 py-3 text-left align-bottom dark:border-emerald-900/50 dark:bg-emerald-950/25"
                 >
                   <span className="inline-flex max-w-full items-center rounded-md text-[0.6875rem] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
                     På hold
+                  </span>
+                </th>
+                <th
+                  scope="col"
+                  className="px-5 py-3 text-left align-bottom"
+                  title="Antal turneringskampe for spillerens hold. Grøn når det matcher Opsætning → Kampe for niveauet."
+                >
+                  <span className="inline-flex max-w-full items-center rounded-md text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Kampe
                   </span>
                 </th>
               </tr>
@@ -371,6 +375,9 @@ export function PlayersAdmin({ players, fetchError, assignedPlayerIds }: Props) 
               sortedRows.map((p) => {
                 const lv = getLevelVisualClasses(p.level);
                 const isAssigned = assignedPlayerIdSet.has(p.id);
+                const matchCount = matchCountByPlayerId[p.id] ?? 0;
+                const expectedMatches = resolvePlanMatchesPerTeam(p.level, planMatchesByLevel);
+                const matchesOk = expectedMatches != null && matchCount === expectedMatches;
                 return (
                 <tr
                   key={p.id}
@@ -393,13 +400,12 @@ export function PlayersAdmin({ players, fetchError, assignedPlayerIds }: Props) 
                     {formatCell(p.home_club)}
                   </td>
                   <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300">
-                    <span className={lv.badge}>{formatCell(p.level)}</span>
+                    <span className={lv.badge} title={p.level ? String(p.level) : undefined}>
+                      {p.level != null && p.level !== "" ? formatLevelShortLabel(p.level) : "—"}
+                    </span>
                   </td>
                   <td className="px-5 py-3.5 text-gray-600 tabular-nums dark:text-gray-300">
                     {formatCell(p.age)}
-                  </td>
-                  <td className="px-5 py-3.5 font-mono text-xs text-gray-500 dark:text-gray-400">
-                    {formatCell(p.ticket_id)}
                   </td>
                   <td className="border-l border-emerald-200/80 bg-emerald-50/45 px-5 py-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/15">
                     {isAssigned ? (
@@ -418,6 +424,24 @@ export function PlayersAdmin({ players, fetchError, assignedPlayerIds }: Props) 
                         —
                       </span>
                     )}
+                  </td>
+                  <td className="px-5 py-3.5 tabular-nums">
+                    <span
+                      className={
+                        matchesOk
+                          ? "font-semibold text-emerald-600 dark:text-emerald-400"
+                          : "text-gray-600 dark:text-gray-300"
+                      }
+                      title={
+                        expectedMatches != null
+                          ? matchesOk
+                            ? `${matchCount} kampe — matcher indstillingen for niveauet (${expectedMatches})`
+                            : `${matchCount} kampe — forventet ${expectedMatches} for niveauet`
+                          : `${matchCount} kampe — ingen gemt kampe/hold-indstilling for dette niveau (Opsætning → Kampe)`
+                      }
+                    >
+                      {matchCount}
+                    </span>
                   </td>
                 </tr>
                 );

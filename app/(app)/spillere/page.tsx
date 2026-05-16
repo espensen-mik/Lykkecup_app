@@ -1,13 +1,15 @@
 import { PlayersAdmin } from "@/components/players-admin";
 import { fetchPlayersForEvent, LYKKECUP_EVENT_ID } from "@/lib/players";
+import { fetchPlayerMatchCountsForEvent } from "@/lib/players-server";
 import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export default async function SpillerePage() {
-  const [{ players, error }, membersRes] = await Promise.all([
+  const [{ players, error }, membersRes, matchCounts] = await Promise.all([
     fetchPlayersForEvent(),
     supabase.from("team_members").select("player_id").eq("event_id", LYKKECUP_EVENT_ID),
+    fetchPlayerMatchCountsForEvent(),
   ]);
   const assignedPlayerIds = new Set(
     ((membersRes.data ?? []) as { player_id: string }[]).map((row) => row.player_id),
@@ -30,7 +32,13 @@ export default async function SpillerePage() {
 
       <div className="overflow-hidden rounded-lg border border-lc-border bg-white shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
         <div className="p-6 sm:p-8">
-          <PlayersAdmin players={players} fetchError={error} assignedPlayerIds={assignedPlayerIdList} />
+          <PlayersAdmin
+            players={players}
+            fetchError={error ?? matchCounts.error}
+            assignedPlayerIds={assignedPlayerIdList}
+            matchCountByPlayerId={matchCounts.matchCountByPlayerId}
+            planMatchesByLevel={matchCounts.planMatchesByLevel}
+          />
         </div>
       </div>
     </div>

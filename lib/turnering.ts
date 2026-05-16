@@ -1,21 +1,6 @@
-import { levelSlugForPalette, normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
-import { supabase } from "@/lib/supabase";
-import type { TeamMemberRow, TeamRow } from "@/types/teams";
+import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 
 export const TURNERING_EVENT_ID = "ae74ce1e-9793-48cd-bb1d-c4a248eaf4bf";
-
-function cleanLevelLabel(level: string | null | undefined): string {
-  const normalized = normalizeLevelKey(level);
-  if (normalized === "Ukendt niveau") return normalized;
-  return normalized.replace(/\*+/g, "").replace(/\s+/g, " ").trim();
-}
-
-function canonicalLevelBucket(level: string | null | undefined): { bucketKey: string; label: string } {
-  const cleaned = cleanLevelLabel(level);
-  if (cleaned === "Ukendt niveau") return { bucketKey: cleaned, label: cleaned };
-  const slug = levelSlugForPalette(cleaned);
-  return { bucketKey: `slug:${slug}`, label: cleaned };
-}
 
 export type PuljerOverviewLevel = {
   levelKey: string;
@@ -25,72 +10,11 @@ export type PuljerOverviewLevel = {
   unassignedTeams: number;
 };
 
-export async function fetchPuljerOverview(): Promise<{
-  levels: PuljerOverviewLevel[];
-  error: string | null;
-}> {
-  const eventId = TURNERING_EVENT_ID;
-  const [teamsRes, poolsRes] = await Promise.all([
-    supabase.from("teams").select("id, level, pool_id").eq("event_id", eventId),
-    supabase.from("pools").select("id, level").eq("event_id", eventId),
-  ]);
-
-  if (teamsRes.error) return { levels: [], error: teamsRes.error.message };
-  if (poolsRes.error) return { levels: [], error: poolsRes.error.message };
-
-  const teams = (teamsRes.data ?? []) as Pick<TeamRow, "id" | "level" | "pool_id">[];
-  const pools = (poolsRes.data ?? []) as { id: string; level: string | null }[];
-
-  const levelMap = new Map<string, PuljerOverviewLevel>();
-  for (const t of teams) {
-    const levelKey = normalizeLevelKey(t.level);
-    const row =
-      levelMap.get(levelKey) ??
-      {
-        levelKey,
-        totalTeams: 0,
-        poolCount: 0,
-        assignedTeams: 0,
-        unassignedTeams: 0,
-      };
-    row.totalTeams += 1;
-    if (t.pool_id) row.assignedTeams += 1;
-    else row.unassignedTeams += 1;
-    levelMap.set(levelKey, row);
-  }
-
-  for (const p of pools) {
-    const key = normalizeLevelKey(p.level);
-    const row = levelMap.get(key);
-    if (!row) continue;
-    row.poolCount += 1;
-  }
-
-  const keys = sortLevelKeysForNav([...levelMap.keys()]);
-  return { levels: keys.map((k) => levelMap.get(k)!), error: null };
-}
-
 export type TurneringsplanOverviewLevel = {
   levelKey: string;
   teamCount: number;
   poolCount: number;
 };
-
-export async function fetchTurneringsplanOverview(): Promise<{
-  levels: TurneringsplanOverviewLevel[];
-  error: string | null;
-}> {
-  const { levels, error } = await fetchPuljerOverview();
-  if (error) return { levels: [], error };
-  return {
-    levels: levels.map((l) => ({
-      levelKey: l.levelKey,
-      teamCount: l.totalTeams,
-      poolCount: l.poolCount,
-    })),
-    error: null,
-  };
-}
 
 export type TurneringLevelBundle = {
   teams: TeamRow[];
@@ -100,6 +24,8 @@ export type TurneringLevelBundle = {
     level: string | null;
     name: string;
     sort_order: number;
+    is_closed: boolean;
+    period_id: string | null;
   }[];
   members: TeamMemberRow[];
   players: {
@@ -108,55 +34,12 @@ export type TurneringLevelBundle = {
     home_club: string | null;
     age: number | null;
   }[];
+  /** Fra Opsætning → Kampe (`plan_matches_per_team` pr. niveau). */
+  planMatchesPerTeam: number;
+  coaches: HoldCoachRow[];
+  teamCoaches: TeamCoachRow[];
   error: string | null;
 };
-
-export async function fetchTurneringLevelData(levelKey: string): Promise<TurneringLevelBundle> {
-  const eventId = TURNERING_EVENT_ID;
-  const normalizedLevel = normalizeLevelKey(levelKey);
-
-  const [teamsRes, poolsRes, membersRes, playersRes] = await Promise.all([
-    supabase
-      .from("teams")
-      .select("id, event_id, pool_id, name, level, sort_order")
-      .eq("event_id", eventId)
-      .eq("level", normalizedLevel)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true }),
-    supabase
-      .from("pools")
-      .select("id, event_id, level, name, sort_order")
-      .eq("event_id", eventId)
-      .eq("level", normalizedLevel)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true }),
-    supabase.from("team_members").select("id, event_id, player_id, team_id").eq("event_id", eventId),
-    supabase.from("players").select("id, name, home_club, age").eq("event_id", eventId),
-  ]);
-
-  if (teamsRes.error) return { teams: [], pools: [], members: [], players: [], error: teamsRes.error.message };
-  if (poolsRes.error) return { teams: [], pools: [], members: [], players: [], error: poolsRes.error.message };
-  if (membersRes.error)
-    return { teams: [], pools: [], members: [], players: [], error: membersRes.error.message };
-  if (playersRes.error)
-    return { teams: [], pools: [], members: [], players: [], error: playersRes.error.message };
-
-  const teams = (teamsRes.data ?? []) as TeamRow[];
-  const pools = (poolsRes.data ?? []) as TurneringLevelBundle["pools"];
-  const allMembers = (membersRes.data ?? []) as TeamMemberRow[];
-  const allPlayers = (playersRes.data ?? []) as TurneringLevelBundle["players"];
-
-  const teamIds = new Set(teams.map((t) => t.id));
-  const playerIdsInTeams = new Set<string>();
-  const members = allMembers.filter((m) => {
-    if (!teamIds.has(m.team_id)) return false;
-    playerIdsInTeams.add(m.player_id);
-    return true;
-  });
-
-  const players = allPlayers.filter((p) => playerIdsInTeams.has(p.id));
-  return { teams, pools, members, players, error: null };
-}
 
 export type MatchRow = {
   id: string;
@@ -172,67 +55,186 @@ export type MatchRow = {
 };
 
 export type TurneringPlanLevelBundle = {
+  /** Fra Opsætning → Kampe (`plan_matches_per_team`). */
+  planMatchesPerTeam: number;
   pools: {
     id: string;
     event_id: string;
     level: string | null;
     name: string;
     sort_order: number;
+    period_id: string | null;
   }[];
   teams: TeamRow[];
+  members: TeamMemberRow[];
+  players: { id: string; name: string; home_club: string | null; age: number | null }[];
+  coaches: HoldCoachRow[];
+  teamCoaches: TeamCoachRow[];
   matches: MatchRow[];
+  courts: { id: string; name: string }[];
+  periods: { id: string; name: string }[];
   error: string | null;
 };
 
-export async function fetchTurneringPlanLevelData(levelKey: string): Promise<TurneringPlanLevelBundle> {
-  const eventId = TURNERING_EVENT_ID;
-  const normalizedLevel = normalizeLevelKey(levelKey);
-  const [poolsRes, teamsRes] = await Promise.all([
-    supabase
-      .from("pools")
-      .select("id, event_id, level, name, sort_order")
-      .eq("event_id", eventId)
-      .eq("level", normalizedLevel)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true }),
-    supabase
-      .from("teams")
-      .select("id, event_id, pool_id, name, level, sort_order")
-      .eq("event_id", eventId)
-      .eq("level", normalizedLevel)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true }),
-  ]);
+const ROUND_ROBIN_BYE = "__BYE__";
 
-  if (poolsRes.error) return { pools: [], teams: [], matches: [], error: poolsRes.error.message };
-  if (teamsRes.error) return { pools: [], teams: [], matches: [], error: teamsRes.error.message };
-
-  const pools = (poolsRes.data ?? []) as TurneringPlanLevelBundle["pools"];
-  const teams = (teamsRes.data ?? []) as TeamRow[];
-  const poolIds = pools.map((p) => p.id);
-  if (poolIds.length === 0) return { pools, teams, matches: [], error: null };
-
-  const matchesRes = await supabase
-    .from("matches")
-    .select("id, event_id, pool_id, team_a_id, team_b_id, court_id, start_time, end_time, status, created_at")
-    .eq("event_id", eventId)
-    .in("pool_id", poolIds)
-    .order("created_at", { ascending: true });
-
-  if (matchesRes.error) return { pools: [], teams: [], matches: [], error: matchesRes.error.message };
-  return { pools, teams, matches: (matchesRes.data ?? []) as MatchRow[], error: null };
+export function matchPairKey(teamAId: string, teamBId: string): string {
+  return teamAId < teamBId ? `${teamAId}|${teamBId}` : `${teamBId}|${teamAId}`;
 }
 
-export function generateRoundRobinMatches<T extends { id: string }>(
-  teams: T[],
-): Array<{ teamAId: string; teamBId: string }> {
-  const matches: Array<{ teamAId: string; teamBId: string }> = [];
-  for (let i = 0; i < teams.length; i += 1) {
-    for (let j = i + 1; j < teams.length; j += 1) {
-      matches.push({ teamAId: teams[i].id, teamBId: teams[j].id });
+export type PoolMatchSyncAnalysis = {
+  isSynced: boolean;
+  missingCount: number;
+  unexpectedCount: number;
+  duplicateCount: number;
+  invalidCount: number;
+  /** Hold i puljen som ikke optræder i nogen genereret kamp. */
+  teamsWithoutMatch: string[];
+  message: string | null;
+};
+
+type TeamForPairing = { id: string; sort_order?: number; name?: string };
+
+function sortTeamsForPairing<T extends TeamForPairing>(teams: readonly T[]): T[] {
+  return [...teams].sort(
+    (a, b) =>
+      (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
+      (a.name ?? "").localeCompare(b.name ?? "", "da", { sensitivity: "base" }) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
+export function analyzePoolMatchSync<T extends TeamForPairing>(
+  teams: readonly T[],
+  matches: readonly { team_a_id: string; team_b_id: string }[],
+  maxMatchesPerTeam?: number,
+): PoolMatchSyncAnalysis {
+  const teamIds = new Set(teams.map((t) => t.id));
+  const nameById = new Map(teams.map((t) => [t.id, t.name ?? t.id]));
+
+  const expected = new Set(
+    generateRoundRobinMatches([...teams], maxMatchesPerTeam).map((m) =>
+      matchPairKey(m.teamAId, m.teamBId),
+    ),
+  );
+
+  const actualPairCounts = new Map<string, number>();
+  let invalidCount = 0;
+  const teamsInMatches = new Set<string>();
+
+  for (const match of matches) {
+    if (!teamIds.has(match.team_a_id) || !teamIds.has(match.team_b_id) || match.team_a_id === match.team_b_id) {
+      invalidCount += 1;
+      continue;
+    }
+    teamsInMatches.add(match.team_a_id);
+    teamsInMatches.add(match.team_b_id);
+    const key = matchPairKey(match.team_a_id, match.team_b_id);
+    actualPairCounts.set(key, (actualPairCounts.get(key) ?? 0) + 1);
+  }
+
+  let duplicateCount = 0;
+  for (const count of actualPairCounts.values()) {
+    if (count > 1) duplicateCount += count - 1;
+  }
+
+  const missingCount = [...expected].filter((key) => !actualPairCounts.has(key)).length;
+  const unexpectedCount = [...actualPairCounts.keys()].filter((key) => !expected.has(key)).length;
+  const teamsWithoutMatch = teams.filter((t) => !teamsInMatches.has(t.id)).map((t) => t.id);
+
+  const noTeamsToSchedule = teams.length < 2;
+  const hasMatches = matches.length > 0;
+  const isSynced = noTeamsToSchedule
+    ? !hasMatches
+    : missingCount === 0 &&
+      unexpectedCount === 0 &&
+      duplicateCount === 0 &&
+      invalidCount === 0;
+
+  let message: string | null = null;
+  if (!isSynced && teams.length >= 2) {
+    if (teamsWithoutMatch.length > 0) {
+      const names = teamsWithoutMatch.map((id) => nameById.get(id) ?? id).join(", ");
+      message =
+        teamsWithoutMatch.length === 1
+          ? `${names} er ikke med i de genererede kampe — typisk fordi hold er tilføjet efter sidste generering. Generér kampe igen.`
+          : `Disse hold mangler i kampprogrammet: ${names}. Generér kampe igen efter ændring af puljen.`;
+    } else if (unexpectedCount > 0 && missingCount > 0) {
+      message = `Kampene passer ikke til puljens ${teams.length} hold (${missingCount} mangler, ${unexpectedCount} overflødige). Generér kampe igen.`;
+    } else if (unexpectedCount > 0) {
+      message = `${unexpectedCount} kamp(e) hører ikke til puljens nuværende hold. Generér kampe igen.`;
+    } else if (missingCount > 0) {
+      message = `${missingCount} forventet kamp mangler. Generér kampe igen.`;
+    } else if (duplicateCount > 0) {
+      message = `${duplicateCount} dublet-kamp(e). Generér kampe igen.`;
+    } else if (invalidCount > 0) {
+      message = `${invalidCount} ugyldig(e) kamp(e) (hold uden for puljen). Generér kampe igen.`;
+    } else {
+      message = "Der er uoverensstemmelse mellem puljens hold og de genererede kampe. Generér kampe igen.";
     }
   }
-  return matches;
+
+  return {
+    isSynced,
+    missingCount,
+    unexpectedCount,
+    duplicateCount,
+    invalidCount,
+    teamsWithoutMatch,
+    message,
+  };
+}
+
+function rotateRoundRobinOrder(order: string[]): void {
+  const last = order.pop();
+  if (last === undefined) return;
+  order.splice(1, 0, last);
+}
+
+/**
+ * Alle-mod-alle op til `maxMatchesPerTeam` kampe pr. hold (klassisk rundtournér).
+ * Uden cap: fuld round-robin (n−1 kampe pr. hold).
+ */
+export function generateRoundRobinMatches<T extends TeamForPairing>(
+  teams: readonly T[],
+  maxMatchesPerTeam?: number,
+): Array<{ teamAId: string; teamBId: string }> {
+  if (teams.length < 2) return [];
+
+  let order = sortTeamsForPairing(teams).map((t) => t.id);
+  if (order.length % 2 === 1) order = [...order, ROUND_ROBIN_BYE];
+
+  const n = order.length;
+  const maxRounds = n - 1;
+  const roundsToPlay =
+    maxMatchesPerTeam == null || !Number.isFinite(maxMatchesPerTeam)
+      ? maxRounds
+      : Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), maxRounds));
+
+  const pairings: Array<{ teamAId: string; teamBId: string }> = [];
+  const slotOrder = [...order];
+
+  for (let round = 0; round < roundsToPlay; round += 1) {
+    for (let i = 0; i < n / 2; i += 1) {
+      const teamAId = slotOrder[i]!;
+      const teamBId = slotOrder[n - 1 - i]!;
+      if (teamAId === ROUND_ROBIN_BYE || teamBId === ROUND_ROBIN_BYE) continue;
+      pairings.push({ teamAId, teamBId });
+    }
+    if (round < roundsToPlay - 1) rotateRoundRobinOrder(slotOrder);
+  }
+
+  return pairings;
+}
+
+/** Antal kampe ved begrænset round-robin (til KPI / sync). */
+export function plannedPoolMatchCount(teamCount: number, maxMatchesPerTeam?: number): number {
+  if (teamCount < 2) return 0;
+  if (maxMatchesPerTeam == null || !Number.isFinite(maxMatchesPerTeam)) {
+    return (teamCount * (teamCount - 1)) / 2;
+  }
+  const cap = Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), teamCount - 1));
+  return cap * Math.floor(teamCount / 2);
 }
 
 export type TurneringDashboardLevelStats = {
@@ -261,177 +263,3 @@ export type TurneringDashboardOverview = {
   };
   error: string | null;
 };
-
-export async function fetchTurneringDashboardOverview(): Promise<TurneringDashboardOverview> {
-  const eventId = TURNERING_EVENT_ID;
-  const [playersRes, teamsRes, poolsRes, matchesRes] = await Promise.all([
-    supabase.from("players").select("id, level").eq("event_id", eventId),
-    supabase.from("teams").select("id, level, pool_id").eq("event_id", eventId),
-    supabase.from("pools").select("id, level").eq("event_id", eventId),
-    supabase.from("matches").select("id, pool_id").eq("event_id", eventId),
-  ]);
-
-  if (playersRes.error) {
-    return {
-      levels: [],
-      totals: {
-        playerCount: 0,
-        teamCount: 0,
-        poolCount: 0,
-        pooledTeams: 0,
-        matchesGenerated: 0,
-        expectedMatches: 0,
-        poolsReadyForMatches: 0,
-      },
-      error: playersRes.error.message,
-    };
-  }
-  if (teamsRes.error) {
-    return {
-      levels: [],
-      totals: {
-        playerCount: 0,
-        teamCount: 0,
-        poolCount: 0,
-        pooledTeams: 0,
-        matchesGenerated: 0,
-        expectedMatches: 0,
-        poolsReadyForMatches: 0,
-      },
-      error: teamsRes.error.message,
-    };
-  }
-  if (poolsRes.error) {
-    return {
-      levels: [],
-      totals: {
-        playerCount: 0,
-        teamCount: 0,
-        poolCount: 0,
-        pooledTeams: 0,
-        matchesGenerated: 0,
-        expectedMatches: 0,
-        poolsReadyForMatches: 0,
-      },
-      error: poolsRes.error.message,
-    };
-  }
-  if (matchesRes.error) {
-    return {
-      levels: [],
-      totals: {
-        playerCount: 0,
-        teamCount: 0,
-        poolCount: 0,
-        pooledTeams: 0,
-        matchesGenerated: 0,
-        expectedMatches: 0,
-        poolsReadyForMatches: 0,
-      },
-      error: matchesRes.error.message,
-    };
-  }
-
-  const players = (playersRes.data ?? []) as { id: string; level: string | null }[];
-  const teams = (teamsRes.data ?? []) as { id: string; level: string | null; pool_id: string | null }[];
-  const pools = (poolsRes.data ?? []) as { id: string; level: string | null }[];
-  const matches = (matchesRes.data ?? []) as { id: string; pool_id: string | null }[];
-
-  const levelMap = new Map<string, TurneringDashboardLevelStats>();
-  const ensureLevel = (bucketKey: string, label: string): TurneringDashboardLevelStats => {
-    const current = levelMap.get(bucketKey);
-    if (current) return current;
-    const row: TurneringDashboardLevelStats = {
-      levelKey: label,
-      playerCount: 0,
-      teamCount: 0,
-      poolCount: 0,
-      pooledTeams: 0,
-      unpooledTeams: 0,
-      teamPooledPct: 0,
-      matchesGenerated: 0,
-      expectedMatches: 0,
-      matchCoveragePct: 0,
-    };
-    levelMap.set(bucketKey, row);
-    return row;
-  };
-
-  for (const p of players) {
-    const level = canonicalLevelBucket(p.level);
-    ensureLevel(level.bucketKey, level.label).playerCount += 1;
-  }
-
-  const poolLevelById = new Map<string, string>();
-  for (const pool of pools) {
-    const level = canonicalLevelBucket(pool.level);
-    poolLevelById.set(pool.id, level.bucketKey);
-    ensureLevel(level.bucketKey, level.label).poolCount += 1;
-  }
-
-  const teamCountByPool = new Map<string, number>();
-  for (const team of teams) {
-    const level = canonicalLevelBucket(team.level);
-    const row = ensureLevel(level.bucketKey, level.label);
-    row.teamCount += 1;
-    if (team.pool_id) {
-      row.pooledTeams += 1;
-      teamCountByPool.set(team.pool_id, (teamCountByPool.get(team.pool_id) ?? 0) + 1);
-    } else {
-      row.unpooledTeams += 1;
-    }
-  }
-
-  for (const match of matches) {
-    if (!match.pool_id) continue;
-    const bucketKey = poolLevelById.get(match.pool_id);
-    if (!bucketKey) continue;
-    const row = levelMap.get(bucketKey);
-    if (!row) continue;
-    row.matchesGenerated += 1;
-  }
-
-  for (const [poolId, teamCount] of teamCountByPool.entries()) {
-    const bucketKey = poolLevelById.get(poolId);
-    if (!bucketKey) continue;
-    const expected = teamCount >= 2 ? (teamCount * (teamCount - 1)) / 2 : 0;
-    const row = levelMap.get(bucketKey);
-    if (!row) continue;
-    row.expectedMatches += expected;
-  }
-
-  for (const row of levelMap.values()) {
-    row.teamPooledPct = row.teamCount > 0 ? Math.round((row.pooledTeams / row.teamCount) * 1000) / 10 : 0;
-    row.matchCoveragePct =
-      row.expectedMatches > 0 ? Math.round((row.matchesGenerated / row.expectedMatches) * 1000) / 10 : 0;
-  }
-
-  const levels = sortLevelKeysForNav([...levelMap.values()].map((v) => v.levelKey)).map(
-    (label) => [...levelMap.values()].find((row) => row.levelKey === label)!,
-  );
-
-  const totals = levels.reduce(
-    (acc, row) => {
-      acc.playerCount += row.playerCount;
-      acc.teamCount += row.teamCount;
-      acc.poolCount += row.poolCount;
-      acc.pooledTeams += row.pooledTeams;
-      acc.matchesGenerated += row.matchesGenerated;
-      acc.expectedMatches += row.expectedMatches;
-      return acc;
-    },
-    {
-      playerCount: 0,
-      teamCount: 0,
-      poolCount: 0,
-      pooledTeams: 0,
-      matchesGenerated: 0,
-      expectedMatches: 0,
-      poolsReadyForMatches: 0,
-    },
-  );
-
-  totals.poolsReadyForMatches = [...teamCountByPool.values()].filter((count) => count >= 2).length;
-  return { levels, totals, error: null };
-}
-

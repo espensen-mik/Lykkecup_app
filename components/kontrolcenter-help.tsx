@@ -123,7 +123,11 @@ function GuideSections() {
           </li>
           <li>
             <strong>Turnering</strong> — fold ud for <strong>Puljer</strong> og <strong>Turneringsplan</strong>. Under hvert
-            punkt vælger du niveau for at arbejde med puljer eller kampprogram for det niveau.
+            punkt vælger du niveau for at arbejde med puljer eller kampplanlægning for det niveau.
+          </li>
+          <li>
+            <strong>Kampprogram</strong> — samlet oversigt over alle kampe (per bane eller kronologisk efter runder), når
+            Turneringsplan er på plads.
           </li>
         </ul>
       </section>

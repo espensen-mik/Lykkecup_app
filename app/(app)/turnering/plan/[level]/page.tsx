@@ -3,8 +3,8 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TurneringPlanWorkspace } from "@/components/turnering/plan-workspace";
-import { normalizeLevelKey } from "@/lib/holddannelse";
-import { fetchTurneringPlanLevelData } from "@/lib/turnering";
+import { canonicalBanerLevelLabel, normalizeLevelKey } from "@/lib/holddannelse";
+import { fetchTurneringPlanLevelData } from "@/lib/turnering-server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,16 +22,16 @@ function decodeLevelParam(segment: string): string {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { level } = await params;
-  const levelKey = normalizeLevelKey(decodeLevelParam(level));
+  const levelKey = canonicalBanerLevelLabel(normalizeLevelKey(decodeLevelParam(level)));
   return {
     title: `${levelKey} — Turneringsplan`,
-    description: `Placeholder for kampplanlægning i niveau ${levelKey}`,
+    description: `Kampplanlægning for niveau ${levelKey}`,
   };
 }
 
 export default async function TurneringPlanLevelPage({ params }: PageProps) {
   const { level } = await params;
-  const levelKey = normalizeLevelKey(decodeLevelParam(level));
+  const levelKey = canonicalBanerLevelLabel(normalizeLevelKey(decodeLevelParam(level)));
   const bundle = await fetchTurneringPlanLevelData(levelKey);
 
   if (bundle.error) {
@@ -60,16 +60,23 @@ export default async function TurneringPlanLevelPage({ params }: PageProps) {
             {levelKey}
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Generer kampe automatisk fra puljerne i dette niveau. Baner og tider planlægges i næste trin.
+            Puljer oprettes under Puljer. Her genererer du kampe og tildeler bane og tid automatisk.
           </p>
         </header>
       </div>
 
       <TurneringPlanWorkspace
         levelKey={levelKey}
+        planMatchesPerTeam={bundle.planMatchesPerTeam}
         initialPools={bundle.pools}
         initialTeams={bundle.teams}
+        initialMembers={bundle.members}
+        initialPlayers={bundle.players}
+        initialCoaches={bundle.coaches}
+        initialTeamCoaches={bundle.teamCoaches}
         initialMatches={bundle.matches}
+        courts={bundle.courts}
+        periods={bundle.periods}
       />
     </div>
   );

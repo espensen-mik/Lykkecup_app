@@ -15,6 +15,7 @@ import {
   Newspaper,
   MapPinned,
   MessagesSquare,
+  Settings,
   Info,
   Ticket,
   Users,
@@ -266,6 +267,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       return pathname === "/turnering/puljer" || pathname.startsWith("/turnering/puljer/");
     if (href === "/turnering/plan")
       return pathname === "/turnering/plan" || pathname.startsWith("/turnering/plan/");
+    if (href === "/kampprogram") return pathname.startsWith("/kampprogram");
     if (href === "/admin") return pathname === "/admin" || pathname === "/dashboard";
     if (href === "/beskeder") return pathname === "/beskeder";
     if (href === "/app-indhold") return pathname === "/app-indhold" || pathname.startsWith("/app-indhold/");
@@ -547,6 +549,40 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           </div>
           {turneringOpen ? (
             <div className="ml-4 space-y-0.5 border-l border-gray-200 py-0.5 pl-3 dark:border-gray-700">
+              <Link
+                href="/turnering/baner"
+                onClick={(e) => {
+                  if (turneringLocked) {
+                    e.preventDefault();
+                    return;
+                  }
+                  setMobileOpen(false);
+                }}
+                aria-disabled={turneringLocked}
+                tabIndex={turneringLocked ? -1 : undefined}
+                className={`flex items-center gap-2 rounded-md border-l-2 py-1.5 pl-2 pr-2 text-[0.86rem] font-medium transition-colors ${
+                  turneringLocked
+                    ? "cursor-not-allowed border-transparent text-gray-400 dark:text-gray-500"
+                    : isActive("/turnering/baner")
+                    ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                    : "border-transparent text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800/60"
+                }`}
+                title={turneringLocked ? turneringLockedHint : undefined}
+              >
+                <Settings
+                  className={`h-3.5 w-3.5 shrink-0 ${
+                    turneringLocked
+                      ? "text-gray-400 dark:text-gray-500"
+                      : isActive("/turnering/baner")
+                      ? "text-[#0f766e] dark:text-teal-300"
+                      : "text-gray-400 dark:text-gray-500"
+                  }`}
+                  strokeWidth={2}
+                  aria-hidden
+                />
+                <span className="truncate">Opsætning</span>
+              </Link>
+
               <div className="space-y-0.5">
                 <div
                   className={`flex items-center gap-1.5 rounded-md border-l-2 py-1 ${
@@ -702,32 +738,43 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                   </ul>
                 ) : null}
               </div>
-
-              <Link
-                href="/turnering/baner"
-                onClick={(e) => {
-                  if (turneringLocked) {
-                    e.preventDefault();
-                    return;
-                  }
-                  setMobileOpen(false);
-                }}
-                aria-disabled={turneringLocked}
-                tabIndex={turneringLocked ? -1 : undefined}
-                className={`flex items-center gap-2 rounded-md border-l-2 py-1.5 pl-2 pr-2 text-[0.86rem] font-medium transition-colors ${
-                  turneringLocked
-                    ? "cursor-not-allowed border-transparent text-gray-400 dark:text-gray-500"
-                    : isActive("/turnering/baner")
-                    ? "border-[#14b8a6] bg-teal-50/90 text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
-                    : "border-transparent text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800/60"
-                }`}
-                title={turneringLocked ? turneringLockedHint : undefined}
-              >
-                Baner & tider
-              </Link>
             </div>
           ) : null}
         </div>
+
+        <Link
+          href="/kampprogram"
+          onClick={(e) => {
+            if (turneringLocked) {
+              e.preventDefault();
+              return;
+            }
+            setMobileOpen(false);
+          }}
+          aria-disabled={turneringLocked}
+          tabIndex={turneringLocked ? -1 : undefined}
+          title={turneringLocked ? turneringLockedHint : undefined}
+          className={`mt-1 flex items-center gap-3 rounded-md border-l-2 py-2.5 pr-3 text-[0.9375rem] font-medium transition-colors ${
+            turneringLocked
+              ? "cursor-not-allowed border-transparent pl-3 text-gray-400 dark:text-gray-500"
+              : isActive("/kampprogram")
+                ? "border-[#14b8a6] bg-teal-50/90 pl-[10px] text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                : "border-transparent pl-3 text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-white"
+          }`}
+        >
+          <ClipboardList
+            className={`h-4 w-4 shrink-0 ${
+              turneringLocked
+                ? "text-gray-400 dark:text-gray-500"
+                : isActive("/kampprogram")
+                  ? "text-[#0f766e] dark:text-teal-300"
+                  : "text-gray-400 dark:text-gray-500"
+            }`}
+            strokeWidth={2}
+            aria-hidden
+          />
+          <span className="truncate">Kampprogram</span>
+        </Link>
 
         <div className="mt-auto shrink-0 pb-1 pt-4">
           <Link

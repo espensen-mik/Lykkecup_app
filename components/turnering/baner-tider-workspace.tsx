@@ -8,27 +8,49 @@ import type {
   CourtAvailabilityRow,
   CourtBreakRow,
   CourtRow,
+  CourtType,
   LevelScheduleRow,
-  VenueRow,
 } from "@/lib/baner-tider";
 import {
   formatTimeForInput,
+  timeInputToTimestamptz,
   timeToMinutes,
   validateAvailability,
   validateBreakInsideAvailability,
 } from "@/lib/baner-tider";
+import {
+  availabilityRowsToRegnemaskineAvailability,
+  breakRowsToRegnemaskineBreaks,
+  computeCourtCapacities,
+  conservativeRoundTimingFromSchedule,
+  courtsRowsToRegnemaskineCourts,
+} from "@/lib/lykkecup-regnemaskine";
+import { courtTypeForLevel, defaultRoundsPerMatchForLevel } from "@/lib/level-court-settings";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
+import { LykkecupRegnemaskine, type RegnemaskineLevelInput } from "@/components/turnering/lykkecup-regnemaskine";
+import { PerioderPanel } from "@/components/turnering/perioder-panel";
+import type { PeriodsBundle } from "@/lib/tournament-periods";
 
-type TabId = "haller" | "tider" | "niveau";
+type TabId = "haller" | "niveau" | "kampe" | "perioder";
 
 const tabs: { id: TabId; label: string }[] = [
   { id: "haller", label: "Haller & baner" },
-  { id: "tider", label: "Tider" },
   { id: "niveau", label: "Niveau indstillinger" },
+  { id: "kampe", label: "Kampe" },
+  { id: "perioder", label: "Perioder" },
 ];
 
 function courtTypeLabel(t: CourtRow["court_type"]) {
-  return t === "large" ? "Stor bane" : "Lille bane";
+  switch (t) {
+    case "mini":
+      return "Mini bane";
+    case "kort":
+      return "Kort bane";
+    case "stor":
+      return "Stor bane";
+    default:
+      return String(t);
+  }
 }
 
 function CourtTimeline({
@@ -40,7 +62,7 @@ function CourtTimeline({
 }) {
   if (!availability) {
     return (
-      <p className="text-xs text-gray-500 dark:text-gray-400">Ingen åbningstid sat — tilføj under &quot;Tider&quot;.</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400">Ingen åbningstid sat — angiv under Rediger bane.</p>
     );
   }
   const a0 = timeToMinutes(availability.start_time);
@@ -81,18 +103,24 @@ function Modal({
   open,
   title,
   onClose,
+  wide,
   children,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center" role="dialog" aria-modal>
       <button type="button" className="absolute inset-0 bg-black/40" aria-label="Luk" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-lc-border bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+      <div
+        className={`relative z-10 w-full rounded-xl border border-lc-border bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900 ${
+          wide ? "max-h-[90vh] max-w-2xl overflow-y-auto" : "max-w-md"
+        }`}
+      >
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
           <button
@@ -109,7 +137,15 @@ function Modal({
   );
 }
 
-export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) {
+export function BanerTiderWorkspace({
+  initial,
+  levels,
+  periodsBundle,
+}: {
+  initial: BanerTiderBundle;
+  levels: RegnemaskineLevelInput[];
+  periodsBundle: PeriodsBundle;
+}) {
   const router = useRouter();
   const supabase = useMemo(() => getAuthBrowserClient(), []);
   const eventId = TURNERING_EVENT_ID;
@@ -125,9 +161,7 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
 
   const [venueName, setVenueName] = useState("");
   const [courtName, setCourtName] = useState("");
-  const [courtType, setCourtType] = useState<CourtRow["court_type"]>("large");
-
-  const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
+  const [courtType, setCourtType] = useState<CourtType>("stor");
 
   const courtsByVenue = useMemo(() => {
     const map = new Map<string, CourtRow[]>();
@@ -171,17 +205,18 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
     return m;
   }, [initial.levelSettings]);
 
-  const sortedCourtsFlat = useMemo(() => {
-    const out: { court: CourtRow; venue: VenueRow | null }[] = [];
-    for (const v of initial.venues) {
-      for (const c of courtsByVenue.get(v.id) ?? []) {
-        out.push({ court: c, venue: v });
-      }
-    }
-    return out;
-  }, [initial.venues, courtsByVenue]);
+  const roundTiming = useMemo(
+    () => conservativeRoundTimingFromSchedule(initial.levelSettings),
+    [initial.levelSettings],
+  );
 
-  const effectiveSelectedCourtId = selectedCourtId ?? sortedCourtsFlat[0]?.court.id ?? null;
+  const slotsByCourtId = useMemo(() => {
+    const courts = courtsRowsToRegnemaskineCourts(initial.courts);
+    const availability = availabilityRowsToRegnemaskineAvailability(initial.availability);
+    const breaks = breakRowsToRegnemaskineBreaks(initial.breaks);
+    const rows = computeCourtCapacities(courts, availability, breaks, roundTiming);
+    return new Map(rows.map((r) => [r.courtId, r.slots]));
+  }, [initial.courts, initial.availability, initial.breaks, roundTiming]);
 
   const refresh = useCallback(() => {
     router.refresh();
@@ -242,7 +277,7 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
       return;
     }
     setCourtName("");
-    setCourtType("large");
+    setCourtType("stor");
     setCourtModal(null);
     setToast("Bane oprettet.");
     refresh();
@@ -253,6 +288,17 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
     if (!editCourt) return;
     const name = courtName.trim();
     if (!name) return;
+    const v1 = validateAvailability(avStart, avEnd);
+    if (v1) {
+      setError(v1);
+      return;
+    }
+    const startTs = timeInputToTimestamptz(avStart);
+    const endTs = timeInputToTimestamptz(avEnd);
+    if (!startTs || !endTs) {
+      setError("Kunne ikke konvertere tider til databasen.");
+      return;
+    }
     const err = await run(async () => {
       const { error: upErr } = await supabase
         .from("courts")
@@ -262,6 +308,15 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
         })
         .eq("id", editCourt.id);
       if (upErr) return upErr.message;
+
+      await supabase.from("court_availability").delete().eq("event_id", eventId).eq("court_id", editCourt.id);
+      const { error: avErr } = await supabase.from("court_availability").insert({
+        event_id: eventId,
+        court_id: editCourt.id,
+        start_time: startTs,
+        end_time: endTs,
+      });
+      if (avErr) return avErr.message;
       return null;
     });
     if (err) {
@@ -269,7 +324,7 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
       return;
     }
     setEditCourt(null);
-    setToast("Bane opdateret.");
+    setToast("Bane gemt.");
     refresh();
   }
 
@@ -286,69 +341,51 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
     refresh();
   }
 
-  const selectedAvail = effectiveSelectedCourtId ? availabilityByCourt.get(effectiveSelectedCourtId) ?? null : null;
-  const selectedBreaks = effectiveSelectedCourtId ? breaksByCourt.get(effectiveSelectedCourtId) ?? [] : [];
+  const editAvail = editCourt ? (availabilityByCourt.get(editCourt.id) ?? null) : null;
+  const editBreaks = editCourt ? (breaksByCourt.get(editCourt.id) ?? []) : [];
 
   const [avStart, setAvStart] = useState("");
   const [avEnd, setAvEnd] = useState("");
 
   useEffect(() => {
-    setAvStart(formatTimeForInput(selectedAvail?.start_time));
-    setAvEnd(formatTimeForInput(selectedAvail?.end_time));
-  }, [effectiveSelectedCourtId, selectedAvail?.id, selectedAvail?.start_time, selectedAvail?.end_time]);
-
-  async function saveAvailability(e: React.FormEvent) {
-    e.preventDefault();
-    if (!effectiveSelectedCourtId) return;
-    const start = avStart;
-    const end = avEnd;
-    const v1 = validateAvailability(start, end);
-    if (v1) {
-      setError(v1);
-      return;
-    }
-    const err = await run(async () => {
-      await supabase.from("court_availability").delete().eq("event_id", eventId).eq("court_id", effectiveSelectedCourtId);
-      const { error: insErr } = await supabase.from("court_availability").insert({
-        event_id: eventId,
-        court_id: effectiveSelectedCourtId,
-        start_time: start,
-        end_time: end,
-      });
-      if (insErr) return insErr.message;
-      return null;
-    });
-    if (err) {
-      setError(err);
-      return;
-    }
-    setToast("Åbningstid gemt.");
-    refresh();
-  }
+    if (!editCourt) return;
+    const avail = availabilityByCourt.get(editCourt.id);
+    setAvStart(formatTimeForInput(avail?.start_time));
+    setAvEnd(formatTimeForInput(avail?.end_time));
+    setBreakLabel("");
+    setBreakStart("12:00");
+    setBreakEnd("12:30");
+    setEditBreak(null);
+  }, [editCourt?.id, availabilityByCourt, editCourt]);
 
   const [breakLabel, setBreakLabel] = useState("");
   const [breakStart, setBreakStart] = useState("12:00");
   const [breakEnd, setBreakEnd] = useState("12:30");
   const [editBreak, setEditBreak] = useState<CourtBreakRow | null>(null);
 
-  async function addBreak(e: React.FormEvent) {
-    e.preventDefault();
-    if (!effectiveSelectedCourtId || !selectedAvail) {
+  async function addBreak() {
+    if (!editCourt || !editAvail) {
       setError("Angiv først åbningstid for banen.");
       return;
     }
-    const v = validateBreakInsideAvailability(selectedAvail.start_time, selectedAvail.end_time, breakStart, breakEnd);
+    const v = validateBreakInsideAvailability(editAvail.start_time, editAvail.end_time, breakStart, breakEnd);
     if (v) {
       setError(v);
+      return;
+    }
+    const breakStartTs = timeInputToTimestamptz(breakStart);
+    const breakEndTs = timeInputToTimestamptz(breakEnd);
+    if (!breakStartTs || !breakEndTs) {
+      setError("Kunne ikke konvertere pausetider til databasen.");
       return;
     }
     const err = await run(async () => {
       const { error: insErr } = await supabase.from("court_breaks").insert({
         event_id: eventId,
-        court_id: effectiveSelectedCourtId,
+        court_id: editCourt.id,
         label: breakLabel.trim() || null,
-        start_time: breakStart,
-        end_time: breakEnd,
+        start_time: breakStartTs,
+        end_time: breakEndTs,
       });
       if (insErr) return insErr.message;
       return null;
@@ -364,10 +401,16 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
 
   async function saveEditBreak(e: React.FormEvent) {
     e.preventDefault();
-    if (!editBreak || !selectedAvail) return;
-    const v = validateBreakInsideAvailability(selectedAvail.start_time, selectedAvail.end_time, breakStart, breakEnd);
+    if (!editBreak || !editAvail) return;
+    const v = validateBreakInsideAvailability(editAvail.start_time, editAvail.end_time, breakStart, breakEnd);
     if (v) {
       setError(v);
+      return;
+    }
+    const breakStartTs = timeInputToTimestamptz(breakStart);
+    const breakEndTs = timeInputToTimestamptz(breakEnd);
+    if (!breakStartTs || !breakEndTs) {
+      setError("Kunne ikke konvertere pausetider til databasen.");
       return;
     }
     const err = await run(async () => {
@@ -375,8 +418,8 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
         .from("court_breaks")
         .update({
           label: breakLabel.trim() || null,
-          start_time: breakStart,
-          end_time: breakEnd,
+          start_time: breakStartTs,
+          end_time: breakEndTs,
         })
         .eq("id", editBreak.id);
       if (upErr) return upErr.message;
@@ -406,7 +449,8 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
     refresh();
   }
 
-  const [levelDrafts, setLevelDrafts] = useState<Record<string, { match: string; pause: string }>>({});
+  const [levelDrafts, setLevelDrafts] = useState<Record<string, { match: string; pause: string; rounds: string }>>({});
+  const [courtDrafts, setCourtDrafts] = useState<Partial<Record<string, CourtType>>>({});
 
   function draftFor(level: string) {
     const row = levelSettingsByLevel.get(level);
@@ -415,30 +459,43 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
     return {
       match: row ? String(row.match_duration_minutes) : "60",
       pause: row ? String(row.break_between_matches_minutes) : "5",
+      rounds: row ? String(row.rounds_per_match) : String(defaultRoundsPerMatchForLevel(level)),
     };
   }
 
-  function setDraft(level: string, patch: Partial<{ match: string; pause: string }>) {
+  function setDraft(level: string, patch: Partial<{ match: string; pause: string; rounds: string }>) {
     setLevelDrafts((prev) => {
       const row = levelSettingsByLevel.get(level);
       const base = prev[level] ?? {
         match: row ? String(row.match_duration_minutes) : "60",
         pause: row ? String(row.break_between_matches_minutes) : "5",
+        rounds: row ? String(row.rounds_per_match) : String(defaultRoundsPerMatchForLevel(level)),
       };
       return { ...prev, [level]: { ...base, ...patch } };
     });
+  }
+
+  function courtPickFor(level: string): CourtType {
+    const fromDraft = courtDrafts[level];
+    if (fromDraft) return fromDraft;
+    return courtTypeForLevel(level, initial.levelCourtSettings);
   }
 
   async function saveLevelRow(level: string) {
     const d = draftFor(level);
     const match = Number.parseInt(d.match, 10);
     const pause = Number.parseInt(d.pause, 10);
+    const rounds = Number.parseInt(d.rounds, 10);
     if (!Number.isFinite(match) || match < 1 || match > 24 * 60) {
       setError("Kampvarighed skal være et positivt tal (minutter).");
       return;
     }
     if (!Number.isFinite(pause) || pause < 0 || pause > 24 * 60) {
       setError("Pause mellem kampe skal være et tal (minutter).");
+      return;
+    }
+    if (!Number.isFinite(rounds) || rounds < 1 || rounds > 4) {
+      setError("Runder pr. kamp skal være mellem 1 og 4.");
       return;
     }
     const err = await run(async () => {
@@ -449,6 +506,7 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
           .update({
             match_duration_minutes: match,
             break_between_matches_minutes: pause,
+            rounds_per_match: rounds,
           })
           .eq("id", existing.id);
         if (upErr) return upErr.message;
@@ -458,9 +516,22 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
           level,
           match_duration_minutes: match,
           break_between_matches_minutes: pause,
+          rounds_per_match: rounds,
         });
         if (insErr) return insErr.message;
       }
+
+      const ct = courtPickFor(level);
+      const { error: lcErr } = await supabase.from("level_court_settings").upsert(
+        {
+          event_id: eventId,
+          level,
+          court_type: ct,
+        },
+        { onConflict: "event_id,level" },
+      );
+      if (lcErr) return lcErr.message;
+
       return null;
     });
     if (err) {
@@ -475,9 +546,9 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <header>
         <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0d9488] dark:text-teal-400">Turnering</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">Baner & tider</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">Opsætning</h1>
         <p className="mt-2 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-          Administrer haller, baner, åbningstider, pauser og kampvarighed pr. niveau. Bruges senere til automatisk kampplanlægning.
+          Turneringsopsætning: baner og tider, niveauindstillinger og kampebehov vs. kapacitet.
         </p>
       </header>
 
@@ -559,7 +630,7 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
                       onClick={() => {
                         setCourtModal({ venueId: v.id });
                         setCourtName("");
-                        setCourtType("large");
+                        setCourtType("stor");
                       }}
                       className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
                     >
@@ -572,7 +643,15 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
                         Ingen baner i denne hal.
                       </li>
                     ) : (
-                      (courtsByVenue.get(v.id) ?? []).map((c) => (
+                      (courtsByVenue.get(v.id) ?? []).map((c) => {
+                        const avail = availabilityByCourt.get(c.id);
+                        const totalSlots = slotsByCourtId.get(c.id) ?? 0;
+                        const usedSlots = initial.scheduledSlotsByCourtId[c.id] ?? 0;
+                        const openLabel =
+                          avail != null
+                            ? `${formatTimeForInput(avail.start_time)} – ${formatTimeForInput(avail.end_time)}`
+                            : "Ingen åbningstid";
+                        return (
                         <li
                           key={c.id}
                           className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50/80 px-4 py-3 dark:border-gray-700/80 dark:bg-gray-800/40"
@@ -580,6 +659,10 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
                           <div className="min-w-0">
                             <p className="font-medium text-gray-900 dark:text-white">{c.name}</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">{courtTypeLabel(c.court_type)}</p>
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{openLabel}</p>
+                            <p className="text-xs font-medium tabular-nums text-gray-600 dark:text-gray-300">
+                              Runder: {usedSlots}/{totalSlots > 0 ? totalSlots : "—"}
+                            </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <button
@@ -608,7 +691,8 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
                             </button>
                           </div>
                         </li>
-                      ))
+                        );
+                      })
                     )}
                   </ul>
                 </article>
@@ -618,178 +702,14 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
         </section>
       ) : null}
 
-      {tab === "tider" ? (
-        <section className="space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tider (åbningstid & pauser)</h2>
-
-          {sortedCourtsFlat.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-gray-200 bg-white px-5 py-10 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
-              Opret først baner under fanen &quot;Haller & baner&quot;.
-            </p>
-          ) : (
-            <>
-              <div className="rounded-xl border border-lc-border bg-white p-5 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200" htmlFor="court-select">
-                  Vælg bane
-                </label>
-                <select
-                  id="court-select"
-                  className="mt-2 w-full max-w-md rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
-                  value={effectiveSelectedCourtId ?? ""}
-                  onChange={(e) => setSelectedCourtId(e.target.value || null)}
-                >
-                  {sortedCourtsFlat.map(({ court, venue }) => (
-                    <option key={court.id} value={court.id}>
-                      {(venue?.name ?? "Hal") + " — " + court.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {effectiveSelectedCourtId ? (
-                <>
-                  <article className="rounded-xl border border-lc-border bg-white p-5 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35">
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">Åbningstid</h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Én åbningstid pr. bane pr. turnering.</p>
-                    <form className="mt-4 flex flex-wrap items-end gap-4" onSubmit={saveAvailability}>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Starttid</label>
-                        <input
-                          type="time"
-                          required
-                          className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
-                          value={avStart}
-                          onChange={(e) => setAvStart(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Sluttid</label>
-                        <input
-                          type="time"
-                          required
-                          className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
-                          value={avEnd}
-                          onChange={(e) => setAvEnd(e.target.value)}
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={busy}
-                        className="rounded-lg bg-[#14b8a6] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#0d9488] disabled:opacity-50"
-                      >
-                        Gem åbningstid
-                      </button>
-                    </form>
-                  </article>
-
-                  <article className="rounded-xl border border-lc-border bg-white p-5 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35">
-                    <div className="flex flex-wrap items-end justify-between gap-4">
-                      <div>
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Pauser</h3>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Pauser skal ligge inden for åbningstiden.</p>
-                      </div>
-                    </div>
-
-                    <CourtTimeline availability={selectedAvail} breaks={selectedBreaks} />
-
-                    <ul className="mt-6 space-y-3">
-                      {selectedBreaks.length === 0 ? (
-                        <li className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-                          Ingen pauser endnu.
-                        </li>
-                      ) : (
-                        selectedBreaks.map((b) => (
-                          <li
-                            key={b.id}
-                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-100 bg-red-50/50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/25"
-                          >
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-white">{b.label?.trim() || "Pause"}</p>
-                              <p className="text-sm text-gray-600 dark:text-gray-300">
-                                {formatTimeForInput(b.start_time)} – {formatTimeForInput(b.end_time)}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => {
-                                  setEditBreak(b);
-                                  setBreakLabel(b.label ?? "");
-                                  setBreakStart(formatTimeForInput(b.start_time));
-                                  setBreakEnd(formatTimeForInput(b.end_time));
-                                }}
-                                className="text-sm font-medium text-[#0f766e] underline-offset-2 hover:underline dark:text-teal-300"
-                              >
-                                Rediger
-                              </button>
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void deleteBreak(b)}
-                                className="text-sm font-medium text-red-700 hover:underline dark:text-red-300"
-                              >
-                                Slet
-                              </button>
-                            </div>
-                          </li>
-                        ))
-                      )}
-                    </ul>
-
-                    <form className="mt-6 grid gap-4 border-t border-gray-100 pt-6 dark:border-gray-700" onSubmit={addBreak}>
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-100">Tilføj pause</p>
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Label (valgfri)</label>
-                          <input
-                            type="text"
-                            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
-                            value={breakLabel}
-                            onChange={(e) => setBreakLabel(e.target.value)}
-                            placeholder="F.eks. Frokost"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Starttid</label>
-                          <input
-                            type="time"
-                            required
-                            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
-                            value={breakStart}
-                            onChange={(e) => setBreakStart(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Sluttid</label>
-                          <input
-                            type="time"
-                            required
-                            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
-                            value={breakEnd}
-                            onChange={(e) => setBreakEnd(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={busy || !selectedAvail}
-                        className="w-fit rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
-                      >
-                        Tilføj pause
-                      </button>
-                    </form>
-                  </article>
-                </>
-              ) : null}
-            </>
-          )}
-        </section>
-      ) : null}
-
       {tab === "niveau" ? (
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Niveau indstillinger</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Én <strong className="font-medium text-gray-700 dark:text-gray-300">runde</strong> = kampvarighed + pause (fx 9+1 min).
+            Vælg <strong className="font-medium text-gray-700 dark:text-gray-300">2 runder pr. kamp</strong> når en kamp har to halvlege
+            (ROCK på stor bane).
+          </p>
           {initial.levelKeys.length === 0 ? (
             <p className="rounded-xl border border-dashed border-gray-200 bg-white px-5 py-10 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
               Ingen niveauer fundet endnu (spillere/hold). Når der findes niveauer i turneringen, vises de her.
@@ -800,17 +720,36 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
                 <thead className="bg-gray-50/80 dark:bg-gray-800/50">
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Niveau</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Kampvarighed (min)</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Pause mellem kampe (min)</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Bane (planlægning)</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Min. pr. runde</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Pause (min)</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Runder pr. kamp</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {initial.levelKeys.map((level) => {
                     const d = draftFor(level);
+                    const courtVal = courtPickFor(level);
                     return (
                       <tr key={level}>
                         <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900 dark:text-white">{level}</td>
+                        <td className="px-4 py-3">
+                          <select
+                            className="min-w-[10rem] rounded-md border border-gray-200 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-900"
+                            value={courtVal}
+                            onChange={(e) =>
+                              setCourtDrafts((prev) => ({
+                                ...prev,
+                                [level]: e.target.value as CourtType,
+                              }))
+                            }
+                          >
+                            <option value="mini">Mini bane</option>
+                            <option value="kort">Kort bane</option>
+                            <option value="stor">Stor bane</option>
+                          </select>
+                        </td>
                         <td className="px-4 py-3">
                           <input
                             type="number"
@@ -830,6 +769,21 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
                           />
                         </td>
                         <td className="px-4 py-3">
+                          <select
+                            className="w-28 rounded-md border border-gray-200 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-900"
+                            value={d.rounds}
+                            onChange={(e) => setDraft(level, { rounds: e.target.value })}
+                            title={
+                              d.rounds === "2"
+                                ? "Kampen bruger to på hinanden følgende runder (to halvlege)"
+                                : "Kampen bruger én runde"
+                            }
+                          >
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
                           <button
                             type="button"
                             disabled={busy}
@@ -847,6 +801,12 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
             </div>
           )}
         </section>
+      ) : null}
+
+      {tab === "perioder" ? <PerioderPanel initial={periodsBundle} /> : null}
+
+      {tab === "kampe" ? (
+        <LykkecupRegnemaskine levels={levels} baner={initial} embedded onOpenTab={setTab} />
       ) : null}
 
       <Modal open={venueModal} title="Opret hal" onClose={() => setVenueModal(false)}>
@@ -888,10 +848,11 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
             <select
               className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
               value={courtType}
-              onChange={(e) => setCourtType(e.target.value as CourtRow["court_type"])}
+              onChange={(e) => setCourtType(e.target.value as CourtType)}
             >
-              <option value="large">Stor bane</option>
-              <option value="small">Lille bane</option>
+              <option value="mini">Mini bane</option>
+              <option value="kort">Kort bane</option>
+              <option value="stor">Stor bane</option>
             </select>
           </div>
           <button
@@ -904,8 +865,8 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
         </form>
       </Modal>
 
-      <Modal open={editCourt != null} title="Rediger bane" onClose={() => setEditCourt(null)}>
-        <form className="space-y-4" onSubmit={handleSaveCourtEdit}>
+      <Modal open={editCourt != null} title="Rediger bane" wide onClose={() => setEditCourt(null)}>
+        <form className="space-y-6" onSubmit={handleSaveCourtEdit}>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Navn</label>
             <input
@@ -920,18 +881,145 @@ export function BanerTiderWorkspace({ initial }: { initial: BanerTiderBundle }) 
             <select
               className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
               value={courtType}
-              onChange={(e) => setCourtType(e.target.value as CourtRow["court_type"])}
+              onChange={(e) => setCourtType(e.target.value as CourtType)}
             >
-              <option value="large">Stor bane</option>
-              <option value="small">Lille bane</option>
+              <option value="mini">Mini bane</option>
+              <option value="kort">Kort bane</option>
+              <option value="stor">Stor bane</option>
             </select>
           </div>
+
+          <div className="border-t border-gray-100 pt-5 dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Åbningstid</h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Én åbningstid pr. bane pr. turnering.</p>
+            <div className="mt-3 flex flex-wrap items-end gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Starttid</label>
+                <input
+                  type="time"
+                  required
+                  className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
+                  value={avStart}
+                  onChange={(e) => setAvStart(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Sluttid</label>
+                <input
+                  type="time"
+                  required
+                  className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
+                  value={avEnd}
+                  onChange={(e) => setAvEnd(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-5 dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Pauser</h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Gem banen først med åbningstid — derefter kan du tilføje pauser.
+            </p>
+            <div className="mt-4">
+              <CourtTimeline availability={editAvail} breaks={editBreaks} />
+            </div>
+
+            <ul className="mt-4 space-y-2">
+              {editBreaks.length === 0 ? (
+                <li className="rounded-lg border border-dashed border-gray-200 px-4 py-4 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                  Ingen pauser endnu.
+                </li>
+              ) : (
+                editBreaks.map((b) => (
+                  <li
+                    key={b.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-100 bg-red-50/50 px-3 py-2 dark:border-red-900/40 dark:bg-red-950/25"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{b.label?.trim() || "Pause"}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-300">
+                        {formatTimeForInput(b.start_time)} – {formatTimeForInput(b.end_time)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setEditBreak(b);
+                          setBreakLabel(b.label ?? "");
+                          setBreakStart(formatTimeForInput(b.start_time));
+                          setBreakEnd(formatTimeForInput(b.end_time));
+                        }}
+                        className="text-xs font-medium text-[#0f766e] underline-offset-2 hover:underline dark:text-teal-300"
+                      >
+                        Rediger
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void deleteBreak(b)}
+                        className="text-xs font-medium text-red-700 hover:underline dark:text-red-300"
+                      >
+                        Slet
+                      </button>
+                    </div>
+                  </li>
+                ))
+              )}
+            </ul>
+
+            <div className="mt-4 grid gap-3 border-t border-gray-100 pt-4 dark:border-gray-700 sm:grid-cols-2 lg:grid-cols-4" role="group" aria-label="Tilføj pause">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Label (valgfri)</label>
+                <input
+                  type="text"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
+                  value={breakLabel}
+                  onChange={(e) => setBreakLabel(e.target.value)}
+                  placeholder="F.eks. Frokost"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Starttid</label>
+                <input
+                  type="time"
+                  required
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
+                  value={breakStart}
+                  onChange={(e) => setBreakStart(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Sluttid</label>
+                <input
+                  type="time"
+                  required
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
+                  value={breakEnd}
+                  onChange={(e) => setBreakEnd(e.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-4">
+                <button
+                  type="button"
+                  disabled={busy || !editAvail}
+                  onClick={() => void addBreak()}
+                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+                >
+                  Tilføj pause
+                </button>
+              </div>
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={busy}
             className="w-full rounded-lg bg-[#14b8a6] py-2 text-sm font-semibold text-white hover:bg-[#0d9488] disabled:opacity-50"
           >
-            Gem
+            Gem bane
           </button>
         </form>
       </Modal>

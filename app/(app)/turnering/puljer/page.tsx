@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { levelPathSegment } from "@/lib/holddannelse";
-import { fetchPuljerOverview } from "@/lib/turnering";
+import { fetchPuljerOverview } from "@/lib/turnering-server";
 
 export const dynamic = "force-dynamic";
 

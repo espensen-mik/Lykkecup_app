@@ -1,11 +1,22 @@
 "use client";
 
-import { AlertTriangle, ChevronDown, Plus, Sparkles, X } from "lucide-react";
-import { useMemo, useState } from "react";
-import { StyledSelect } from "@/components/ui/styled-select";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { TeamDetailModal, TeamRowWithPlayers } from "@/components/teams/team-detail-ui";
+import { buildTeamDetailsById, type TeamDetailView } from "@/lib/team-detail";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, ChevronDown, Plus, Search, Sparkles, Users, X } from "lucide-react";
+import {
+  POOL_MAX_TEAMS,
+  poolTeamCountStatus,
+  roundRobinMatchesPerTeam,
+  type PoolPlanningHint,
+} from "@/lib/puljer";
+import { createPoolAction, releaseOrphanedPoolTeamsAction } from "@/lib/turnering-actions";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
-import { supabase } from "@/lib/supabase";
-import type { TeamMemberRow, TeamRow } from "@/types/teams";
+import { getAuthBrowserClient } from "@/lib/auth-browser";
+import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 
 type PoolRow = {
   id: string;
@@ -13,6 +24,8 @@ type PoolRow = {
   level: string | null;
   name: string;
   sort_order: number;
+  is_closed: boolean;
+  period_id?: string | null;
 };
 
 type PlayerLite = {
@@ -29,21 +42,94 @@ type TeamSummary = {
   clubCount: number;
 };
 
+export type { TeamDetailView } from "@/lib/team-detail";
+
 type Props = {
   levelKey: string;
   initialTeams: TeamRow[];
   initialPools: PoolRow[];
   initialMembers: TeamMemberRow[];
   initialPlayers: PlayerLite[];
+  initialCoaches: HoldCoachRow[];
+  initialTeamCoaches: TeamCoachRow[];
+  planMatchesPerTeam: number;
 };
-
-type FilterStatus = "all" | "unassigned" | "assigned";
-type SortMode = "name" | "avgAge" | "playerCount";
-const POOL_TEAM_CAPACITY = 6;
 
 function fmtAge(v: number | null): string {
   if (v == null || Number.isNaN(v)) return "—";
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+function poolIsClosed(p: PoolRow): boolean {
+  return Boolean(p.is_closed);
+}
+
+function sortPoolsForDisplay(rows: PoolRow[]): PoolRow[] {
+  const open = rows.filter((p) => !poolIsClosed(p));
+  const closed = rows.filter((p) => poolIsClosed(p));
+  const cmp = (a: PoolRow, b: PoolRow) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "da");
+  return [...open].sort(cmp).concat([...closed].sort(cmp));
+}
+
+function teamStats(
+  teamId: string,
+  membersByTeam: Map<string, TeamMemberRow[]>,
+  playerById: Map<string, PlayerLite>,
+): { playerCount: number; avgAge: number | null; clubCount: number } {
+  const tMembers = membersByTeam.get(teamId) ?? [];
+  let ageSum = 0;
+  let ageCount = 0;
+  const clubs = new Set<string>();
+  for (const m of tMembers) {
+    const p = playerById.get(m.player_id);
+    if (!p) continue;
+    if (typeof p.age === "number" && !Number.isNaN(p.age)) {
+      ageSum += p.age;
+      ageCount += 1;
+    }
+    const club = p.home_club?.trim();
+    if (club) clubs.add(club);
+  }
+  return {
+    playerCount: tMembers.length,
+    avgAge: ageCount > 0 ? Math.round((ageSum / ageCount) * 10) / 10 : null,
+    clubCount: clubs.size,
+  };
+}
+
+function PoolCapacityHint({ teamCount, hint }: { teamCount: number; hint: PoolPlanningHint }) {
+  const status = poolTeamCountStatus(teamCount, hint);
+  const rr = roundRobinMatchesPerTeam(teamCount);
+  const labels: Record<typeof status, string> = {
+    empty: "Tom pulje",
+    too_few: "Tilføj flere hold",
+    good: "Passer til plan",
+    high: "Mange hold",
+    full: "Fuld (max 6)",
+  };
+  const colors: Record<typeof status, string> = {
+    empty: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    too_few: "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200",
+    good: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200",
+    high: "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200",
+    full: "bg-red-100 text-red-900 dark:bg-red-950/50 dark:text-red-200",
+  };
+
+  return (
+    <div className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+      <p>
+        <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${colors[status]}`}>{labels[status]}</span>
+        <span className="ml-2 tabular-nums">
+          {teamCount} / {hint.recommendedTeamCount} anbefalet (max {POOL_MAX_TEAMS})
+        </span>
+      </p>
+      {teamCount >= 2 ? (
+        <p>
+          Alle-mod-alle: hvert hold spiller <strong className="font-semibold">{rr}</strong> kampe i puljen.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function PoolAssignmentWorkspace({
@@ -52,170 +138,191 @@ export function PoolAssignmentWorkspace({
   initialPools,
   initialMembers,
   initialPlayers,
+  initialCoaches,
+  initialTeamCoaches,
+  planMatchesPerTeam,
 }: Props) {
+  const router = useRouter();
+  const supabase = getAuthBrowserClient();
+  const hint = useMemo(
+    (): PoolPlanningHint => ({
+      matchesPerTeam: planMatchesPerTeam,
+      recommendedTeamCount: Math.min(POOL_MAX_TEAMS, Math.max(2, planMatchesPerTeam + 1)),
+    }),
+    [planMatchesPerTeam],
+  );
+
   const [teams, setTeams] = useState<TeamRow[]>(initialTeams);
-  const [pools, setPools] = useState<PoolRow[]>(initialPools);
+  const [pools, setPools] = useState<PoolRow[]>(() => sortPoolsForDisplay(initialPools));
   const [members] = useState<TeamMemberRow[]>(initialMembers);
-  const [players] = useState<PlayerLite[]>(initialPlayers);
+  const [activePoolId, setActivePoolId] = useState<string | null>(
+    () => initialPools.find((p) => !poolIsClosed(p))?.id ?? initialPools[0]?.id ?? null,
+  );
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
-  const [sortMode, setSortMode] = useState<SortMode>("name");
+  const [onlyUnassigned, setOnlyUnassigned] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [busyTeamIds, setBusyTeamIds] = useState<Set<string>>(new Set());
   const [creatingPool, setCreatingPool] = useState(false);
   const [autoPoolBusy, setAutoPoolBusy] = useState(false);
+  const [releasingOrphans, setReleasingOrphans] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [collapsedPoolIds, setCollapsedPoolIds] = useState<Set<string>>(() => new Set());
   const [previewTeamId, setPreviewTeamId] = useState<string | null>(null);
-  const [collapsedPoolIds, setCollapsedPoolIds] = useState<Set<string>>(new Set());
-  const [deletingPoolIds, setDeletingPoolIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setPools(sortPoolsForDisplay(initialPools));
+  }, [initialPools]);
+
+  useEffect(() => {
+    setTeams(initialTeams);
+  }, [initialTeams]);
 
   const playerById = useMemo(() => {
     const m = new Map<string, PlayerLite>();
-    for (const p of players) m.set(p.id, p);
+    for (const p of initialPlayers) m.set(p.id, p);
     return m;
-  }, [players]);
+  }, [initialPlayers]);
 
   const membersByTeam = useMemo(() => {
     const m = new Map<string, TeamMemberRow[]>();
     for (const member of members) {
-      const list = m.get(member.team_id);
-      if (list) list.push(member);
-      else m.set(member.team_id, [member]);
+      const list = m.get(member.team_id) ?? [];
+      list.push(member);
+      m.set(member.team_id, list);
     }
     return m;
   }, [members]);
 
-  const playersByTeam = useMemo(() => {
-    const byTeam = new Map<string, Array<{ id: string; name: string; age: number | null; club: string | null }>>();
-    for (const [teamId, teamMembers] of membersByTeam.entries()) {
-      const list: Array<{ id: string; name: string; age: number | null; club: string | null }> = [];
-      for (const m of teamMembers) {
-        const p = playerById.get(m.player_id);
-        if (!p) continue;
-        list.push({
-          id: p.id,
-          name: p.name,
-          age: p.age,
-          club: p.home_club?.trim() || null,
-        });
-      }
-      list.sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
-      byTeam.set(teamId, list);
-    }
-    return byTeam;
-  }, [membersByTeam, playerById]);
+  const teamDetailsById = useMemo(
+    () =>
+      buildTeamDetailsById(teams, members, initialPlayers, initialTeamCoaches, initialCoaches),
+    [teams, members, initialPlayers, initialTeamCoaches, initialCoaches],
+  );
+
+  const previewDetail = useMemo(() => {
+    if (!previewTeamId) return null;
+    const team = teams.find((t) => t.id === previewTeamId);
+    if (!team) return null;
+    const detail = teamDetailsById.get(team.id);
+    if (!detail) return null;
+    const stats = teamStats(team.id, membersByTeam, playerById);
+    return { ...detail, ...stats };
+  }, [previewTeamId, teams, teamDetailsById, membersByTeam, playerById]);
 
   const teamSummaries = useMemo<TeamSummary[]>(() => {
     return teams.map((team) => {
-      const tMembers = membersByTeam.get(team.id) ?? [];
-      let ageSum = 0;
-      let ageCount = 0;
-      const clubs = new Set<string>();
-      for (const m of tMembers) {
-        const p = playerById.get(m.player_id);
-        if (!p) continue;
-        const age = p.age;
-        if (typeof age === "number" && !Number.isNaN(age)) {
-          ageSum += age;
-          ageCount += 1;
-        }
-        const club = p.home_club?.trim();
-        if (club) clubs.add(club);
-      }
-      return {
-        team,
-        playerCount: tMembers.length,
-        avgAge: ageCount > 0 ? Math.round((ageSum / ageCount) * 10) / 10 : null,
-        clubCount: clubs.size,
-      };
+      const stats = teamStats(team.id, membersByTeam, playerById);
+      return { team, ...stats };
     });
   }, [teams, membersByTeam, playerById]);
 
-  const teamSummaryById = useMemo(() => {
-    const m = new Map<string, TeamSummary>();
-    for (const s of teamSummaries) m.set(s.team.id, s);
-    return m;
-  }, [teamSummaries]);
+  const poolById = useMemo(() => new Map(pools.map((p) => [p.id, p])), [pools]);
+
+  const orphanedTeams = useMemo(
+    () => teams.filter((t) => t.pool_id && !poolById.has(t.pool_id)),
+    [teams, poolById],
+  );
+
+  const activePool = activePoolId ? poolById.get(activePoolId) : null;
+  const activePoolClosed = activePool ? poolIsClosed(activePool) : false;
+
+  const unassignedTeams = useMemo(
+    () => teamSummaries.filter((s) => !s.team.pool_id),
+    [teamSummaries],
+  );
 
   const kpi = useMemo(() => {
-    const totalTeams = teams.length;
-    const assignedTeams = teams.filter((t) => Boolean(t.pool_id)).length;
-    const unassignedTeams = totalTeams - assignedTeams;
+    const assignedInPools = teams.filter((t) => t.pool_id && poolById.has(t.pool_id)).length;
     return {
-      totalTeams,
-      assignedTeams,
-      unassignedTeams,
+      totalTeams: teams.length,
+      assignedTeams: assignedInPools,
+      orphanedAssignments: orphanedTeams.length,
+      unassignedTeams: teams.length - assignedInPools - orphanedTeams.length,
       poolCount: pools.length,
+      openPools: pools.filter((p) => !poolIsClosed(p)).length,
     };
-  }, [teams, pools]);
+  }, [teams, pools, poolById, orphanedTeams.length]);
 
-  const filteredTeams = useMemo(() => {
+  const releaseOrphanedTeams = useCallback(async () => {
+    if (orphanedTeams.length === 0) return;
+    const ok = window.confirm(
+      `${orphanedTeams.length} hold peger på en pulje der ikke findes. Frigør dem så de kan fordeles igen?`,
+    );
+    if (!ok) return;
+    setReleasingOrphans(true);
+    setActionError(null);
+    const result = await releaseOrphanedPoolTeamsAction(levelKey);
+    setReleasingOrphans(false);
+    if (!result.ok) {
+      setActionError(result.message);
+      return;
+    }
+    const orphanIds = new Set(orphanedTeams.map((t) => t.id));
+    setTeams((prev) => prev.map((t) => (orphanIds.has(t.id) ? { ...t, pool_id: null } : t)));
+    setActionMsg(result.message);
+    router.refresh();
+  }, [levelKey, orphanedTeams, router]);
+
+  const filteredUnassigned = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let rows = teamSummaries.filter((s) => {
-      if (statusFilter === "unassigned" && s.team.pool_id) return false;
-      if (statusFilter === "assigned" && !s.team.pool_id) return false;
-      if (!q) return true;
-      return s.team.name.toLowerCase().includes(q);
-    });
-
-    rows = [...rows].sort((a, b) => {
-      if (sortMode === "name") {
-        if (a.team.pool_id !== b.team.pool_id) return a.team.pool_id ? 1 : -1;
-        return a.team.name.localeCompare(b.team.name, "da", { sensitivity: "base" });
-      }
-      if (sortMode === "playerCount") {
-        if (b.playerCount !== a.playerCount) return b.playerCount - a.playerCount;
-        return a.team.name.localeCompare(b.team.name, "da", { sensitivity: "base" });
-      }
-      const aAge = a.avgAge ?? -1;
-      const bAge = b.avgAge ?? -1;
-      if (bAge !== aAge) return bAge - aAge;
-      return a.team.name.localeCompare(b.team.name, "da", { sensitivity: "base" });
-    });
-
-    return rows;
-  }, [teamSummaries, search, statusFilter, sortMode]);
+    let rows = unassignedTeams;
+    if (onlyUnassigned) rows = rows.filter((s) => !s.team.pool_id);
+    if (q) rows = rows.filter((s) => s.team.name.toLowerCase().includes(q));
+    return [...rows].sort((a, b) => a.team.name.localeCompare(b.team.name, "da", { sensitivity: "base" }));
+  }, [unassignedTeams, search, onlyUnassigned]);
 
   const poolRows = useMemo(() => {
     const byId = new Map<string, TeamSummary[]>();
     for (const p of pools) byId.set(p.id, []);
     for (const s of teamSummaries) {
       if (!s.team.pool_id) continue;
-      const list = byId.get(s.team.pool_id);
-      if (list) list.push(s);
+      byId.get(s.team.pool_id)?.push(s);
     }
     for (const list of byId.values()) {
       list.sort((a, b) => a.team.sort_order - b.team.sort_order || a.team.name.localeCompare(b.team.name, "da"));
     }
-    return pools.map((pool) => {
-      const teamsInPool = byId.get(pool.id) ?? [];
-      const avgTeamAge =
-        teamsInPool.length > 0
-          ? Math.round(
-              (teamsInPool.reduce((sum, t) => sum + (t.avgAge ?? 0), 0) / Math.max(1, teamsInPool.length)) * 10,
-            ) / 10
-          : null;
-      return { pool, teamsInPool, avgTeamAge };
-    });
+    return pools.map((pool) => ({
+      pool,
+      teamsInPool: byId.get(pool.id) ?? [],
+    }));
   }, [pools, teamSummaries]);
 
-  const previewTeamSummary = useMemo(
-    () => (previewTeamId ? teamSummaryById.get(previewTeamId) ?? null : null),
-    [previewTeamId, teamSummaryById],
-  );
-  const previewPlayers = useMemo(
-    () => (previewTeamId ? playersByTeam.get(previewTeamId) ?? [] : []),
-    [previewTeamId, playersByTeam],
-  );
+  const openPools = useMemo(() => pools.filter((p) => !poolIsClosed(p)), [pools]);
+  const closedPools = useMemo(() => pools.filter((p) => poolIsClosed(p)), [pools]);
 
-  const poolAgeMean = useMemo(() => {
-    const ages = poolRows.map((p) => p.avgTeamAge).filter((x): x is number => x != null);
-    if (ages.length === 0) return null;
-    return ages.reduce((s, a) => s + a, 0) / ages.length;
-  }, [poolRows]);
+  type PoolListItem = { kind: "pool"; pool: PoolRow; teamsInPool: TeamSummary[] } | { kind: "header" };
 
-  async function updateTeamPool(teamId: string, nextPoolId: string | null) {
+  const poolListItems = useMemo((): PoolListItem[] => {
+    const items: PoolListItem[] = [];
+    for (const row of poolRows.filter((r) => !poolIsClosed(r.pool))) {
+      items.push({ kind: "pool", pool: row.pool, teamsInPool: row.teamsInPool });
+    }
+    if (closedPools.length > 0) {
+      items.push({ kind: "header" });
+      for (const row of poolRows.filter((r) => poolIsClosed(r.pool))) {
+        items.push({ kind: "pool", pool: row.pool, teamsInPool: row.teamsInPool });
+      }
+    }
+    return items;
+  }, [poolRows, closedPools.length]);
+
+  const updateTeamPool = useCallback(async (teamId: string, nextPoolId: string | null) => {
+    if (nextPoolId) {
+      const pool = poolById.get(nextPoolId);
+      if (pool && poolIsClosed(pool)) {
+        setActionError("Puljen er lukket — åbn den igen for at tilføje hold.");
+        return;
+      }
+      const countInPool = teams.filter((t) => t.pool_id === nextPoolId).length;
+      if (countInPool >= POOL_MAX_TEAMS) {
+        setActionError(`Puljen har allerede ${POOL_MAX_TEAMS} hold (maksimum).`);
+        return;
+      }
+    }
+
     setBusyTeamIds((prev) => new Set(prev).add(teamId));
-    setActionMsg(null);
+    setActionError(null);
     const { error } = await supabase.from("teams").update({ pool_id: nextPoolId }).eq("id", teamId);
     setBusyTeamIds((prev) => {
       const n = new Set(prev);
@@ -223,120 +330,178 @@ export function PoolAssignmentWorkspace({
       return n;
     });
     if (error) {
-      setActionMsg(`Kunne ikke opdatere hold: ${error.message}`);
+      setActionError(error.message);
       return;
     }
     setTeams((prev) => prev.map((t) => (t.id === teamId ? { ...t, pool_id: nextPoolId } : t)));
-  }
+  }, [poolById, teams]);
 
-  async function createPool() {
+  const addTeamToActivePool = useCallback(
+    (teamId: string) => {
+      if (!activePoolId || activePoolClosed) return;
+      void updateTeamPool(teamId, activePoolId);
+    },
+    [activePoolId, activePoolClosed, updateTeamPool],
+  );
+
+  const createPool = useCallback(async () => {
     setCreatingPool(true);
-    setActionMsg(null);
-    const maxSort = pools.length > 0 ? Math.max(...pools.map((p) => p.sort_order)) : 0;
-    const name = `Pulje ${pools.length + 1}`;
-    const { data, error } = await supabase
-      .from("pools")
-      .insert({
-        event_id: TURNERING_EVENT_ID,
-        level: levelKey,
-        name,
-        sort_order: maxSort + 1,
-      })
-      .select("id, event_id, level, name, sort_order")
-      .single();
+    setActionError(null);
+    const result = await createPoolAction(levelKey);
     setCreatingPool(false);
-    if (error || !data) {
-      setActionMsg(`Kunne ikke oprette pulje: ${error?.message ?? "ukendt fejl"}`);
+    if (!result.ok || !result.pool) {
+      setActionError(result.message);
+      return;
+    }
+    const row: PoolRow = {
+      id: result.pool.id,
+      event_id: result.pool.event_id,
+      level: result.pool.level,
+      name: result.pool.name,
+      sort_order: result.pool.sort_order,
+      is_closed: result.pool.is_closed ?? false,
+      period_id: result.pool.period_id,
+    };
+    setPools((prev) => sortPoolsForDisplay([...prev, row]));
+    setActivePoolId(row.id);
+  }, [levelKey]);
+
+  const togglePoolClosed = useCallback(async (pool: PoolRow) => {
+    setActionError(null);
+    const next = !poolIsClosed(pool);
+    setBusy(true);
+    const { error } = await supabase.from("pools").update({ is_closed: next }).eq("id", pool.id);
+    setBusy(false);
+    if (error) {
+      setActionError(error.message);
       return;
     }
     setPools((prev) =>
-      [...prev, data as PoolRow].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "da")),
+      sortPoolsForDisplay(prev.map((p) => (p.id === pool.id ? { ...p, is_closed: next } : p))),
     );
-  }
-
-  async function runAutoPool() {
-    if (pools.length === 0) {
-      setActionMsg("Opret mindst én pulje først før AutoPulje kan køres.");
-      return;
-    }
-    const ok = window.confirm(
-      "AutoPulje vil kun fordele hold uden pulje. Hver pulje kan maksimalt have 6 hold. Vil du fortsætte?",
-    );
-    if (!ok) return;
-
-    setAutoPoolBusy(true);
-    setActionMsg(null);
-
-    const teamsSorted = [...teamSummaries]
-      .filter((t) => !t.team.pool_id)
-      .sort((a, b) => (b.avgAge ?? -1) - (a.avgAge ?? -1));
-
-    if (teamsSorted.length === 0) {
-      setAutoPoolBusy(false);
-      setActionMsg("Alle hold er allerede placeret i en pulje.");
-      return;
-    }
-
-    const poolState = new Map<string, { count: number; ageSum: number; ageKnownCount: number }>();
-    for (const row of poolRows) {
-      let ageSum = 0;
-      let ageKnownCount = 0;
-      for (const t of row.teamsInPool) {
-        if (t.avgAge != null) {
-          ageSum += t.avgAge;
-          ageKnownCount += 1;
-        }
-      }
-      poolState.set(row.pool.id, {
-        count: row.teamsInPool.length,
-        ageSum,
-        ageKnownCount,
+    if (next) {
+      setCollapsedPoolIds((prev) => new Set(prev).add(pool.id));
+    } else {
+      setCollapsedPoolIds((prev) => {
+        const s = new Set(prev);
+        s.delete(pool.id);
+        return s;
       });
     }
+  }, []);
+
+  const deletePool = useCallback(
+    async (pool: PoolRow, teamCount: number) => {
+      const ok = window.confirm(
+        teamCount > 0
+          ? `${pool.name}: ${teamCount} hold flyttes til listen til venstre. Slet puljen?`
+          : `Slet ${pool.name}?`,
+      );
+      if (!ok) return;
+      setBusy(true);
+      setActionError(null);
+      if (teamCount > 0) {
+        const clearRes = await supabase
+          .from("teams")
+          .update({ pool_id: null })
+          .eq("pool_id", pool.id);
+        if (clearRes.error) {
+          setBusy(false);
+          setActionError(clearRes.error.message);
+          return;
+        }
+        setTeams((prev) => prev.map((t) => (t.pool_id === pool.id ? { ...t, pool_id: null } : t)));
+      }
+      const delRes = await supabase.from("pools").delete().eq("id", pool.id);
+      setBusy(false);
+      if (delRes.error) {
+        setActionError(delRes.error.message);
+        return;
+      }
+      setPools((prev) => prev.filter((p) => p.id !== pool.id));
+      if (activePoolId === pool.id) {
+        setActivePoolId(openPools.find((p) => p.id !== pool.id)?.id ?? null);
+      }
+    },
+    [activePoolId, openPools],
+  );
+
+  const runAutoPool = useCallback(async () => {
+    const targetPerPool = hint.recommendedTeamCount;
+    if (unassignedTeams.length === 0) {
+      setActionError("Ingen hold uden pulje at fordele.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `AutoPulje fordeler hold uden pulje på åbne puljer (op til ${targetPerPool} hold pr. pulje fra Opsætning → Kampe). Nye puljer oprettes ved behov. Fortsæt?`,
+      )
+    ) {
+      return;
+    }
+    setAutoPoolBusy(true);
+    setActionError(null);
+
+    const teamsSorted = [...unassignedTeams].sort((a, b) => (b.avgAge ?? -1) - (a.avgAge ?? -1));
+    const poolState = new Map<string, number>();
+    const openPoolIds = new Set(openPools.map((p) => p.id));
+    for (const p of openPools) {
+      poolState.set(p.id, teams.filter((t) => t.pool_id === p.id).length);
+    }
+
+    const newPools: PoolRow[] = [];
+
+    const pickPoolWithRoom = (): string | null => {
+      let best: { poolId: string; count: number } | null = null;
+      for (const [poolId, count] of poolState.entries()) {
+        if (!openPoolIds.has(poolId)) continue;
+        if (count >= targetPerPool) continue;
+        if (!best || count < best.count) best = { poolId, count };
+      }
+      return best?.poolId ?? null;
+    };
+
+    const createOpenPool = async (): Promise<string | null> => {
+      const result = await createPoolAction(levelKey, { revalidate: false });
+      if (!result.ok || !result.pool) {
+        setActionError(result.message);
+        return null;
+      }
+      const row: PoolRow = {
+        id: result.pool.id,
+        event_id: result.pool.event_id,
+        level: result.pool.level,
+        name: result.pool.name,
+        sort_order: result.pool.sort_order,
+        is_closed: result.pool.is_closed ?? false,
+        period_id: result.pool.period_id,
+      };
+      newPools.push(row);
+      openPoolIds.add(row.id);
+      poolState.set(row.id, 0);
+      return row.id;
+    };
 
     const assignments: Array<{ teamId: string; poolId: string }> = [];
-    let skippedForCapacity = 0;
-    for (const t of teamsSorted) {
-      let best: {
-        poolId: string;
-        count: number;
-        ageDistance: number;
-        ageKnownCount: number;
-      } | null = null;
-      for (const [poolId, st] of poolState.entries()) {
-        if (st.count >= POOL_TEAM_CAPACITY) continue;
-        const teamAge = t.avgAge;
-        const poolAge = st.ageKnownCount > 0 ? st.ageSum / st.ageKnownCount : null;
-        const ageDistance =
-          teamAge == null || poolAge == null ? 0 : Math.abs(teamAge - poolAge);
+    let skipped = 0;
 
-        if (
-          !best ||
-          ageDistance < best.ageDistance ||
-          (ageDistance === best.ageDistance && st.count < best.count) ||
-          (ageDistance === best.ageDistance &&
-            st.count === best.count &&
-            st.ageKnownCount < best.ageKnownCount)
-        ) {
-          best = { poolId, count: st.count, ageDistance, ageKnownCount: st.ageKnownCount };
+    for (const s of teamsSorted) {
+      let poolId = pickPoolWithRoom();
+      if (!poolId) {
+        poolId = await createOpenPool();
+        if (!poolId) {
+          skipped += teamsSorted.length - assignments.length;
+          break;
         }
       }
-      if (!best) {
-        skippedForCapacity += 1;
-        continue;
-      }
-      assignments.push({ teamId: t.team.id, poolId: best.poolId });
-      const st = poolState.get(best.poolId)!;
-      st.count += 1;
-      if (t.avgAge != null) {
-        st.ageSum += t.avgAge;
-        st.ageKnownCount += 1;
-      }
+      const count = poolState.get(poolId) ?? 0;
+      assignments.push({ teamId: s.team.id, poolId });
+      poolState.set(poolId, count + 1);
     }
 
     if (assignments.length === 0) {
       setAutoPoolBusy(false);
-      setActionMsg(`Ingen ledig puljekapacitet. Hver pulje har allerede ${POOL_TEAM_CAPACITY} hold.`);
+      setActionError("Kunne ikke fordele hold — tjek Opsætning → Kampe og prøv igen.");
       return;
     }
 
@@ -344,446 +509,415 @@ export function PoolAssignmentWorkspace({
       assignments.map((a) => supabase.from("teams").update({ pool_id: a.poolId }).eq("id", a.teamId)),
     );
     setAutoPoolBusy(false);
-    const firstErr = updates.find((r) => r.error)?.error;
-    if (firstErr) {
-      setActionMsg(`AutoPulje fejlede: ${firstErr.message}`);
+    const err = updates.find((r) => r.error)?.error;
+    if (err) {
+      setActionError(err.message);
       return;
     }
 
-    const assignMap = new Map(assignments.map((a) => [a.teamId, a.poolId]));
-    setTeams((prev) => prev.map((t) => ({ ...t, pool_id: assignMap.get(t.id) ?? t.pool_id })));
+    if (newPools.length > 0) {
+      setPools((prev) => sortPoolsForDisplay([...prev, ...newPools]));
+      setActivePoolId((current) => current ?? newPools[0]?.id ?? null);
+      router.refresh();
+    }
+
+    const map = new Map(assignments.map((a) => [a.teamId, a.poolId]));
+    setTeams((prev) => prev.map((t) => ({ ...t, pool_id: map.get(t.id) ?? t.pool_id })));
+
+    const createdNote =
+      newPools.length > 0 ? ` ${newPools.length} ${newPools.length === 1 ? "ny pulje" : "nye puljer"} oprettet.` : "";
     setActionMsg(
-      skippedForCapacity > 0
-        ? `AutoPulje gennemført: ${assignments.length} hold fordelt, ${skippedForCapacity} mangler plads (max ${POOL_TEAM_CAPACITY} pr. pulje).`
-        : `AutoPulje gennemført: ${assignments.length} hold fordelt.`,
+      skipped > 0
+        ? `AutoPulje: ${assignments.length} hold fordelt (${targetPerPool} pr. pulje).${createdNote} ${skipped} hold kunne ikke placeres.`
+        : `AutoPulje: ${assignments.length} hold fordelt (${targetPerPool} pr. pulje).${createdNote}`,
     );
-  }
-
-  function togglePoolCollapsed(poolId: string) {
-    setCollapsedPoolIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(poolId)) next.delete(poolId);
-      else next.add(poolId);
-      return next;
-    });
-  }
-
-  async function deletePool(pool: PoolRow, teamCount: number) {
-    const ok = window.confirm(
-      teamCount > 0
-        ? `${pool.name} indeholder ${teamCount} hold. Holdene bliver sat til "Uden pulje". Vil du slette puljen?`
-        : `Vil du slette ${pool.name}?`,
-    );
-    if (!ok) return;
-
-    setActionMsg(null);
-    setDeletingPoolIds((prev) => new Set(prev).add(pool.id));
-
-    if (teamCount > 0) {
-      const clearRes = await supabase
-        .from("teams")
-        .update({ pool_id: null })
-        .eq("event_id", TURNERING_EVENT_ID)
-        .eq("pool_id", pool.id);
-      if (clearRes.error) {
-        setDeletingPoolIds((prev) => {
-          const next = new Set(prev);
-          next.delete(pool.id);
-          return next;
-        });
-        setActionMsg(`Kunne ikke frigøre hold fra pulje: ${clearRes.error.message}`);
-        return;
-      }
-    }
-
-    const delRes = await supabase.from("pools").delete().eq("id", pool.id);
-    setDeletingPoolIds((prev) => {
-      const next = new Set(prev);
-      next.delete(pool.id);
-      return next;
-    });
-    if (delRes.error) {
-      setActionMsg(`Kunne ikke slette pulje: ${delRes.error.message}`);
-      return;
-    }
-
-    setTeams((prev) => prev.map((t) => (t.pool_id === pool.id ? { ...t, pool_id: null } : t)));
-    setPools((prev) => prev.filter((p) => p.id !== pool.id));
-    setCollapsedPoolIds((prev) => {
-      const next = new Set(prev);
-      next.delete(pool.id);
-      return next;
-    });
-    setActionMsg(`${pool.name} er slettet.`);
-  }
+  }, [hint.recommendedTeamCount, levelKey, openPools, pools, router, teams, unassignedTeams]);
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Hold i alt" value={kpi.totalTeams} />
-        <Kpi label="Fordelt i puljer" value={kpi.assignedTeams} accent />
-        <Kpi label="Uden pulje" value={kpi.unassignedTeams} />
-        <Kpi label="Puljer" value={kpi.poolCount} />
+    <div className="flex min-h-0 flex-1 flex-col gap-8">
+      <section className="grid shrink-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi label="Hold i niveau" value={kpi.totalTeams} accent="teal" />
+        <Kpi label="I puljer" value={kpi.assignedTeams} accent="blue" />
+        <Kpi label="Uden pulje" value={kpi.unassignedTeams} accent="slate" />
+        <Kpi label="Puljer (åbne)" value={`${kpi.openPools}/${kpi.poolCount}`} accent="teal" />
       </section>
 
-      <section className="rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[14rem] flex-1">
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Søg hold
-            </label>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Søg efter holdnavn …"
-              className="w-full rounded-lg border border-lc-border bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition-colors focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            />
-          </div>
-          <div className="min-w-[12rem]">
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Status
-            </label>
-            <StyledSelect
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as FilterStatus)}
-              className="rounded-lg border border-lc-border bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            >
-              <option value="all">Alle hold</option>
-              <option value="unassigned">Kun uden pulje</option>
-              <option value="assigned">Kun fordelt</option>
-            </StyledSelect>
-          </div>
-          <div className="min-w-[12rem]">
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Sortering
-            </label>
-            <StyledSelect
-              value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="rounded-lg border border-lc-border bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            >
-              <option value="name">Holdnavn</option>
-              <option value="avgAge">Gns. alder</option>
-              <option value="playerCount">Spillerantal</option>
-            </StyledSelect>
-          </div>
-        </div>
-      </section>
+      <div className="shrink-0 rounded-lg border border-teal-200/80 bg-teal-50/60 px-4 py-3 text-sm text-teal-950 dark:border-teal-900/40 dark:bg-teal-950/25 dark:text-teal-100">
+        <p>
+          Plan fra{" "}
+          <Link href="/turnering/baner" className="font-semibold underline-offset-2 hover:underline">
+            Opsætning → Kampe
+          </Link>
+          : <strong className="tabular-nums">{hint.matchesPerTeam}</strong> kampe/hold. I en pulje med alle-mod-alle
+          spiller hvert hold <em>n−1</em> kampe — anbefalet{" "}
+          <strong className="tabular-nums">{hint.recommendedTeamCount}</strong> hold pr. pulje (max {POOL_MAX_TEAMS}).
+        </p>
+      </div>
 
-      {actionMsg ? (
-        <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100">
-          {actionMsg}
+      {orphanedTeams.length > 0 ? (
+        <div className="shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/35 dark:text-amber-100">
+          <p>
+            <strong className="tabular-nums">{orphanedTeams.length}</strong> hold er markeret som placeret i en pulje,
+            men puljen vises ikke (slettet eller gammel data).
+          </p>
+          <button
+            type="button"
+            disabled={releasingOrphans || busy}
+            onClick={() => void releaseOrphanedTeams()}
+            className="mt-2 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100"
+          >
+            {releasingOrphans ? "Frigør…" : `Frigør ${orphanedTeams.length} hold`}
+          </button>
         </div>
       ) : null}
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="space-y-3 rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Hold</h2>
-          {filteredTeams.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50/70 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
-              Ingen hold matcher filtrene.
+      {actionError ? (
+        <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+          {actionError}
+        </div>
+      ) : null}
+      {actionMsg ? (
+        <div className="shrink-0 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100">
+          {actionMsg}
+          <button type="button" className="ml-2 underline" onClick={() => setActionMsg(null)}>
+            OK
+          </button>
+        </div>
+      ) : null}
+
+      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-8">
+        {/* Venstre: hold uden pulje */}
+        <section className="flex min-h-0 min-w-0 flex-col rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none sm:p-5 lg:min-h-0 lg:flex-1">
+          <h2 className="shrink-0 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Hold uden pulje
+          </h2>
+          <p className="mt-1 shrink-0 text-xs text-gray-500 dark:text-gray-400">
+            Vælg en aktiv pulje til højre og klik på et hold for at tilføje det.
+            {activePool ? (
+              <>
+                {" "}
+                Aktiv pulje:{" "}
+                <span className="font-medium text-gray-700 dark:text-gray-300">{activePool.name}</span>
+              </>
+            ) : (
+              " Opret eller vælg en pulje først."
+            )}
+          </p>
+
+          {activePoolId && !activePoolClosed ? (
+            <div className="mt-2 shrink-0 rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-900 shadow-sm dark:border-teal-700 dark:bg-teal-950/40 dark:text-teal-100">
+              Aktiv pulje: {activePool?.name} · Hold tilføjes her
+            </div>
+          ) : activePoolClosed ? (
+            <p className="mt-2 shrink-0 text-xs text-amber-800 dark:text-amber-200">
+              {activePool?.name} er lukket — vælg en åben pulje eller genåbn den.
             </p>
-          ) : (
-            <ul className="space-y-2">
-              {filteredTeams.map((s) => {
-                const busy = busyTeamIds.has(s.team.id);
+          ) : null}
+
+          <div className="mt-4 shrink-0">
+            <label
+              htmlFor="puljer-search"
+              className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+            >
+              Søg
+            </label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                strokeWidth={2}
+                aria-hidden
+              />
+              <input
+                id="puljer-search"
+                type="search"
+                placeholder="Holdnavn…"
+                autoComplete="off"
+                className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <label className="mt-3 flex shrink-0 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              type="checkbox"
+              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              checked={onlyUnassigned}
+              onChange={(e) => setOnlyUnassigned(e.target.checked)}
+            />
+            Vis kun hold uden pulje
+          </label>
+
+          <ul className="mt-4 min-h-0 space-y-2 overflow-y-auto pr-1 max-lg:max-h-[min(520px,65vh)] lg:flex-1">
+            {filteredUnassigned.length === 0 ? (
+              <li className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                {unassignedTeams.length === 0
+                  ? orphanedTeams.length > 0
+                    ? "Ingen hold i listen til venstre — men nogle hold mangler en synlig pulje (se advarsel ovenfor)."
+                    : "Alle hold er placeret i puljer."
+                  : "Ingen hold matcher søgningen."}
+              </li>
+            ) : (
+              filteredUnassigned.map((s) => {
+                const canClick = Boolean(activePoolId) && !activePoolClosed && !busyTeamIds.has(s.team.id);
+                const detail = teamDetailsById.get(s.team.id);
                 return (
-                  <li
-                    key={s.team.id}
-                    className="rounded-lg border border-gray-200/90 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/70"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-medium text-gray-900 dark:text-white">{s.team.name}</p>
-                      <span
-                        title={s.team.pool_id ? "Holdet er placeret i en pulje." : "Holdet er endnu ikke placeret i en pulje."}
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          s.team.pool_id
-                            ? "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                        }`}
-                      >
-                        {s.team.pool_id ? "I pulje" : "Uden pulje"}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {s.playerCount} spillere · gns. alder {fmtAge(s.avgAge)} · {s.clubCount} klubber
-                    </p>
-                    <div className="mt-2 flex items-center gap-2">
+                  <li key={s.team.id}>
+                    <TeamRowWithPlayers
+                      detail={detail ?? { teamName: s.team.name, nickname: null, players: [], coaches: [] }}
+                      onShowDetail={() => setPreviewTeamId(s.team.id)}
+                    >
                       <button
                         type="button"
-                        onClick={() => setPreviewTeamId(s.team.id)}
-                        className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                        disabled={!canClick}
+                        onClick={() => addTeamToActivePool(s.team.id)}
+                        className={`w-full px-3 py-2.5 text-left text-sm transition-colors ${
+                          canClick
+                            ? "cursor-pointer hover:bg-teal-50/60 dark:hover:bg-teal-950/25"
+                            : "cursor-not-allowed bg-gray-50/80 opacity-80 dark:bg-gray-800/40"
+                        }`}
                       >
-                        Se spillere
+                        <p className="font-medium text-gray-900 dark:text-white">{s.team.name}</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {s.playerCount} spillere · gns. {fmtAge(s.avgAge)} år · {s.clubCount} klubber
+                        </p>
                       </button>
-                      <StyledSelect
-                        disabled={busy}
-                        value={s.team.pool_id ?? ""}
-                        onChange={(e) => void updateTeamPool(s.team.id, e.target.value || null)}
-                        className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                      >
-                        <option value="">Uden pulje</option>
-                        {pools.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </StyledSelect>
+                    </TeamRowWithPlayers>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </section>
+
+        {/* Højre: puljer */}
+        <section className="flex min-h-0 min-w-0 flex-col space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Puljer</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void runAutoPool()}
+                disabled={autoPoolBusy || busy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100 disabled:opacity-50 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200"
+              >
+                <Sparkles className="h-4 w-4" aria-hidden />
+                {autoPoolBusy ? "Kører…" : "AutoPulje"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void createPool()}
+                disabled={creatingPool || busy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#0f766e] disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                {creatingPool ? "Opretter…" : "Opret pulje"}
+              </button>
+            </div>
+          </div>
+
+          {activePoolId ? (
+            <div className="shrink-0 rounded-xl border-2 border-teal-400 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-900 shadow-sm dark:border-teal-600 dark:bg-teal-950/40 dark:text-teal-100">
+              Valgt pulje: {activePool?.name}
+            </div>
+          ) : null}
+
+          {pools.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-4 py-10 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800/40 dark:text-gray-400">
+              Ingen puljer endnu. Klik &quot;Opret pulje&quot; for at starte.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {poolListItems.map((item) => {
+                if (item.kind === "header") {
+                  return (
+                    <li key="_lukkede" className="list-none pt-1">
+                      <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Lukkede puljer
+                      </p>
+                    </li>
+                  );
+                }
+
+                const { pool, teamsInPool } = item;
+                const closed = poolIsClosed(pool);
+                const collapsed = collapsedPoolIds.has(pool.id);
+                const active = pool.id === activePoolId;
+
+                return (
+                  <li
+                    key={pool.id}
+                    className={`overflow-visible rounded-xl border bg-white shadow-sm transition-colors dark:bg-gray-900/35 dark:shadow-none ${
+                      closed
+                        ? active
+                          ? "border-teal-500 ring-2 ring-teal-500/25"
+                          : "border-emerald-200 dark:border-emerald-900/40"
+                        : active
+                          ? "border-teal-500 ring-4 ring-teal-500/35"
+                          : "border-lc-border dark:border-gray-700"
+                    }`}
+                  >
+                    {closed ? (
+                      <p className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-100">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+                        Pulje lukket — genåbn for at tilføje eller fjerne hold
+                      </p>
+                    ) : null}
+
+                    <div className="p-3 sm:p-4">
+                      {active && !closed ? (
+                        <p className="mb-3 rounded-lg border border-teal-300 bg-teal-50 px-3 py-1.5 text-[0.7rem] font-bold uppercase tracking-wide text-teal-900 dark:border-teal-700 dark:bg-teal-950/45 dark:text-teal-100">
+                          Aktiv pulje · Klik hold til venstre for at tilføje
+                        </p>
+                      ) : null}
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          aria-expanded={!collapsed}
+                          onClick={() =>
+                            setCollapsedPoolIds((prev) => {
+                              const s = new Set(prev);
+                              if (s.has(pool.id)) s.delete(pool.id);
+                              else s.add(pool.id);
+                              return s;
+                            })
+                          }
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        >
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+                            aria-hidden
+                          />
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <button type="button" onClick={() => setActivePoolId(pool.id)} className="w-full text-left">
+                            <h3
+                              className={`text-base font-semibold ${closed ? "text-emerald-950 dark:text-emerald-50" : "text-gray-900 dark:text-white"}`}
+                            >
+                              {pool.name}
+                            </h3>
+                          </button>
+                          <PoolCapacityHint teamCount={teamsInPool.length} hint={hint} />
+                        </div>
+                      </div>
+
+                      {!collapsed ? (
+                        <>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void togglePoolClosed(pool)}
+                              className={`rounded-md px-2.5 py-1.5 text-xs font-medium ${
+                                closed
+                                  ? "border border-gray-200 bg-white text-gray-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                                  : "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200"
+                              }`}
+                            >
+                              {closed ? "Genåbn pulje" : "Luk pulje"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void deletePool(pool, teamsInPool.length)}
+                              className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200"
+                            >
+                              Slet pulje
+                            </button>
+                          </div>
+
+                          {teamsInPool.length === 0 ? (
+                            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">Ingen hold i puljen endnu.</p>
+                          ) : (
+                            <ul className="mt-3 space-y-2">
+                              {teamsInPool.map((s) => {
+                                const teamBusy = busyTeamIds.has(s.team.id);
+                                const detail = teamDetailsById.get(s.team.id);
+                                return (
+                                  <li key={s.team.id}>
+                                    <TeamRowWithPlayers
+                                      detail={
+                                        detail ?? {
+                                          teamName: s.team.name,
+                                          nickname: null,
+                                          players: [],
+                                          coaches: [],
+                                        }
+                                      }
+                                      onShowDetail={() => setPreviewTeamId(s.team.id)}
+                                    >
+                                      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                            {s.team.name}
+                                          </p>
+                                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            {s.playerCount} spillere · {fmtAge(s.avgAge)} år
+                                          </p>
+                                        </div>
+                                        {!closed ? (
+                                          <button
+                                            type="button"
+                                            disabled={teamBusy}
+                                            onClick={() => void updateTeamPool(s.team.id, null)}
+                                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                                          >
+                                            <X className="h-3 w-3" aria-hidden />
+                                            Fjern
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                    </TeamRowWithPlayers>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </>
+                      ) : null}
                     </div>
                   </li>
                 );
               })}
             </ul>
           )}
-        </div>
+        </section>
+      </div>
 
-        <div className="space-y-4 rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Puljer</h2>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void runAutoPool()}
-                disabled={autoPoolBusy}
-                className="inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-800 transition-colors hover:bg-sky-100 disabled:opacity-60 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200 dark:hover:bg-sky-950/50"
-              >
-                <Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                {autoPoolBusy ? "Kører…" : "AutoPulje"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void createPool()}
-                disabled={creatingPool}
-                className="inline-flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1.5 text-xs font-medium text-teal-800 transition-colors hover:bg-teal-100 disabled:opacity-60 dark:border-teal-900/50 dark:bg-teal-950/30 dark:text-teal-200 dark:hover:bg-teal-950/50"
-              >
-                <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                {creatingPool ? "Opretter…" : "Opret pulje"}
-              </button>
-            </div>
-          </div>
-
-          {poolRows.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50/70 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
-              Ingen puljer oprettet endnu.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {poolRows.map(({ pool, teamsInPool, avgTeamAge }) => {
-                const imbalance =
-                  poolAgeMean != null && avgTeamAge != null ? Math.abs(avgTeamAge - poolAgeMean) >= 2 : false;
-                const collapsed = collapsedPoolIds.has(pool.id);
-                const deleting = deletingPoolIds.has(pool.id);
-                return (
-                  <section
-                    key={pool.id}
-                    className="rounded-lg border border-gray-200/90 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/70"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => togglePoolCollapsed(pool.id)}
-                        className="inline-flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                        aria-expanded={!collapsed}
-                        aria-controls={`pool-${pool.id}`}
-                      >
-                        <ChevronDown
-                          className={`h-4 w-4 shrink-0 text-gray-500 transition-transform dark:text-gray-400 ${collapsed ? "-rotate-90" : ""}`}
-                          aria-hidden
-                        />
-                        <span className="truncate font-medium text-gray-900 dark:text-white">{pool.name}</span>
-                      </button>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <span>{teamsInPool.length} hold</span>
-                        <span
-                          title={`Kapacitet i puljen: ${teamsInPool.length} af ${POOL_TEAM_CAPACITY} hold.`}
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${
-                            teamsInPool.length >= POOL_TEAM_CAPACITY
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                              : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                          }`}
-                        >
-                          {teamsInPool.length}/{POOL_TEAM_CAPACITY}
-                        </span>
-                        <span>· gns. holdalder {fmtAge(avgTeamAge)}</span>
-                        {imbalance ? (
-                          <span
-                            title="Puljens gennemsnitlige holdalder afviger markant fra de andre puljer i niveauet."
-                            className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                          >
-                            <AlertTriangle className="h-3 w-3" aria-hidden />
-                            Ujævn alder
-                          </span>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => void deletePool(pool, teamsInPool.length)}
-                          disabled={deleting}
-                          className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200 dark:hover:bg-red-950/45"
-                        >
-                          {deleting ? "Sletter…" : "Slet pulje"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {collapsed ? null : teamsInPool.length === 0 ? (
-                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Ingen hold i denne pulje endnu.</p>
-                    ) : (
-                      <ul id={`pool-${pool.id}`} className="mt-2 space-y-2">
-                        {teamsInPool.map((s) => {
-                          const busy = busyTeamIds.has(s.team.id);
-                          return (
-                            <li key={s.team.id} className="rounded-md border border-gray-100 p-2 dark:border-gray-800">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">{s.team.name}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  {s.playerCount} spillere · {fmtAge(s.avgAge)} år
-                                </p>
-                              </div>
-                              <div className="mt-2 flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewTeamId(s.team.id)}
-                                  className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-                                >
-                                  Se spillere
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void updateTeamPool(s.team.id, null)}
-                                  className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-                                >
-                                  Fjern
-                                </button>
-                                <StyledSelect
-                                  disabled={busy}
-                                  value={s.team.pool_id ?? ""}
-                                  onChange={(e) => void updateTeamPool(s.team.id, e.target.value || null)}
-                                  className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-800 outline-none focus:border-[#14b8a6] focus:ring-2 focus:ring-[#14b8a6]/20 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                                >
-                                  <option value="">Uden pulje</option>
-                                  {pools.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                      {p.name}
-                                    </option>
-                                  ))}
-                                </StyledSelect>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </section>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <TeamPlayersModal
-        open={Boolean(previewTeamSummary)}
+      <TeamDetailModal
+        open={Boolean(previewDetail)}
         onClose={() => setPreviewTeamId(null)}
-        teamName={previewTeamSummary?.team.name ?? ""}
-        playerCount={previewTeamSummary?.playerCount ?? 0}
-        players={previewPlayers}
+        detail={
+          previewDetail ?? { teamName: "", nickname: null, players: [], coaches: [] }
+        }
+        playerCount={previewDetail?.playerCount ?? 0}
       />
     </div>
   );
 }
 
-function Kpi({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
+
+function Kpi({
+  label,
+  value,
+  accent = "slate",
+}: {
+  label: string;
+  value: number | string;
+  accent?: "teal" | "blue" | "slate";
+}) {
+  const valueClass =
+    accent === "teal"
+      ? "text-[#0f766e] dark:text-teal-300"
+      : accent === "blue"
+        ? "text-[#1d4ed8] dark:text-blue-300"
+        : "text-gray-900 dark:text-white";
   return (
     <div className="rounded-lg border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-      <p
-        className={`mt-2 text-2xl font-semibold tabular-nums tracking-tight ${
-          accent ? "text-[#0f766e] dark:text-teal-300" : "text-gray-900 dark:text-white"
-        }`}
-      >
-        {value}
-      </p>
+      <p className={`mt-2 text-2xl font-semibold tabular-nums tracking-tight ${valueClass}`}>{value}</p>
     </div>
   );
 }
-
-function TeamPlayersModal({
-  open,
-  onClose,
-  teamName,
-  playerCount,
-  players,
-}: {
-  open: boolean;
-  onClose: () => void;
-  teamName: string;
-  playerCount: number;
-  players: Array<{ id: string; name: string; age: number | null; club: string | null }>;
-}) {
-  if (!open) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]"
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="w-full max-w-lg rounded-xl border border-lc-border bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Spillere på ${teamName}`}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-lc-border px-5 py-4 dark:border-gray-700">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#0d9488] dark:text-teal-400">
-              Team detaljer
-            </p>
-            <h3 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{teamName}</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {playerCount} {playerCount === 1 ? "spiller" : "spillere"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-            aria-label="Luk spillerliste"
-          >
-            <X className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-          </button>
-        </div>
-
-        <div className="max-h-[55vh] overflow-y-auto px-5 py-4">
-          {players.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-400">
-              Ingen spillere fundet på holdet.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {players.map((p) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5 dark:border-gray-700"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{p.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{p.club || "—"}</p>
-                  </div>
-                  <p className="shrink-0 text-xs font-medium tabular-nums text-gray-500 dark:text-gray-400">
-                    {p.age == null ? "— år" : `${p.age} år`}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
