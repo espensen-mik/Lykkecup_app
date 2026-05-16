@@ -129,6 +129,10 @@ function GuideSections() {
             <strong>Kampprogram</strong> — samlet oversigt over alle kampe (per bane eller kronologisk efter runder), når
             Turneringsplan er på plads.
           </li>
+          <li>
+            <strong>LykkeCup Check</strong> — live tjek af spillere på hold, kampe pr. hold/spiller, puljer, synkronisering
+            og planlægning (under Kampprogram i menuen).
+          </li>
         </ul>
       </section>
 

@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardList,
+  ShieldCheck,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -267,7 +268,8 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       return pathname === "/turnering/puljer" || pathname.startsWith("/turnering/puljer/");
     if (href === "/turnering/plan")
       return pathname === "/turnering/plan" || pathname.startsWith("/turnering/plan/");
-    if (href === "/kampprogram") return pathname.startsWith("/kampprogram");
+    if (href === "/kampprogram") return pathname === "/kampprogram";
+    if (href === "/kampprogram/check") return pathname.startsWith("/kampprogram/check");
     if (href === "/admin") return pathname === "/admin" || pathname === "/dashboard";
     if (href === "/beskeder") return pathname === "/beskeder";
     if (href === "/app-indhold") return pathname === "/app-indhold" || pathname.startsWith("/app-indhold/");
@@ -774,6 +776,40 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             aria-hidden
           />
           <span className="truncate">Kampprogram</span>
+        </Link>
+
+        <Link
+          href="/kampprogram/check"
+          onClick={(e) => {
+            if (turneringLocked) {
+              e.preventDefault();
+              return;
+            }
+            setMobileOpen(false);
+          }}
+          aria-disabled={turneringLocked}
+          tabIndex={turneringLocked ? -1 : undefined}
+          title={turneringLocked ? turneringLockedHint : undefined}
+          className={`flex items-center gap-3 rounded-md border-l-2 py-2 pr-3 text-[0.8125rem] font-medium transition-colors ${
+            turneringLocked
+              ? "cursor-not-allowed border-transparent pl-6 text-gray-400 dark:text-gray-500"
+              : isActive("/kampprogram/check")
+                ? "border-[#14b8a6] bg-teal-50/90 pl-[22px] text-[#0f766e] dark:border-teal-400 dark:bg-teal-950/40 dark:text-teal-200"
+                : "border-transparent pl-6 text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
+          }`}
+        >
+          <ShieldCheck
+            className={`h-3.5 w-3.5 shrink-0 ${
+              turneringLocked
+                ? "text-gray-400 dark:text-gray-500"
+                : isActive("/kampprogram/check")
+                  ? "text-[#0f766e] dark:text-teal-300"
+                  : "text-gray-400 dark:text-gray-500"
+            }`}
+            strokeWidth={2}
+            aria-hidden
+          />
+          <span className="truncate">LykkeCup Check</span>
         </Link>
 
         <div className="mt-auto shrink-0 pb-1 pt-4">

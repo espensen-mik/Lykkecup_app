@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import { KampprogramWorkspace } from "@/components/kampprogram/kampprogram-workspace";
 import { fetchKampprogramBundle } from "@/lib/kampprogram-server";
 
@@ -36,6 +38,13 @@ export default async function KampprogramPage() {
           Samlet overblik over alle turneringskampe. Se programmet per bane eller kronologisk efter runder, når kampe er
           genereret og planlagt under Turneringsplan.
         </p>
+        <Link
+          href="/kampprogram/check"
+          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-lc-border bg-white px-3.5 py-2 text-sm font-medium text-[#0f766e] shadow-sm transition hover:border-teal-200 hover:bg-teal-50/80 dark:border-gray-600 dark:bg-gray-900/50 dark:text-teal-300 dark:hover:bg-teal-950/30"
+        >
+          <ShieldCheck className="h-4 w-4" strokeWidth={2} aria-hidden />
+          LykkeCup Check
+        </Link>
       </header>
 
       <div className="overflow-hidden rounded-lg border border-lc-border bg-white shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
