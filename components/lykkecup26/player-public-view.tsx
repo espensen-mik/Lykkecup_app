@@ -41,7 +41,7 @@ function MatchScheduleCard({ match }: { match: Lc26PublicMatch }) {
             <span className="text-[10px] font-bold uppercase tracking-[0.14em]">Hvornår</span>
           </div>
           {timeLabel ? (
-            <p className="mt-2 text-[1.75rem] font-bold leading-none tracking-tight text-lc26-navy tabular-nums sm:text-[2rem]">
+            <p className="mt-2 text-xl font-bold leading-none tracking-tight text-lc26-navy tabular-nums sm:text-2xl">
               kl. {timeLabel}
             </p>
           ) : (
@@ -139,11 +139,36 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
                 </p>
               </div>
             ) : (
-              <ul className="mt-4 space-y-4">
-            {matches.map((m) => (
-              <MatchScheduleCard key={m.id} match={m} />
-            ))}
-          </ul>
+              <ul className="mt-4 space-y-3">
+                {teammates.map((t) => {
+                  const isSelf = t.id === currentPlayerId;
+                  return (
+                    <li
+                      key={t.id}
+                      className={`flex flex-wrap items-baseline justify-between gap-2 rounded-xl border px-4 py-3.5 ${
+                        isSelf
+                          ? "border-lc26-teal/40 bg-lc26-teal/[0.06]"
+                          : "border-stone-200/90 bg-white shadow-sm"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium text-lc26-navy">
+                          {t.name}
+                          {isSelf ? (
+                            <span className="ml-2 rounded-full bg-lc26-teal/15 px-2 py-0.5 text-xs font-semibold text-lc26-teal">
+                              Dig
+                            </span>
+                          ) : null}
+                        </span>
+                        <p className="mt-1 text-sm text-lc26-navy/50">
+                          {t.home_club?.trim() || "—"} ·{" "}
+                          {t.age != null && !Number.isNaN(t.age) ? `${t.age} år` : "Alder —"}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </section>
 
