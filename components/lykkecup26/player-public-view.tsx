@@ -1,8 +1,8 @@
-import { ArrowLeft, Calendar } from "lucide-react";
+import { ArrowLeft, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-player-controls";
-import { formatDaDateTime } from "@/lib/datetime";
-import type { Lc26PlayerPageData } from "@/lib/lykkecup26-public";
+import { formatDaTimeOnly } from "@/lib/datetime";
+import type { Lc26PlayerPageData, Lc26PublicMatch } from "@/lib/lykkecup26-public";
 
 type Props = {
   data: Lc26PlayerPageData;
@@ -10,6 +10,67 @@ type Props = {
 };
 
 const sectionTitle = "text-lg font-semibold tracking-[-0.02em] text-lc26-navy";
+
+function matchLocationParts(match: Lc26PublicMatch): { primary: string; secondary: string | null } {
+  const court = match.courtName?.trim();
+  const venue = match.venueName?.trim();
+  if (court && venue) return { primary: court, secondary: venue };
+  if (court) return { primary: court, secondary: null };
+  if (venue) return { primary: venue, secondary: null };
+  return { primary: "", secondary: null };
+}
+
+function MatchScheduleCard({ match }: { match: Lc26PublicMatch }) {
+  const timeLabel = match.startTime ? formatDaTimeOnly(match.startTime) : null;
+  const { primary: locationPrimary, secondary: locationSecondary } = matchLocationParts(match);
+  const hasLocation = Boolean(locationPrimary);
+
+  return (
+    <li className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_6px_28px_-14px_rgb(22_51_88/0.22)]">
+      <div className="border-b border-stone-100 px-4 py-3.5 sm:px-5 sm:py-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-lc26-navy/45">Modstander</p>
+        <p className="mt-0.5 text-balance text-lg font-semibold leading-snug tracking-[-0.02em] text-lc26-navy sm:text-xl">
+          {match.opponentTeamName}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 divide-x divide-stone-200/90">
+        <div className="flex min-h-[5.5rem] flex-col justify-between bg-gradient-to-b from-lc26-teal/[0.14] to-lc26-teal/[0.06] px-3.5 py-3.5 sm:min-h-[6rem] sm:px-4 sm:py-4">
+          <div className="flex items-center gap-1.5 text-lc26-teal">
+            <Clock className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em]">Hvornår</span>
+          </div>
+          {timeLabel ? (
+            <p className="mt-2 text-[1.75rem] font-bold leading-none tracking-tight text-lc26-navy tabular-nums sm:text-[2rem]">
+              kl. {timeLabel}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm font-medium leading-snug text-lc26-navy/55">Tid kommer senere</p>
+          )}
+        </div>
+
+        <div className="flex min-h-[5.5rem] flex-col justify-between bg-stone-50/80 px-3.5 py-3.5 sm:min-h-[6rem] sm:px-4 sm:py-4">
+          <div className="flex items-center gap-1.5 text-lc26-navy/55">
+            <MapPin className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em]">Hvor</span>
+          </div>
+          {hasLocation ? (
+            <div>
+              <p className="mt-2 text-balance text-lg font-bold leading-tight tracking-[-0.02em] text-lc26-navy sm:text-xl">
+                {locationPrimary}
+              </p>
+              {locationSecondary ? (
+                <p className="mt-0.5 text-sm font-medium leading-snug text-lc26-navy/58">{locationSecondary}</p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm font-medium leading-snug text-lc26-navy/55">Bane kommer senere</p>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
 
 export function PlayerPublicView({ data, currentPlayerId }: Props) {
   const { player, team, teammates, coaches, matches, error } = data;
@@ -78,36 +139,11 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
                 </p>
               </div>
             ) : (
-              <ul className="mt-4 space-y-3">
-                {teammates.map((t) => {
-                  const isSelf = t.id === currentPlayerId;
-                  return (
-                    <li
-                      key={t.id}
-                      className={`flex flex-wrap items-baseline justify-between gap-2 rounded-xl border px-4 py-3.5 ${
-                        isSelf
-                          ? "border-lc26-teal/40 bg-lc26-teal/[0.06]"
-                          : "border-stone-200/90 bg-white shadow-sm"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <span className="font-medium text-lc26-navy">
-                          {t.name}
-                          {isSelf ? (
-                            <span className="ml-2 rounded-full bg-lc26-teal/15 px-2 py-0.5 text-xs font-semibold text-lc26-teal">
-                              Dig
-                            </span>
-                          ) : null}
-                        </span>
-                        <p className="mt-1 text-sm text-lc26-navy/50">
-                          {t.home_club?.trim() || "—"} ·{" "}
-                          {t.age != null && !Number.isNaN(t.age) ? `${t.age} år` : "Alder —"}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <ul className="mt-4 space-y-4">
+            {matches.map((m) => (
+              <MatchScheduleCard key={m.id} match={m} />
+            ))}
+          </ul>
             )}
           </section>
 
@@ -153,43 +189,13 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
           <div className="mt-4 rounded-2xl border border-lc26-teal/20 bg-white px-6 py-12 text-center shadow-sm">
             <p className="text-[15px] font-medium text-lc26-navy">Ingen kampe endnu</p>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-lc26-navy/48">
-              Når kampene er lagt ind, ser du modstander, tid og bane her.
+              Når kampene er lagt ind, ser du modstander, klokkeslæt og bane her.
             </p>
           </div>
         ) : (
-          <ul className="mt-4 space-y-3">
+          <ul className="mt-4 space-y-4">
             {matches.map((m) => (
-              <li
-                key={m.id}
-                className="flex gap-3.5 rounded-xl border border-stone-200/70 bg-gradient-to-br from-stone-50/90 via-white to-lc26-teal/[0.05] p-4 shadow-[0_4px_20px_-12px_rgb(22_51_88/0.18)] sm:gap-4 sm:p-5"
-              >
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-lc26-teal/12 text-lc26-teal sm:h-12 sm:w-12"
-                  aria-hidden
-                >
-                  <Calendar className="h-5 w-5" strokeWidth={1.75} />
-                </div>
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-lc26-teal/85">Kamp</p>
-                  <p className="mt-0.5 font-semibold leading-snug text-lc26-navy">mod {m.opponentTeamName}</p>
-                  <div className="mt-2 space-y-1 border-t border-stone-200/60 pt-2 text-sm text-lc26-navy/58">
-                    {m.startTime ? (
-                      <p>
-                        <span className="text-lc26-navy/38">Tid: </span>
-                        {formatDaDateTime(m.startTime)}
-                      </p>
-                    ) : (
-                      <p className="text-lc26-navy/48">Tid kommer senere</p>
-                    )}
-                    {(m.venueName || m.courtName) && (
-                      <p>
-                        <span className="text-lc26-navy/38">Sted: </span>
-                        {[m.venueName, m.courtName].filter(Boolean).join(" · ")}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </li>
+              <MatchScheduleCard key={m.id} match={m} />
             ))}
           </ul>
         )}
