@@ -26,47 +26,55 @@ function MatchScheduleCard({ match }: { match: Lc26PublicMatch }) {
   const hasLocation = Boolean(locationPrimary);
 
   return (
-    <li className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_6px_28px_-14px_rgb(22_51_88/0.22)]">
-      <div className="border-b border-stone-100 px-4 py-3.5 sm:px-5 sm:py-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-lc26-navy/45">Modstander</p>
-        <p className="mt-0.5 text-balance text-lg font-semibold leading-snug tracking-[-0.02em] text-lc26-navy sm:text-xl">
+    <li className="relative overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm ring-1 ring-stone-100/80">
+      <div className="absolute inset-y-0 left-0 w-1 bg-lc26-teal" aria-hidden />
+
+      <div className="px-4 py-4 pl-5 sm:px-5 sm:py-[1.125rem] sm:pl-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-lc26-navy/40">Kamp mod</p>
+        <p className="mt-1 text-balance text-[1.0625rem] font-semibold leading-snug tracking-[-0.02em] text-lc26-navy sm:text-lg">
           {match.opponentTeamName}
         </p>
-      </div>
 
-      <div className="grid grid-cols-2 divide-x divide-stone-200/90">
-        <div className="flex min-h-[5.5rem] flex-col justify-between bg-gradient-to-b from-lc26-teal/[0.14] to-lc26-teal/[0.06] px-3.5 py-3.5 sm:min-h-[6rem] sm:px-4 sm:py-4">
-          <div className="flex items-center gap-1.5 text-lc26-teal">
-            <Clock className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em]">Hvornår</span>
+        <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-stone-100 pt-4 sm:gap-4">
+          <div className="min-w-0">
+            <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-lc26-teal">
+              <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+              Hvornår
+            </dt>
+            <dd className="mt-1.5">
+              {timeLabel ? (
+                <span className="text-[1.125rem] font-bold leading-none tracking-tight text-lc26-navy tabular-nums sm:text-xl">
+                  kl. {timeLabel}
+                </span>
+              ) : (
+                <span className="text-sm font-medium text-lc26-navy/50">Kommer senere</span>
+              )}
+            </dd>
           </div>
-          {timeLabel ? (
-            <p className="mt-2 text-xl font-bold leading-none tracking-tight text-lc26-navy tabular-nums sm:text-2xl">
-              kl. {timeLabel}
-            </p>
-          ) : (
-            <p className="mt-2 text-sm font-medium leading-snug text-lc26-navy/55">Tid kommer senere</p>
-          )}
-        </div>
 
-        <div className="flex min-h-[5.5rem] flex-col justify-between bg-stone-50/80 px-3.5 py-3.5 sm:min-h-[6rem] sm:px-4 sm:py-4">
-          <div className="flex items-center gap-1.5 text-lc26-navy/55">
-            <MapPin className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em]">Hvor</span>
+          <div className="min-w-0 border-l border-stone-100 pl-3 sm:pl-4">
+            <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-lc26-navy/45">
+              <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+              Hvor
+            </dt>
+            <dd className="mt-1.5">
+              {hasLocation ? (
+                <>
+                  <span className="block text-balance text-[1.0625rem] font-bold leading-snug tracking-[-0.01em] text-lc26-navy sm:text-lg">
+                    {locationPrimary}
+                  </span>
+                  {locationSecondary ? (
+                    <span className="mt-0.5 block text-sm font-medium leading-snug text-lc26-navy/55">
+                      {locationSecondary}
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <span className="text-sm font-medium text-lc26-navy/50">Kommer senere</span>
+              )}
+            </dd>
           </div>
-          {hasLocation ? (
-            <div>
-              <p className="mt-2 text-balance text-lg font-bold leading-tight tracking-[-0.02em] text-lc26-navy sm:text-xl">
-                {locationPrimary}
-              </p>
-              {locationSecondary ? (
-                <p className="mt-0.5 text-sm font-medium leading-snug text-lc26-navy/58">{locationSecondary}</p>
-              ) : null}
-            </div>
-          ) : (
-            <p className="mt-2 text-sm font-medium leading-snug text-lc26-navy/55">Bane kommer senere</p>
-          )}
-        </div>
+        </dl>
       </div>
     </li>
   );
@@ -203,6 +211,7 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
 
       <section className="mb-8">
         <h2 className={sectionTitle}>Dit kampprogram</h2>
+        <p className="mt-1 text-sm text-lc26-navy/50">Dine kampe med tid og bane</p>
         {!team ? (
           <div className="mt-4 rounded-2xl border border-stone-200 bg-white px-6 py-10 text-center shadow-sm">
             <p className="text-sm font-medium text-lc26-navy/75">Kommer snart</p>
@@ -218,7 +227,7 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
             </p>
           </div>
         ) : (
-          <ul className="mt-4 space-y-4">
+          <ul className="mt-5 space-y-3">
             {matches.map((m) => (
               <MatchScheduleCard key={m.id} match={m} />
             ))}
