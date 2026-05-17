@@ -81,7 +81,7 @@ export function schedulingEpochStartMinutes(
   return min < 24 * 60 ? min : 0;
 }
 
-/** Puljens periode først, derefter alle andre perioder (fx Formiddag-huller til Eftermiddag-pulje). */
+/** Puljens periode først, derefter andre perioder kun ved overflow (fx Eftermiddag fuld → Formiddag-huller). */
 export function periodsToTryForScheduling(
   periods: readonly TournamentPeriodRow[],
   primaryPeriodId: string,

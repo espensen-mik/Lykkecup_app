@@ -325,7 +325,19 @@ function findEarliestSlotForMatch(
   return null;
 }
 
-/** Alle ledige (bane, tid) for en kamp — til backtracking når greedy fejler. */
+function sortSlotCandidates(slots: SlotCandidate[]): SlotCandidate[] {
+  return [...slots].sort(
+    (a, b) =>
+      a.startMinutes - b.startMinutes ||
+      a.courtId.localeCompare(b.courtId) ||
+      a.periodId.localeCompare(b.periodId),
+  );
+}
+
+/**
+ * Ledige (bane, tid) for en kamp.
+ * Bruger puljens periode først; andre perioder kun hvis der ingen ledige tider er i primær.
+ */
 function findAllSlotsForMatch(
   periods: readonly TournamentPeriodRow[],
   primaryPeriodId: string,
@@ -396,14 +408,9 @@ function findAllSlotsForMatch(
     }
   }
 
-  slots.sort(
-    (a, b) =>
-      a.startMinutes - b.startMinutes ||
-      a.courtId.localeCompare(b.courtId) ||
-      a.periodId.localeCompare(b.periodId),
-  );
-
-  return slots;
+  const primarySlots = slots.filter((s) => s.periodId === primaryPeriodId);
+  if (primarySlots.length > 0) return sortSlotCandidates(primarySlots);
+  return sortSlotCandidates(slots);
 }
 
 function deterministicShuffle<T>(items: readonly T[], seed: number): T[] {
