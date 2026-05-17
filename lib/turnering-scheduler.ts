@@ -406,82 +406,25 @@ function findAllSlotsForMatch(
   return slots;
 }
 
-function schedulePoolByBacktracking(
+function deterministicShuffle<T>(items: readonly T[], seed: number): T[] {
+  const arr = [...items];
+  let s = (seed + 1) | 0;
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    const j = s % (i + 1);
+    const tmp = arr[i]!;
+    arr[i] = arr[j]!;
+    arr[j] = tmp;
+  }
+  return arr;
+}
+
+function overflowNamesFromAssignments(
+  assignments: readonly ScheduleAssignment[],
   periods: readonly TournamentPeriodRow[],
   primaryPeriodId: string,
   base: SchedulePoolBase,
-  matches: readonly ScheduleMatchInput[],
-  externalTeamSeed: TeamRoundTracker,
-  teamRestMinutes: number,
-): { assignments: ScheduleAssignment[]; overflowPeriodNames: string[] } | null {
-  const courtOrder = [...base.courtIds].sort((a, b) => a.localeCompare(b));
-  const occupancy: OccupiedSlot[] = [...base.existingOccupancy];
-  const assignments: ScheduleAssignment[] = [];
-  const matchById = new Map(matches.map((m) => [m.id, m]));
-
-  function teamState(): TeamRoundTracker {
-    const tracker = createTeamRoundTracker();
-    for (const [teamId, endMin] of externalTeamSeed) tracker.set(teamId, endMin);
-    for (const a of assignments) {
-      const m = matchById.get(a.matchId);
-      if (!m) continue;
-      recordTeamsAfterMatch(tracker, m.teamAId, m.teamBId, a.endMinutes);
-    }
-    return tracker;
-  }
-
-  function dfs(remaining: readonly ScheduleMatchInput[]): boolean {
-    if (remaining.length === 0) return true;
-
-    let pick: ScheduleMatchInput | null = null;
-    let pickSlots: SlotCandidate[] = [];
-
-    for (const match of remaining) {
-      const slots = findAllSlotsForMatch(
-        periods,
-        primaryPeriodId,
-        match,
-        courtOrder,
-        base,
-        occupancy,
-        teamState(),
-        teamRestMinutes,
-      );
-      if (slots.length === 0) return false;
-      if (!pick || slots.length < pickSlots.length) {
-        pick = match;
-        pickSlots = slots;
-      }
-    }
-
-    const chosen = pick!;
-    const rest = remaining.filter((m) => m.id !== chosen.id);
-
-    for (const slot of pickSlots) {
-      assignments.push({
-        matchId: chosen.id,
-        courtId: slot.courtId,
-        startMinutes: slot.startMinutes,
-        endMinutes: slot.endMinutes,
-        roundIndex: slot.roundSlot,
-      });
-      occupancy.push({
-        courtId: slot.courtId,
-        startMinutes: slot.startMinutes,
-        endMinutes: slot.endMinutes,
-      });
-
-      if (dfs(rest)) return true;
-
-      assignments.pop();
-      occupancy.pop();
-    }
-
-    return false;
-  }
-
-  if (!dfs(matches)) return null;
-
+): string[] {
   const overflowPeriodNames: string[] = [];
   for (const a of assignments) {
     for (const period of periods) {
@@ -494,8 +437,102 @@ function schedulePoolByBacktracking(
       }
     }
   }
+  return overflowPeriodNames;
+}
 
-  return { assignments, overflowPeriodNames };
+/** Hurtig planlægning med flere kamp-rækkefølger (undgår eksponentiel backtracking). */
+function schedulePoolFast(
+  periods: readonly TournamentPeriodRow[],
+  primaryPeriodId: string,
+  base: SchedulePoolBase,
+  matches: readonly ScheduleMatchInput[],
+  externalTeamSeed: TeamRoundTracker,
+  teamRestMinutes: number,
+): { assignments: ScheduleAssignment[]; overflowPeriodNames: string[] } | null {
+  const courtOrder = [...base.courtIds].sort((a, b) => a.localeCompare(b));
+
+  const tryOrder = (ordered: readonly ScheduleMatchInput[]): ScheduleAssignment[] | null => {
+    const occupancy: OccupiedSlot[] = [...base.existingOccupancy];
+    const tracker = createTeamRoundTracker();
+    for (const [teamId, endMin] of externalTeamSeed) tracker.set(teamId, endMin);
+    const assignments: ScheduleAssignment[] = [];
+
+    for (const match of ordered) {
+      const slots = findAllSlotsForMatch(
+        periods,
+        primaryPeriodId,
+        match,
+        courtOrder,
+        base,
+        occupancy,
+        tracker,
+        teamRestMinutes,
+      );
+      if (slots.length === 0) return null;
+      const slot = slots[0]!;
+      assignments.push({
+        matchId: match.id,
+        courtId: slot.courtId,
+        startMinutes: slot.startMinutes,
+        endMinutes: slot.endMinutes,
+        roundIndex: slot.roundSlot,
+      });
+      occupancy.push({
+        courtId: slot.courtId,
+        startMinutes: slot.startMinutes,
+        endMinutes: slot.endMinutes,
+      });
+      recordTeamsAfterMatch(tracker, match.teamAId, match.teamBId, slot.endMinutes);
+    }
+    return assignments;
+  };
+
+  const emptyOcc = [...base.existingOccupancy];
+  const emptyTracker = createTeamRoundTracker();
+  for (const [teamId, endMin] of externalTeamSeed) emptyTracker.set(teamId, endMin);
+
+  const byFewestSlots = [...matches].sort((a, b) => {
+    const ca = findAllSlotsForMatch(
+      periods,
+      primaryPeriodId,
+      a,
+      courtOrder,
+      base,
+      emptyOcc,
+      emptyTracker,
+      teamRestMinutes,
+    ).length;
+    const cb = findAllSlotsForMatch(
+      periods,
+      primaryPeriodId,
+      b,
+      courtOrder,
+      base,
+      emptyOcc,
+      emptyTracker,
+      teamRestMinutes,
+    ).length;
+    return ca - cb || a.id.localeCompare(b.id);
+  });
+
+  const orders: ScheduleMatchInput[][] = [
+    byFewestSlots,
+    [...byFewestSlots].reverse(),
+    [...matches],
+    ...Array.from({ length: 24 }, (_, seed) => deterministicShuffle(matches, seed)),
+  ];
+
+  for (const order of orders) {
+    const assignments = tryOrder(order);
+    if (assignments) {
+      return {
+        assignments,
+        overflowPeriodNames: overflowNamesFromAssignments(assignments, periods, primaryPeriodId, base),
+      };
+    }
+  }
+
+  return null;
 }
 
 function scheduleMatchesOnCourt(
@@ -1175,9 +1212,14 @@ async function assignMatchScheduleForPoolIds(
   let overflowPeriodNames: string[] = [];
 
   const maxMatches = 30;
+  if (process.env.NODE_ENV === "development") {
+    console.info(
+      `[scheduler] Hele dagen ${levelKey}: ${poolIds.length} puljer, ${poolMatchesAll.length} kampe, ${eligibleCourtIds.length} baner`,
+    );
+  }
   if (poolMatchesAll.length <= maxMatches) {
     for (const rest of restAttempts) {
-      const solved = schedulePoolByBacktracking(
+      const solved = schedulePoolFast(
         allPeriods,
         primaryPeriodId,
         poolBase,
@@ -1201,7 +1243,7 @@ async function assignMatchScheduleForPoolIds(
       error:
         poolMatchesAll.length > maxMatches
           ? `For mange kampe (${poolMatchesAll.length}) til automatisk planlægning på niveauet.`
-          : "Ingen komplet plan fundet for niveauets puljer — tjek bane-tider og kapacitet.",
+          : "Ingen komplet plan fundet for niveauets puljer — tjek bane-tider og kapacitet under Opsætning → Haller & baner.",
       overflowPeriodNames: [],
     };
   }
@@ -1603,10 +1645,10 @@ export async function assignMatchScheduleForPool(
   let unscheduled = poolMatches.map((m) => m.id);
   let overflowPeriodNames: string[] = [];
 
-  /** Backtracking på hele puljen (≤15 kampe) — løser greedy-låsninger. */
-  if (poolMatchesAll.length <= 15) {
+  /** Hurtig planlægning af hele puljen (flere rækkefølger). */
+  if (poolMatchesAll.length <= 30) {
     for (const rest of restAttempts) {
-      const solved = schedulePoolByBacktracking(
+      const solved = schedulePoolFast(
         allPeriods,
         pool.period_id,
         poolBase,

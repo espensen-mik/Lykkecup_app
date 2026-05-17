@@ -11,6 +11,7 @@ import { formatTimeForInput, timeInputToTimestamptz } from "@/lib/baner-tider";
 import { buildTeamDetailsById, type TeamDetailView, type TeamPlayerLite } from "@/lib/team-detail";
 import { levelPathSegment } from "@/lib/holddannelse";
 import {
+  generateAllPoolMatchesForLevelAction,
   generatePoolMatchesAction,
   renumberPoolNamesForLevelAction,
   schedulePoolMatchesAction,
@@ -194,6 +195,8 @@ export function TurneringPlanWorkspace({
   }, [pools]);
 
   const [renumberingPools, setRenumberingPools] = useState(false);
+  const [generatingAllPools, setGeneratingAllPools] = useState(false);
+  const [confirmRegenerateAllPools, setConfirmRegenerateAllPools] = useState(false);
 
   async function fixDuplicatePoolNames() {
     setRenumberingPools(true);
@@ -270,6 +273,36 @@ export function TurneringPlanWorkspace({
     await generateMatchesForPool(pool, false);
   }
 
+  async function generateAllPoolsForLevel(regenerate: boolean) {
+    if (pools.length === 0) {
+      setActionMsg(`${levelKey}: ingen puljer — opret puljer under Puljer.`);
+      return;
+    }
+
+    setGeneratingAllPools(true);
+    setConfirmRegenerateAllPools(false);
+    setActionMsg(null);
+
+    try {
+      const result = await generateAllPoolMatchesForLevelAction(levelKey, regenerate);
+      setActionMsg(result.message);
+      if (result.ok || (result.scheduled ?? 0) > 0) router.refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ukendt fejl";
+      setActionMsg(`Kunne ikke generere kampe for alle puljer: ${message}`);
+    } finally {
+      setGeneratingAllPools(false);
+    }
+  }
+
+  function onClickGenerateAllPools() {
+    if (matches.length > 0) {
+      setConfirmRegenerateAllPools(true);
+      return;
+    }
+    void generateAllPoolsForLevel(false);
+  }
+
   return (
     <div className="space-y-8">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -295,6 +328,60 @@ export function TurneringPlanWorkspace({
           Puljer klar til kampe: <span className="font-semibold">{poolsWithEnoughTeams}</span> · Estimeret antal kampe:{" "}
           <span className="font-semibold">{estimatedTotalMatches}</span>
         </p>
+
+        {pools.length > 0 ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {confirmRegenerateAllPools ? (
+              <>
+                <p className="w-full text-sm text-amber-800 dark:text-amber-200">
+                  Erstat alle eksisterende kampe på {levelKey} med nye kampe og tider?
+                </p>
+                <button
+                  type="button"
+                  disabled={generatingAllPools}
+                  onClick={() => void generateAllPoolsForLevel(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                >
+                  {generatingAllPools ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                  )}
+                  Ja, regenerer alle puljer
+                </button>
+                <button
+                  type="button"
+                  disabled={generatingAllPools}
+                  onClick={() => setConfirmRegenerateAllPools(false)}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200"
+                >
+                  Annuller
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={generatingAllPools || poolsWithEnoughTeams === 0}
+                onClick={() => onClickGenerateAllPools()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0d9488] disabled:opacity-50"
+                title={
+                  poolsWithEnoughTeams === 0
+                    ? "Mindst én pulje med 2 hold kræves"
+                    : matches.length > 0
+                      ? "Sletter og opretter kampe for alle puljer på ny"
+                      : "Opretter kampe for alle puljer med bane og tid"
+                }
+              >
+                {generatingAllPools ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Sparkles className="h-4 w-4" aria-hidden />
+                )}
+                {matches.length > 0 ? "Regenerer kampe for alle puljer" : "Generer kampe for alle puljer"}
+              </button>
+            )}
+          </div>
+        ) : null}
 
         {actionMsg ? (
           <p className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">

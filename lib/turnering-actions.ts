@@ -5,7 +5,11 @@ import { createServerSupabase } from "@/lib/auth-server";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
 import { poolPlanningHint, suggestNextPoolName } from "@/lib/puljer";
 import { generateRoundRobinMatches, TURNERING_EVENT_ID } from "@/lib/turnering";
-import { assignMatchScheduleForPool } from "@/lib/turnering-scheduler";
+import {
+  assignMatchScheduleForLevelAllDay,
+  assignMatchScheduleForPool,
+} from "@/lib/turnering-scheduler";
+import { isAllDayPeriod, type TournamentPeriodRow } from "@/lib/tournament-periods";
 
 export type TurneringActionResult = {
   ok: boolean;
@@ -267,6 +271,7 @@ export async function generatePoolMatchesAction(
   poolId: string,
   levelKey: string,
   regenerate: boolean,
+  options?: { skipSchedule?: boolean },
 ): Promise<TurneringActionResult & { scheduled?: number; matchCount?: number }> {
   const supabase = await createServerSupabase();
   const {
@@ -340,10 +345,20 @@ export async function generatePoolMatchesAction(
     };
   }
 
+  if (options?.skipSchedule) {
+    return {
+      ok: true,
+      message: `${pool.name}: ${payload.length} kampe oprettet.`,
+      matchCount: payload.length,
+      scheduled: 0,
+    };
+  }
+
   const schedule = await assignMatchScheduleForPool(supabase, poolId);
 
   revalidatePath("/turnering/plan");
   revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
+  revalidatePath("/kampprogram");
 
   if (schedule.scheduled === 0) {
     return {
@@ -370,6 +385,156 @@ export async function generatePoolMatchesAction(
     message: `${pool.name}: ${payload.length} kampe genereret — ${schedule.scheduled} med bane og tid.${partial}${overflow}`,
     matchCount: payload.length,
     scheduled: schedule.scheduled,
+  };
+}
+
+/** Generer (eller regenerer) kampe for alle puljer på niveauet — planlægger samlet ved «Hele dagen». */
+export async function generateAllPoolMatchesForLevelAction(
+  levelKey: string,
+  regenerate: boolean,
+): Promise<TurneringActionResult & { scheduled?: number; matchCount?: number }> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Du skal være logget ind for at generere kampe." };
+  }
+
+  const normalizedLevel = canonicalBanerLevelLabel(levelKey);
+
+  const [poolsRes, scheduleRes, periodsRes] = await Promise.all([
+    supabase
+      .from("pools")
+      .select("id, name, level, period_id, sort_order")
+      .eq("event_id", TURNERING_EVENT_ID)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase.from("level_schedule_settings").select("level, plan_matches_per_team").eq("event_id", TURNERING_EVENT_ID),
+    supabase
+      .from("tournament_periods")
+      .select("id, event_id, name, start_time, end_time, sort_order, is_all_day")
+      .eq("event_id", TURNERING_EVENT_ID),
+  ]);
+
+  if (poolsRes.error) return { ok: false, message: poolsRes.error.message };
+  if (scheduleRes.error) return { ok: false, message: scheduleRes.error.message };
+  if (periodsRes.error) return { ok: false, message: periodsRes.error.message };
+
+  const levelPools = ((poolsRes.data ?? []) as Array<{
+    id: string;
+    name: string;
+    level: string | null;
+    period_id: string | null;
+    sort_order: number;
+  }>).filter((p) => canonicalBanerLevelLabel(p.level) === normalizedLevel);
+
+  if (levelPools.length === 0) {
+    return { ok: false, message: `${normalizedLevel}: ingen puljer — opret puljer under Puljer.` };
+  }
+
+  const poolIds = levelPools.map((p) => p.id);
+
+  if (regenerate && poolIds.length > 0) {
+    const delRes = await supabase.from("matches").delete().eq("event_id", TURNERING_EVENT_ID).in("pool_id", poolIds);
+    if (delRes.error) return { ok: false, message: delRes.error.message };
+  }
+
+  const { data: existingMatches } = await supabase
+    .from("matches")
+    .select("pool_id")
+    .eq("event_id", TURNERING_EVENT_ID)
+    .in("pool_id", poolIds);
+
+  const poolsWithMatches = new Set(((existingMatches ?? []) as { pool_id: string }[]).map((m) => m.pool_id));
+
+  let totalMatchCount = 0;
+  const generatedPoolIds: string[] = [];
+  const skipped: string[] = [];
+  const errors: string[] = [];
+
+  for (const pool of levelPools) {
+    if (!regenerate && poolsWithMatches.has(pool.id)) {
+      skipped.push(pool.name);
+      continue;
+    }
+
+    const result = await generatePoolMatchesAction(pool.id, levelKey, regenerate, { skipSchedule: true });
+    if (!result.ok) {
+      errors.push(`${pool.name}: ${result.message}`);
+      continue;
+    }
+    totalMatchCount += result.matchCount ?? 0;
+    generatedPoolIds.push(pool.id);
+  }
+
+  if (generatedPoolIds.length === 0 && errors.length === 0) {
+    return {
+      ok: false,
+      message:
+        skipped.length > 0
+          ? `${normalizedLevel}: alle puljer har allerede kampe. Brug «Generer alle» igen for at regenerere.`
+          : `${normalizedLevel}: ingen kampe blev genereret.`,
+    };
+  }
+
+  if (generatedPoolIds.length === 0) {
+    return { ok: false, message: errors.join(" ") };
+  }
+
+  const allPeriods = (periodsRes.data ?? []) as TournamentPeriodRow[];
+  const allDayPeriodIds = new Set(allPeriods.filter((p) => isAllDayPeriod(p)).map((p) => p.id));
+  const allDayPools = levelPools.filter((p) => p.period_id != null && allDayPeriodIds.has(p.period_id));
+
+  let scheduled = 0;
+  let unscheduled = 0;
+  let scheduleError: string | null = null;
+  const overflowNames: string[] = [];
+
+  if (allDayPools.length > 0) {
+    const anchor = allDayPools[0]!;
+    const schedule = await assignMatchScheduleForLevelAllDay(
+      supabase,
+      normalizedLevel,
+      anchor.id,
+      anchor.period_id!,
+    );
+    scheduled = schedule.scheduled;
+    unscheduled = schedule.unscheduled;
+    scheduleError = schedule.error;
+    overflowNames.push(...schedule.overflowPeriodNames);
+  } else {
+    for (const poolId of generatedPoolIds) {
+      const schedule = await assignMatchScheduleForPool(supabase, poolId);
+      scheduled += schedule.scheduled;
+      unscheduled += schedule.unscheduled;
+      if (schedule.error && !scheduleError) scheduleError = schedule.error;
+      for (const n of schedule.overflowPeriodNames) {
+        if (!overflowNames.includes(n)) overflowNames.push(n);
+      }
+    }
+  }
+
+  revalidatePath("/turnering/plan");
+  revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
+  revalidatePath("/kampprogram");
+
+  const partial = unscheduled > 0 ? ` ${unscheduled} kampe mangler bane/tid.` : "";
+  const overflow =
+    overflowNames.length > 0 ? ` Nogle kampe ligger i ${overflowNames.join(", ")}.` : "";
+  const skipNote =
+    skipped.length > 0 ? ` Sprang over (havde kampe): ${skipped.join(", ")}.` : "";
+  const errNote = errors.length > 0 ? ` Fejl: ${errors.join(" ")}` : "";
+
+  const ok = errors.length === 0 && unscheduled === 0 && scheduled > 0;
+
+  return {
+    ok,
+    message: `${normalizedLevel}: ${totalMatchCount} kampe i ${generatedPoolIds.length} pulje(r) — ${scheduled} med bane og tid.${partial}${overflow}${skipNote}${errNote}${
+      scheduleError && scheduled === 0 ? ` ${scheduleError}` : ""
+    }`,
+    matchCount: totalMatchCount,
+    scheduled,
   };
 }
 
@@ -401,6 +566,10 @@ export async function schedulePoolMatchesAction(
   revalidatePath("/turnering/plan");
   revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
   revalidatePath("/kampprogram");
+
+  if (schedule.scheduled === 0 && schedule.error) {
+    return { ok: false, message: schedule.error, scheduled: 0 };
+  }
 
   const partial =
     schedule.unscheduled > 0 ? ` ${schedule.unscheduled} kampe mangler stadig bane/tid.` : "";
