@@ -352,10 +352,10 @@ export function PlayersAdmin({
                 </th>
                 <th
                   scope="col"
-                  className="px-5 py-3 text-left align-bottom"
-                  title="Antal turneringskampe for spillerens hold. Grøn når det matcher Opsætning → Kampe for niveauet."
+                  className="border-l border-emerald-200/80 bg-emerald-50/70 px-5 py-3 text-left align-bottom dark:border-emerald-900/50 dark:bg-emerald-950/25"
+                  title="Antal turneringskampe for spillerens hold. Grøn cirkel når det matcher Opsætning → Kampe for niveauet."
                 >
-                  <span className="inline-flex max-w-full items-center rounded-md text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <span className="inline-flex max-w-full items-center rounded-md text-[0.6875rem] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
                     Kampe
                   </span>
                 </th>
@@ -377,7 +377,14 @@ export function PlayersAdmin({
                 const isAssigned = assignedPlayerIdSet.has(p.id);
                 const matchCount = matchCountByPlayerId[p.id] ?? 0;
                 const expectedMatches = resolvePlanMatchesPerTeam(p.level, planMatchesByLevel);
-                const matchesOk = expectedMatches != null && matchCount === expectedMatches;
+                const matchesOk =
+                  isAssigned && expectedMatches != null && matchCount === expectedMatches;
+                const matchTitle =
+                  expectedMatches != null
+                    ? matchesOk
+                      ? `${matchCount} kampe — matcher indstillingen for niveauet (${expectedMatches})`
+                      : `${matchCount} kampe — forventet ${expectedMatches} for niveauet`
+                    : `${matchCount} kampe — ingen gemt kampe/hold-indstilling for dette niveau (Opsætning → Kampe)`;
                 return (
                 <tr
                   key={p.id}
@@ -425,23 +432,26 @@ export function PlayersAdmin({
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 tabular-nums">
-                    <span
-                      className={
-                        matchesOk
-                          ? "font-semibold text-emerald-600 dark:text-emerald-400"
-                          : "text-gray-600 dark:text-gray-300"
-                      }
-                      title={
-                        expectedMatches != null
-                          ? matchesOk
-                            ? `${matchCount} kampe — matcher indstillingen for niveauet (${expectedMatches})`
-                            : `${matchCount} kampe — forventet ${expectedMatches} for niveauet`
-                          : `${matchCount} kampe — ingen gemt kampe/hold-indstilling for dette niveau (Opsætning → Kampe)`
-                      }
-                    >
-                      {matchCount}
-                    </span>
+                  <td className="border-l border-emerald-200/80 bg-emerald-50/45 px-5 py-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/15">
+                    {matchesOk ? (
+                      <span
+                        className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-emerald-300 bg-emerald-500/15 px-1 text-xs font-semibold text-emerald-700 shadow-sm dark:border-emerald-700 dark:bg-emerald-400/20 dark:text-emerald-200"
+                        title={matchTitle}
+                      >
+                        {matchCount}
+                      </span>
+                    ) : (
+                      <span
+                        className={`tabular-nums ${
+                          isAssigned && expectedMatches != null
+                            ? "font-semibold text-amber-800 dark:text-amber-300"
+                            : "text-gray-600 dark:text-gray-300"
+                        }`}
+                        title={matchTitle}
+                      >
+                        {matchCount}
+                      </span>
+                    )}
                   </td>
                 </tr>
                 );

@@ -29,6 +29,7 @@ import { courtTypeForLevel, defaultRoundsPerMatchForLevel } from "@/lib/level-co
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 import { LykkecupRegnemaskine, type RegnemaskineLevelInput } from "@/components/turnering/lykkecup-regnemaskine";
 import { PerioderPanel } from "@/components/turnering/perioder-panel";
+import type { PeriodCapacityHint } from "@/lib/period-capacity";
 import type { PeriodsBundle } from "@/lib/tournament-periods";
 
 type TabId = "haller" | "niveau" | "kampe" | "perioder";
@@ -141,10 +142,12 @@ export function BanerTiderWorkspace({
   initial,
   levels,
   periodsBundle,
+  capacityHints,
 }: {
   initial: BanerTiderBundle;
   levels: RegnemaskineLevelInput[];
   periodsBundle: PeriodsBundle;
+  capacityHints: PeriodCapacityHint[];
 }) {
   const router = useRouter();
   const supabase = useMemo(() => getAuthBrowserClient(), []);
@@ -803,7 +806,7 @@ export function BanerTiderWorkspace({
         </section>
       ) : null}
 
-      {tab === "perioder" ? <PerioderPanel initial={periodsBundle} /> : null}
+      {tab === "perioder" ? <PerioderPanel initial={periodsBundle} capacityHints={capacityHints} /> : null}
 
       {tab === "kampe" ? (
         <LykkecupRegnemaskine levels={levels} baner={initial} embedded onOpenTab={setTab} />

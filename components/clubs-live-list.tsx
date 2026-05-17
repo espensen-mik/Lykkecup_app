@@ -7,6 +7,7 @@ import { StyledSelect } from "@/components/ui/styled-select";
 import { UNKNOWN_CLUB_LABEL, groupPlayersByClub } from "@/lib/clubs";
 import { indexFeedbackByClub } from "@/lib/club-feedback";
 import { formatDaDateTime } from "@/lib/datetime";
+import { formatLevelShortLabel } from "@/lib/holddannelse";
 import { getLevelVisualClasses } from "@/lib/level-colors";
 import { subscribePlayerUpdated } from "@/lib/player-updates";
 import type { Player } from "@/types/player";
@@ -19,11 +20,6 @@ type Props = {
   feedbackLoadError: string | null;
   membersLoadError: string | null;
 };
-
-function formatLevel(level: string | null): string | null {
-  if (level == null || String(level).trim() === "") return null;
-  return String(level);
-}
 
 export function ClubsLiveList({
   initialPlayers,
@@ -193,8 +189,11 @@ export function ClubsLiveList({
                 </div>
                 <ul className="divide-y divide-lc-border dark:divide-gray-700">
                   {group.players.map((p) => {
-                    const lvl = formatLevel(p.level);
                     const lv = getLevelVisualClasses(p.level);
+                    const levelLabel =
+                      p.level != null && String(p.level).trim() !== ""
+                        ? formatLevelShortLabel(p.level)
+                        : null;
                     return (
                       <li key={p.id}>
                         <OpenPlayerRowButton
@@ -225,7 +224,11 @@ export function ClubsLiveList({
                               {p.name}
                             </span>
                           </span>
-                          {lvl ? <span className={lv.badge}>Niveau {lvl}</span> : null}
+                          {levelLabel ? (
+                            <span className={lv.badge} title={String(p.level)}>
+                              {levelLabel}
+                            </span>
+                          ) : null}
                         </OpenPlayerRowButton>
                       </li>
                     );

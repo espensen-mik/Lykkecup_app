@@ -360,11 +360,70 @@ export async function generatePoolMatchesAction(
     schedule.unscheduled > 0
       ? ` ${schedule.unscheduled} kampe mangler stadig bane/tid.`
       : "";
+  const overflow =
+    schedule.overflowPeriodNames.length > 0
+      ? ` Nogle kampe ligger i ${schedule.overflowPeriodNames.join(", ")} fordi puljens periode var fuld.`
+      : "";
 
   return {
     ok: true,
-    message: `${pool.name}: ${payload.length} kampe genereret — ${schedule.scheduled} med bane og tid.${partial}`,
+    message: `${pool.name}: ${payload.length} kampe genereret — ${schedule.scheduled} med bane og tid.${partial}${overflow}`,
     matchCount: payload.length,
+    scheduled: schedule.scheduled,
+  };
+}
+
+/** Planlæg kun kampe i puljen der mangler bane/tid (fx efter period-overflow-fix). */
+export async function schedulePoolMatchesAction(
+  poolId: string,
+  levelKey: string,
+): Promise<TurneringActionResult & { scheduled?: number }> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Du skal være logget ind." };
+  }
+
+  const { data: pool, error: poolErr } = await supabase
+    .from("pools")
+    .select("id, name")
+    .eq("id", poolId)
+    .eq("event_id", TURNERING_EVENT_ID)
+    .maybeSingle();
+
+  if (poolErr) return { ok: false, message: poolErr.message };
+  if (!pool) return { ok: false, message: "Pulje ikke fundet." };
+
+  const schedule = await assignMatchScheduleForPool(supabase, poolId);
+
+  revalidatePath("/turnering/plan");
+  revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
+  revalidatePath("/kampprogram");
+
+  const partial =
+    schedule.unscheduled > 0 ? ` ${schedule.unscheduled} kampe mangler stadig bane/tid.` : "";
+  const overflow =
+    schedule.overflowPeriodNames.length > 0
+      ? ` Nogle kampe ligger i ${schedule.overflowPeriodNames.join(", ")} (puljens periode var fuld).`
+      : "";
+
+  if (schedule.scheduled === 0) {
+    return {
+      ok: false,
+      message:
+        schedule.error ??
+        `${pool.name}: ingen kampe fik bane/tid.${partial} Tjek banetider under Opsætning → Haller & baner.`,
+      scheduled: 0,
+    };
+  }
+
+  return {
+    ok: schedule.unscheduled === 0,
+    message: `${pool.name}: ${schedule.scheduled} kamp(e) planlagt.${partial}${overflow}${
+      schedule.error ? ` ${schedule.error}` : ""
+    }`,
     scheduled: schedule.scheduled,
   };
 }

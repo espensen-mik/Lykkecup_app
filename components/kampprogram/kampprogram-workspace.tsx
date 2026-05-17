@@ -9,7 +9,12 @@ import { deleteOrphanMatchesAction } from "@/lib/kampprogram-actions";
 import { compareCourtNamesForSchedule, formatTimeForInput } from "@/lib/baner-tider";
 import { formatLevelShortLabel } from "@/lib/holddannelse";
 import { getLevelVisualClasses } from "@/lib/level-colors";
-import { formatCourtWithVenue, type KampprogramBundle, type KampprogramMatch } from "@/lib/kampprogram";
+import {
+  formatCourtWithVenue,
+  groupKampprogramByRound,
+  type KampprogramBundle,
+  type KampprogramMatch,
+} from "@/lib/kampprogram";
 import { kontrolCenterTeamDisplayName, type TeamDetailView } from "@/lib/team-detail";
 
 type ViewMode = "court" | "rounds";
@@ -24,11 +29,6 @@ function fmtTimeRange(start: string | null, end: string | null): string {
   if (s && e) return `${s}–${e}`;
   if (s) return s;
   return "—";
-}
-
-function roundKey(m: KampprogramMatch): string {
-  const t = formatTimeForInput(m.startTime);
-  return t || "__unscheduled__";
 }
 
 function teamDetailOrFallback(
@@ -219,25 +219,10 @@ export function KampprogramWorkspace({ initial }: Props) {
     return { map, unassigned };
   }, [filtered, initial.courts, sortByDisplayName]);
 
-  const byRound = useMemo(() => {
-    const groups = new Map<string, KampprogramMatch[]>();
-    for (const m of filtered) {
-      if (!m.isScheduled) continue;
-      const key = roundKey(m);
-      const list = groups.get(key) ?? [];
-      list.push(m);
-      groups.set(key, list);
-    }
-    const keys = [...groups.keys()].filter((k) => k !== "__unscheduled__").sort((a, b) => a.localeCompare(b, "da"));
-    for (const list of groups.values()) {
-      list.sort(
-        (a, b) =>
-          compareCourtNamesForSchedule(a.courtName, b.courtName) ||
-          sortByDisplayName(a.teamAId, b.teamAId),
-      );
-    }
-    return { groups, keys };
-  }, [filtered, sortByDisplayName]);
+  const roundGroups = useMemo(
+    () => groupKampprogramByRound(filtered, sortByDisplayName),
+    [filtered, sortByDisplayName],
+  );
 
   const unscheduledFiltered = useMemo(() => filtered.filter((m) => !m.isScheduled), [filtered]);
 
@@ -416,19 +401,19 @@ export function KampprogramWorkspace({ initial }: Props) {
         </div>
       ) : (
         <div className="space-y-6">
-          {byRound.keys.length === 0 && hideUnscheduled ? (
+          {roundGroups.length === 0 && hideUnscheduled ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">Ingen planlagte kampe matcher filtrene.</p>
           ) : (
-            byRound.keys.map((key) => {
-              const rows = byRound.groups.get(key) ?? [];
+            roundGroups.map((round) => {
+              const rows = round.matches;
               return (
                 <section
-                  key={key}
+                  key={round.startTime}
                   className="rounded-lg border border-lc-border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50"
                 >
-                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">Runde {key}</h2>
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">{round.label}</h2>
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    {rows.length} kamp{rows.length === 1 ? "" : "e"} samtidig på tværs af baner
+                    {round.timeLabel} · {rows.length} kamp{rows.length === 1 ? "" : "e"} samtidig på tværs af baner
                   </p>
                   <div className="mt-3">
                     <MatchTable

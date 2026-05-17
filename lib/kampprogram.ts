@@ -1,4 +1,5 @@
 import type { TeamDetailView } from "@/lib/team-detail";
+import { compareCourtNamesForSchedule, formatTimeForInput } from "@/lib/baner-tider";
 
 /** Client-safe types for kampprogram (ingen server-imports). */
 
@@ -48,6 +49,54 @@ export type KampprogramPeriod = {
   id: string;
   name: string;
 };
+
+export type KampprogramRoundGroup = {
+  roundNumber: number;
+  /** Fx «Runde 1» — samme nummer på tværs af baner ved samme starttid. */
+  label: string;
+  startTime: string;
+  timeLabel: string;
+  matches: KampprogramMatch[];
+};
+
+/** Gruppér planlagte kampe i kronologiske runder (samme starttid = samme runde). */
+export function groupKampprogramByRound(
+  matches: readonly KampprogramMatch[],
+  sortByTeamDisplayName?: (teamAId: string, teamBId: string) => number,
+): KampprogramRoundGroup[] {
+  const groups = new Map<string, KampprogramMatch[]>();
+  for (const m of matches) {
+    if (!m.isScheduled || !m.startTime) continue;
+    const list = groups.get(m.startTime) ?? [];
+    list.push(m);
+    groups.set(m.startTime, list);
+  }
+
+  const keys = [...groups.keys()].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  const teamSort =
+    sortByTeamDisplayName ??
+    ((a, b) => a.localeCompare(b, "da"));
+
+  return keys.map((startTime, index) => {
+    const roundMatches = [...(groups.get(startTime) ?? [])];
+    roundMatches.sort(
+      (a, b) =>
+        compareCourtNamesForSchedule(a.courtName, b.courtName) || teamSort(a.teamAId, b.teamAId),
+    );
+    const sample = roundMatches[0];
+    const start = formatTimeForInput(sample?.startTime ?? null);
+    const end = formatTimeForInput(sample?.endTime ?? null);
+    const timeLabel = start && end ? `${start}–${end}` : start ?? "—";
+    const roundNumber = index + 1;
+    return {
+      roundNumber,
+      label: `Runde ${roundNumber}`,
+      startTime,
+      timeLabel,
+      matches: roundMatches,
+    };
+  });
+}
 
 export type KampprogramBundle = {
   matches: KampprogramMatch[];

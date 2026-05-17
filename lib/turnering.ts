@@ -191,6 +191,24 @@ function rotateRoundRobinOrder(order: string[]): void {
   order.splice(1, 0, last);
 }
 
+/** Runder at spille når puljen har ulige antal hold (bye-runde tæller ikke som kamp). */
+function cappedRoundRobinRoundsToPlay(
+  realTeamCount: number,
+  maxMatchesPerTeam: number | undefined,
+  phantomSlotCount: number,
+): number {
+  const maxRounds = phantomSlotCount - 1;
+  if (maxMatchesPerTeam == null || !Number.isFinite(maxMatchesPerTeam)) {
+    return maxRounds;
+  }
+  const cap = Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), maxRounds));
+  if (realTeamCount % 2 === 1) {
+    // Med bye skal hver klub spille `cap` runder med modstander → `cap` bye-runde ekstra.
+    return Math.max(1, Math.min(cap + 1, maxRounds));
+  }
+  return cap;
+}
+
 /**
  * Alle-mod-alle op til `maxMatchesPerTeam` kampe pr. hold (klassisk rundtournér).
  * Uden cap: fuld round-robin (n−1 kampe pr. hold).
@@ -201,15 +219,12 @@ export function generateRoundRobinMatches<T extends TeamForPairing>(
 ): Array<{ teamAId: string; teamBId: string }> {
   if (teams.length < 2) return [];
 
+  const realTeamCount = teams.length;
   let order = sortTeamsForPairing(teams).map((t) => t.id);
   if (order.length % 2 === 1) order = [...order, ROUND_ROBIN_BYE];
 
   const n = order.length;
-  const maxRounds = n - 1;
-  const roundsToPlay =
-    maxMatchesPerTeam == null || !Number.isFinite(maxMatchesPerTeam)
-      ? maxRounds
-      : Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), maxRounds));
+  const roundsToPlay = cappedRoundRobinRoundsToPlay(realTeamCount, maxMatchesPerTeam, n);
 
   const pairings: Array<{ teamAId: string; teamBId: string }> = [];
   const slotOrder = [...order];
@@ -234,7 +249,7 @@ export function plannedPoolMatchCount(teamCount: number, maxMatchesPerTeam?: num
     return (teamCount * (teamCount - 1)) / 2;
   }
   const cap = Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), teamCount - 1));
-  return cap * Math.floor(teamCount / 2);
+  return Math.floor((teamCount * cap) / 2);
 }
 
 export type TurneringDashboardLevelStats = {

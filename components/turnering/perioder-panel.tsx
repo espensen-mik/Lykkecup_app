@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { formatTimeForInput } from "@/lib/baner-tider";
+import type { PeriodCapacityHint } from "@/lib/period-capacity";
 import {
   DEFAULT_PERIODS,
   fetchPeriodsBundle,
@@ -33,7 +34,13 @@ function draftFromRow(row: TournamentPeriodRow): PeriodDraft {
   };
 }
 
-export function PerioderPanel({ initial }: { initial: PeriodsBundle }) {
+export function PerioderPanel({
+  initial,
+  capacityHints,
+}: {
+  initial: PeriodsBundle;
+  capacityHints: PeriodCapacityHint[];
+}) {
   const router = useRouter();
   const supabase = useMemo(() => getAuthBrowserClient(), []);
 
@@ -64,12 +71,26 @@ export function PerioderPanel({ initial }: { initial: PeriodsBundle }) {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b, "da"));
   }, [pools]);
 
+  const capacityByPeriodId = useMemo(
+    () => new Map(capacityHints.map((h) => [h.periodId, h])),
+    [capacityHints],
+  );
+
   const periodOptions = useMemo(
     () => [
       { value: "", label: "Ingen periode" },
-      ...periods.map((p) => ({ value: p.id, label: `${p.name} (${formatPeriodRange(p)})` })),
+      ...periods.map((p) => {
+        const cap = capacityByPeriodId.get(p.id);
+        const capLabel =
+          cap && cap.assignedPoolCount > 0
+            ? cap.surplusRounds >= 0
+              ? ` · ${cap.surplusRounds} ledige runder`
+              : ` · mangler ~${Math.abs(cap.surplusRounds)} runder`
+            : "";
+        return { value: p.id, label: `${p.name} (${formatPeriodRange(p)})${capLabel}` };
+      }),
     ],
-    [periods],
+    [periods, capacityByPeriodId],
   );
 
   const refresh = useCallback(async () => {
@@ -224,8 +245,9 @@ export function PerioderPanel({ initial }: { initial: PeriodsBundle }) {
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Turneringsperioder</h2>
         <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-          Hver pulje tildeles én periode (fx Formiddag). Alle puljens kampe planlægges inden for periodens
-          tidsvindue, så hold kan deltage i øvrige aktiviteter uden for deres kampe.
+          Hver pulje tildeles én periode (fx Formiddag). Planlægningen starter i den periode; hvis banerne er
+          optaget, flyttes enkelte kampe automatisk til senere perioder (fx Eftermiddag). Kapacitet nedenfor
+          hjælper med at fordele puljer — røde tal betyder sandsynlig mangel på banetid.
         </p>
       </div>
 
@@ -259,11 +281,41 @@ export function PerioderPanel({ initial }: { initial: PeriodsBundle }) {
         <ul className="space-y-3">
           {periods.map((period) => {
             const draft = drafts[period.id] ?? draftFromRow(period);
+            const cap = capacityByPeriodId.get(period.id);
             return (
               <li
                 key={period.id}
                 className="rounded-xl border border-lc-border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50"
               >
+                {cap && cap.assignedPoolCount > 0 ? (
+                  <div
+                    className={`mb-3 rounded-lg border px-3 py-2 text-xs ${
+                      cap.surplusRounds < 0
+                        ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+                        : "border-emerald-200/80 bg-emerald-50/80 text-emerald-900 dark:border-emerald-900/35 dark:bg-emerald-950/25 dark:text-emerald-100"
+                    }`}
+                  >
+                    <p className="font-medium">
+                      Bane-kapacitet: {cap.totalSlots} runde-pladser · behov fra puljer: ~{cap.requiredRounds}{" "}
+                      runder
+                      {cap.surplusRounds >= 0 ? (
+                        <span> · overskud {cap.surplusRounds}</span>
+                      ) : (
+                        <span> · mangler ca. {Math.abs(cap.surplusRounds)} (flyt puljer eller udvid perioden)</span>
+                      )}
+                    </p>
+                    {cap.unscheduledMatches > 0 ? (
+                      <p className="mt-1 text-amber-800 dark:text-amber-200">
+                        {cap.unscheduledMatches} kamp(e) i periodens puljer mangler bane/tid — brug «Planlæg
+                        manglende» på Turneringsplan.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : cap ? (
+                  <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                    {cap.totalSlots} bane-slots i perioden · ingen puljer tildelt endnu.
+                  </p>
+                ) : null}
                 <div className="flex flex-wrap items-end gap-4">
                   <div className="min-w-[10rem] flex-1">
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Navn</label>

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Loader2, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Loader2, Pencil, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -13,6 +13,7 @@ import { levelPathSegment } from "@/lib/holddannelse";
 import {
   generatePoolMatchesAction,
   renumberPoolNamesForLevelAction,
+  schedulePoolMatchesAction,
   updateMatchScheduleAction,
 } from "@/lib/turnering-actions";
 import { poolPlanningHint, poolTeamCountStatus } from "@/lib/puljer";
@@ -237,6 +238,29 @@ export function TurneringPlanWorkspace({
     }
   }
 
+  async function scheduleUnscheduledForPool(pool: PoolRow) {
+    setBusyPoolIds((prev) => {
+      const next = new Set(prev);
+      next.add(pool.id);
+      return next;
+    });
+    setActionMsg(null);
+    try {
+      const result = await schedulePoolMatchesAction(pool.id, levelKey);
+      setActionMsg(result.message);
+      if (result.ok || (result.scheduled ?? 0) > 0) router.refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ukendt fejl";
+      setActionMsg(`Kunne ikke planlægge kampe: ${message}`);
+    } finally {
+      setBusyPoolIds((prev) => {
+        const next = new Set(prev);
+        next.delete(pool.id);
+        return next;
+      });
+    }
+  }
+
   async function onClickGenerate(pool: PoolRow) {
     const poolMatches = matchesByPool.get(pool.id) ?? [];
     if (poolMatches.length > 0) {
@@ -322,6 +346,7 @@ export function TurneringPlanWorkspace({
             const teams = teamsByPool.get(pool.id) ?? [];
             const estimated = plannedPoolMatchCount(teams.length, planMatchesPerTeam);
             const poolMatches = matchesByPool.get(pool.id) ?? [];
+            const unscheduledCount = poolMatches.filter((m) => !m.court_id || !m.start_time).length;
             const sync = analyzePoolMatchSync(teams, poolMatches, planMatchesPerTeam);
             const teamCountStatus = poolTeamCountStatus(teams.length, poolHint);
             const hasEnoughTeams = teams.length >= 2;
@@ -379,6 +404,22 @@ export function TurneringPlanWorkspace({
                         Synkroniseret
                       </HoverInfoPill>
                     )}
+                    {unscheduledCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => void scheduleUnscheduledForPool(pool)}
+                        disabled={isBusy || !pool.period_id}
+                        title={!pool.period_id ? "Tildel periode under Opsætning → Perioder" : undefined}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-900 transition-colors hover:bg-violet-100 disabled:opacity-60 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-200 dark:hover:bg-violet-950/50"
+                      >
+                        {isBusy ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+                        )}
+                        Planlæg {unscheduledCount} manglende
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => void onClickGenerate(pool)}
