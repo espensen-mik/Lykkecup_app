@@ -7,6 +7,7 @@ import { POOL_MAX_TEAMS, poolPlanningHint, suggestNextPoolName } from "@/lib/pul
 import { generateRoundRobinMatches, TURNERING_EVENT_ID } from "@/lib/turnering";
 import {
   assignMatchScheduleForLevelAllDay,
+  assignMatchScheduleForLevelPeriodPools,
   assignMatchScheduleForPool,
 } from "@/lib/turnering-scheduler";
 import {
@@ -699,25 +700,41 @@ export async function generateAllPoolMatchesForLevelAction(
     scheduleError = schedule.error;
     overflowNames.push(...schedule.overflowPeriodNames);
   } else {
-    const periodStartByPoolId = new Map(
-      generatedPoolIds.map((poolId) => {
-        const pool = levelPools.find((p) => p.id === poolId);
-        const period = allPeriods.find((p) => p.id === pool?.period_id);
-        const win = period ? periodWindowMinutes(period) : null;
-        return [poolId, win?.startMinutes ?? 0] as const;
-      }),
-    );
-    const scheduleOrder = [...generatedPoolIds].sort(
-      (a, b) => (periodStartByPoolId.get(b) ?? 0) - (periodStartByPoolId.get(a) ?? 0),
-    );
+    const periodPools = generatedPoolIds.filter((poolId) => {
+      const pool = levelPools.find((p) => p.id === poolId);
+      return pool?.period_id != null && !allDayPeriodIds.has(pool.period_id);
+    });
 
-    for (const poolId of scheduleOrder) {
-      const schedule = await assignMatchScheduleForPool(supabase, poolId);
-      scheduled += schedule.scheduled;
-      unscheduled += schedule.unscheduled;
-      if (schedule.error && !scheduleError) scheduleError = schedule.error;
-      for (const n of schedule.overflowPeriodNames) {
-        if (!overflowNames.includes(n)) overflowNames.push(n);
+    if (periodPools.length >= 2) {
+      const schedule = await assignMatchScheduleForLevelPeriodPools(
+        supabase,
+        normalizedLevel,
+        periodPools,
+      );
+      scheduled = schedule.scheduled;
+      unscheduled = schedule.unscheduled;
+      scheduleError = schedule.error;
+    } else {
+      const periodStartByPoolId = new Map(
+        generatedPoolIds.map((poolId) => {
+          const pool = levelPools.find((p) => p.id === poolId);
+          const period = allPeriods.find((p) => p.id === pool?.period_id);
+          const win = period ? periodWindowMinutes(period) : null;
+          return [poolId, win?.startMinutes ?? 0] as const;
+        }),
+      );
+      const scheduleOrder = [...generatedPoolIds].sort(
+        (a, b) => (periodStartByPoolId.get(b) ?? 0) - (periodStartByPoolId.get(a) ?? 0),
+      );
+
+      for (const poolId of scheduleOrder) {
+        const schedule = await assignMatchScheduleForPool(supabase, poolId);
+        scheduled += schedule.scheduled;
+        unscheduled += schedule.unscheduled;
+        if (schedule.error && !scheduleError) scheduleError = schedule.error;
+        for (const n of schedule.overflowPeriodNames) {
+          if (!overflowNames.includes(n)) overflowNames.push(n);
+        }
       }
     }
   }
@@ -768,7 +785,45 @@ export async function schedulePoolMatchesAction(
   if (poolErr) return { ok: false, message: poolErr.message };
   if (!pool) return { ok: false, message: "Pulje ikke fundet." };
 
-  const schedule = await assignMatchScheduleForPool(supabase, poolId);
+  const normalizedLevel = canonicalBanerLevelLabel(levelKey);
+
+  const [siblingPoolsRes, periodsRes] = await Promise.all([
+    supabase
+      .from("pools")
+      .select("id, level, period_id")
+      .eq("event_id", TURNERING_EVENT_ID),
+    supabase
+      .from("tournament_periods")
+      .select("id, is_all_day, name")
+      .eq("event_id", TURNERING_EVENT_ID),
+  ]);
+
+  if (siblingPoolsRes.error) return { ok: false, message: siblingPoolsRes.error.message };
+  if (periodsRes.error) return { ok: false, message: periodsRes.error.message };
+
+  const allDayIds = new Set(
+    ((periodsRes.data ?? []) as Array<{ id: string; is_all_day: boolean; name: string }>)
+      .filter((p) => isAllDayPeriod(p))
+      .map((p) => p.id),
+  );
+
+  const siblingPoolIds = ((siblingPoolsRes.data ?? []) as Array<{
+    id: string;
+    level: string | null;
+    period_id: string | null;
+  }>)
+    .filter(
+      (p) =>
+        canonicalBanerLevelLabel(p.level) === normalizedLevel &&
+        p.period_id != null &&
+        !allDayIds.has(p.period_id),
+    )
+    .map((p) => p.id);
+
+  const schedule =
+    siblingPoolIds.length >= 2
+      ? await assignMatchScheduleForLevelPeriodPools(supabase, normalizedLevel, siblingPoolIds)
+      : await assignMatchScheduleForPool(supabase, poolId);
 
   revalidatePath("/turnering/plan");
   revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
