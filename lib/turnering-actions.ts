@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/auth-server";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
-import { poolPlanningHint, suggestNextPoolName } from "@/lib/puljer";
+import { POOL_MAX_TEAMS, poolPlanningHint, suggestNextPoolName } from "@/lib/puljer";
 import { generateRoundRobinMatches, TURNERING_EVENT_ID } from "@/lib/turnering";
 import {
   assignMatchScheduleForLevelAllDay,
@@ -128,6 +128,197 @@ export async function releaseOrphanedPoolTeamsAction(levelKey: string): Promise<
     ok: true,
     message: `${orphanIds.length} hold frigjort — de kan fordeles på puljer igen.`,
     released: orphanIds.length,
+  };
+}
+
+export type AutoAssignPoolsAssignment = { teamId: string; poolId: string };
+
+/** Fordel alle hold uden pulje på åbne puljer (opretter nye ved behov) — én server-kørsel. */
+export async function autoAssignPoolsAction(levelKey: string): Promise<
+  TurneringActionResult & {
+    assigned?: number;
+    skipped?: number;
+    poolsCreated?: number;
+    assignments?: AutoAssignPoolsAssignment[];
+    newPools?: CreatedPoolRow[];
+  }
+> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Du skal være logget ind." };
+  }
+
+  const canonLevel = canonicalBanerLevelLabel(levelKey);
+  const eventId = TURNERING_EVENT_ID;
+
+  const [teamsRes, poolsRes, membersRes, playersRes, scheduleRes] = await Promise.all([
+    supabase
+      .from("teams")
+      .select("id, level, pool_id, name, sort_order")
+      .eq("event_id", eventId),
+    supabase
+      .from("pools")
+      .select("id, event_id, level, name, sort_order, period_id, is_closed")
+      .eq("event_id", eventId),
+    supabase.from("team_members").select("team_id, player_id").eq("event_id", eventId),
+    supabase.from("players").select("id, age").eq("event_id", eventId),
+    supabase.from("level_schedule_settings").select("level, plan_matches_per_team").eq("event_id", eventId),
+  ]);
+
+  if (teamsRes.error) return { ok: false, message: teamsRes.error.message };
+  if (poolsRes.error) return { ok: false, message: poolsRes.error.message };
+  if (membersRes.error) return { ok: false, message: membersRes.error.message };
+  if (playersRes.error) return { ok: false, message: playersRes.error.message };
+  if (scheduleRes.error) return { ok: false, message: scheduleRes.error.message };
+
+  const scheduleRows = (scheduleRes.data ?? []) as { level: string; plan_matches_per_team: number | null }[];
+  const targetPerPool = Math.min(
+    POOL_MAX_TEAMS,
+    Math.max(2, poolPlanningHint(canonLevel, scheduleRows).matchesPerTeam + 1),
+  );
+
+  const levelTeams = (teamsRes.data ?? []).filter(
+    (t) => canonicalBanerLevelLabel(t.level) === canonLevel,
+  );
+  const levelPools = (poolsRes.data ?? []).filter(
+    (p) => canonicalBanerLevelLabel(p.level) === canonLevel,
+  );
+  const unassigned = levelTeams.filter((t) => !t.pool_id);
+
+  if (unassigned.length === 0) {
+    return { ok: false, message: "Ingen hold uden pulje at fordele." };
+  }
+
+  const playerAge = new Map(
+    ((playersRes.data ?? []) as { id: string; age: number | null }[]).map((p) => [p.id, p.age]),
+  );
+  const membersByTeam = new Map<string, string[]>();
+  for (const m of membersRes.data ?? []) {
+    const list = membersByTeam.get(m.team_id) ?? [];
+    list.push(m.player_id);
+    membersByTeam.set(m.team_id, list);
+  }
+
+  const avgAge = (teamId: string): number | null => {
+    const ids = membersByTeam.get(teamId) ?? [];
+    let sum = 0;
+    let n = 0;
+    for (const pid of ids) {
+      const age = playerAge.get(pid);
+      if (typeof age === "number" && !Number.isNaN(age)) {
+        sum += age;
+        n += 1;
+      }
+    }
+    return n > 0 ? Math.round((sum / n) * 10) / 10 : null;
+  };
+
+  const teamsSorted = [...unassigned].sort((a, b) => (avgAge(b.id) ?? -1) - (avgAge(a.id) ?? -1));
+
+  const openPools = levelPools.filter((p) => !p.is_closed);
+  const openPoolIds = new Set(openPools.map((p) => p.id));
+  const poolState = new Map<string, number>();
+  for (const p of openPools) {
+    poolState.set(p.id, levelTeams.filter((t) => t.pool_id === p.id).length);
+  }
+
+  const existingNames = levelPools.map((p) => p.name);
+  const newPools: CreatedPoolRow[] = [];
+  let maxSort =
+    levelPools.length > 0 ? Math.max(...levelPools.map((p) => p.sort_order)) : 0;
+
+  const pickPoolWithRoom = (): string | null => {
+    let best: { poolId: string; count: number } | null = null;
+    for (const [poolId, count] of poolState.entries()) {
+      if (!openPoolIds.has(poolId)) continue;
+      if (count >= targetPerPool) continue;
+      if (!best || count < best.count) best = { poolId, count };
+    }
+    return best?.poolId ?? null;
+  };
+
+  const createOpenPool = async (): Promise<string | null> => {
+    const name = suggestNextPoolName([...existingNames, ...newPools.map((p) => p.name)]);
+    maxSort += 1;
+    const { data, error } = await supabase
+      .from("pools")
+      .insert({
+        event_id: eventId,
+        level: canonLevel,
+        name,
+        sort_order: maxSort,
+        is_closed: false,
+      })
+      .select("id, event_id, level, name, sort_order, period_id, is_closed")
+      .single();
+
+    if (error || !data) return null;
+
+    const row = data as CreatedPoolRow;
+    newPools.push(row);
+    existingNames.push(name);
+    openPoolIds.add(row.id);
+    poolState.set(row.id, 0);
+    return row.id;
+  };
+
+  const assignments: AutoAssignPoolsAssignment[] = [];
+  let skipped = 0;
+
+  for (const team of teamsSorted) {
+    let poolId = pickPoolWithRoom();
+    if (!poolId) {
+      poolId = await createOpenPool();
+      if (!poolId) {
+        skipped = teamsSorted.length - assignments.length;
+        break;
+      }
+    }
+    const count = poolState.get(poolId) ?? 0;
+    assignments.push({ teamId: team.id, poolId });
+    poolState.set(poolId, count + 1);
+  }
+
+  if (assignments.length === 0) {
+    return {
+      ok: false,
+      message: "Kunne ikke fordele hold — tjek Opsætning → Kampe og prøv igen.",
+    };
+  }
+
+  const updates = await Promise.all(
+    assignments.map((a) =>
+      supabase.from("teams").update({ pool_id: a.poolId }).eq("id", a.teamId),
+    ),
+  );
+  const updateErr = updates.find((r) => r.error)?.error;
+  if (updateErr) {
+    return { ok: false, message: updateErr.message };
+  }
+
+  revalidatePath("/turnering/puljer");
+  revalidatePath(`/turnering/puljer/${encodeURIComponent(canonLevel)}`);
+  revalidatePath("/turnering/plan");
+  revalidatePath(`/turnering/plan/${encodeURIComponent(canonLevel)}`);
+
+  const createdNote =
+    newPools.length > 0
+      ? ` ${newPools.length} ${newPools.length === 1 ? "ny pulje" : "nye puljer"} oprettet.`
+      : "";
+  const base = `AutoPulje: ${assignments.length} hold fordelt (${targetPerPool} pr. pulje).${createdNote}`;
+  const message = skipped > 0 ? `${base} ${skipped} hold kunne ikke placeres.` : base;
+
+  return {
+    ok: true,
+    message,
+    assigned: assignments.length,
+    skipped,
+    poolsCreated: newPools.length,
+    assignments,
+    newPools,
   };
 }
 

@@ -13,7 +13,11 @@ import {
   roundRobinMatchesPerTeam,
   type PoolPlanningHint,
 } from "@/lib/puljer";
-import { createPoolAction, releaseOrphanedPoolTeamsAction } from "@/lib/turnering-actions";
+import {
+  autoAssignPoolsAction,
+  createPoolAction,
+  releaseOrphanedPoolTeamsAction,
+} from "@/lib/turnering-actions";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
@@ -441,97 +445,37 @@ export function PoolAssignmentWorkspace({
     }
     setAutoPoolBusy(true);
     setActionError(null);
-
-    const teamsSorted = [...unassignedTeams].sort((a, b) => (b.avgAge ?? -1) - (a.avgAge ?? -1));
-    const poolState = new Map<string, number>();
-    const openPoolIds = new Set(openPools.map((p) => p.id));
-    for (const p of openPools) {
-      poolState.set(p.id, teams.filter((t) => t.pool_id === p.id).length);
-    }
-
-    const newPools: PoolRow[] = [];
-
-    const pickPoolWithRoom = (): string | null => {
-      let best: { poolId: string; count: number } | null = null;
-      for (const [poolId, count] of poolState.entries()) {
-        if (!openPoolIds.has(poolId)) continue;
-        if (count >= targetPerPool) continue;
-        if (!best || count < best.count) best = { poolId, count };
-      }
-      return best?.poolId ?? null;
-    };
-
-    const createOpenPool = async (): Promise<string | null> => {
-      const result = await createPoolAction(levelKey, { revalidate: false });
-      if (!result.ok || !result.pool) {
+    setActionMsg(null);
+    try {
+      const result = await autoAssignPoolsAction(levelKey);
+      if (!result.ok) {
         setActionError(result.message);
-        return null;
+        return;
       }
-      const row: PoolRow = {
-        id: result.pool.id,
-        event_id: result.pool.event_id,
-        level: result.pool.level,
-        name: result.pool.name,
-        sort_order: result.pool.sort_order,
-        is_closed: result.pool.is_closed ?? false,
-        period_id: result.pool.period_id,
-      };
-      newPools.push(row);
-      openPoolIds.add(row.id);
-      poolState.set(row.id, 0);
-      return row.id;
-    };
 
-    const assignments: Array<{ teamId: string; poolId: string }> = [];
-    let skipped = 0;
+      const createdRows: PoolRow[] = (result.newPools ?? []).map((p) => ({
+        id: p.id,
+        event_id: p.event_id,
+        level: p.level,
+        name: p.name,
+        sort_order: p.sort_order,
+        is_closed: p.is_closed ?? false,
+        period_id: p.period_id,
+      }));
 
-    for (const s of teamsSorted) {
-      let poolId = pickPoolWithRoom();
-      if (!poolId) {
-        poolId = await createOpenPool();
-        if (!poolId) {
-          skipped += teamsSorted.length - assignments.length;
-          break;
-        }
+      if (createdRows.length > 0) {
+        setPools((prev) => sortPoolsForDisplay([...prev, ...createdRows]));
+        setActivePoolId((current) => current ?? createdRows[0]?.id ?? null);
       }
-      const count = poolState.get(poolId) ?? 0;
-      assignments.push({ teamId: s.team.id, poolId });
-      poolState.set(poolId, count + 1);
-    }
 
-    if (assignments.length === 0) {
-      setAutoPoolBusy(false);
-      setActionError("Kunne ikke fordele hold — tjek Opsætning → Kampe og prøv igen.");
-      return;
-    }
-
-    const updates = await Promise.all(
-      assignments.map((a) => supabase.from("teams").update({ pool_id: a.poolId }).eq("id", a.teamId)),
-    );
-    setAutoPoolBusy(false);
-    const err = updates.find((r) => r.error)?.error;
-    if (err) {
-      setActionError(err.message);
-      return;
-    }
-
-    if (newPools.length > 0) {
-      setPools((prev) => sortPoolsForDisplay([...prev, ...newPools]));
-      setActivePoolId((current) => current ?? newPools[0]?.id ?? null);
+      const map = new Map((result.assignments ?? []).map((a) => [a.teamId, a.poolId]));
+      setTeams((prev) => prev.map((t) => ({ ...t, pool_id: map.get(t.id) ?? t.pool_id })));
+      setActionMsg(result.message);
       router.refresh();
+    } finally {
+      setAutoPoolBusy(false);
     }
-
-    const map = new Map(assignments.map((a) => [a.teamId, a.poolId]));
-    setTeams((prev) => prev.map((t) => ({ ...t, pool_id: map.get(t.id) ?? t.pool_id })));
-
-    const createdNote =
-      newPools.length > 0 ? ` ${newPools.length} ${newPools.length === 1 ? "ny pulje" : "nye puljer"} oprettet.` : "";
-    setActionMsg(
-      skipped > 0
-        ? `AutoPulje: ${assignments.length} hold fordelt (${targetPerPool} pr. pulje).${createdNote} ${skipped} hold kunne ikke placeres.`
-        : `AutoPulje: ${assignments.length} hold fordelt (${targetPerPool} pr. pulje).${createdNote}`,
-    );
-  }, [hint.recommendedTeamCount, levelKey, openPools, pools, router, teams, unassignedTeams]);
+  }, [hint.recommendedTeamCount, levelKey, router, unassignedTeams.length]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-8">
