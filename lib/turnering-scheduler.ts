@@ -15,7 +15,11 @@ import {
 } from "@/lib/lykkecup-regnemaskine";
 import { courtTypeForLevel } from "@/lib/level-court-settings";
 import { timeInputToTimestamptz, timeToMinutes } from "@/lib/baner-tider";
-import { periodsToTryForScheduling, schedulingEpochStartMinutes } from "@/lib/period-capacity";
+import {
+  dedicatedPeriodIdsForOtherPools,
+  periodsToTryForScheduling,
+  schedulingEpochStartMinutes,
+} from "@/lib/period-capacity";
 import {
   isAllDayPeriod,
   periodWindowForScheduling,
@@ -352,7 +356,9 @@ function findAllSlotsForMatch(
   if (roundLen <= 0) return [];
 
   const blockMinutes = Math.max(1, Math.floor(base.roundsPerMatch)) * roundLen;
-  const tryPeriods = periodsToTryForScheduling(periods, primaryPeriodId);
+  const tryPeriods = periodsToTryForScheduling(periods, primaryPeriodId, {
+    blockedPeriodIds: base.blockedOverflowPeriodIds,
+  });
   const slots: SlotCandidate[] = [];
 
   for (const period of tryPeriods) {
@@ -721,6 +727,8 @@ export function scheduleMatchesInPeriod(input: SchedulePeriodContext & {
 type SchedulePoolBase = Omit<SchedulePeriodContext, "period" | "availability"> & {
   baseAvailability: readonly RegnemaskineAvailability[];
   teamRestMinutes?: number;
+  /** Perioder tildelt andre puljer — ingen overflow hertil. */
+  blockedOverflowPeriodIds?: ReadonlySet<string>;
 };
 
 /** Planlæg i puljens periode først; flyt resterende kampe til andre perioder ved behov. */
@@ -732,7 +740,9 @@ export function scheduleMatchesWithPeriodOverflow(
   },
   matches: readonly ScheduleMatchInput[],
 ): { assignments: ScheduleAssignment[]; unscheduled: string[]; overflowPeriodNames: string[] } {
-  const tryPeriods = periodsToTryForScheduling(periods, primaryPeriodId);
+  const tryPeriods = periodsToTryForScheduling(periods, primaryPeriodId, {
+    blockedPeriodIds: base.blockedOverflowPeriodIds,
+  });
   const overflowPeriodNames: string[] = [];
   let remaining = [...matches];
   const assignments: ScheduleAssignment[] = [];
@@ -830,7 +840,9 @@ function scheduleMatchesIndividually(
   const teamRestMinutes =
     base.teamRestMinutes ?? teamRestMinutesBetweenMatches(roundLen);
   const courtOrder = [...base.courtIds].sort((a, b) => a.localeCompare(b));
-  const tryPeriods = periodsToTryForScheduling(periods, primaryPeriodId);
+  const tryPeriods = periodsToTryForScheduling(periods, primaryPeriodId, {
+    blockedPeriodIds: base.blockedOverflowPeriodIds,
+  });
   const overflowPeriodNames: string[] = [];
   const assignments: ScheduleAssignment[] = [];
   const unscheduled: string[] = [];
@@ -1368,7 +1380,7 @@ export async function assignMatchScheduleForPool(
           .select("id, venue_id, event_id, name, court_type, is_active, sort_order")
           .eq("event_id", eventId);
 
-  const [periodRes, allPeriodsRes, matchesRes, courtsRes, availRes, breaksRes, levelRes, levelCourtRes, allMatchesRes] =
+  const [periodRes, allPeriodsRes, eventPoolsRes, matchesRes, courtsRes, availRes, breaksRes, levelRes, levelCourtRes, allMatchesRes] =
     await Promise.all([
       supabase
         .from("tournament_periods")
@@ -1380,6 +1392,7 @@ export async function assignMatchScheduleForPool(
         .select("id, event_id, name, start_time, end_time, sort_order, is_all_day")
         .eq("event_id", eventId)
         .order("sort_order", { ascending: true }),
+      supabase.from("pools").select("id, period_id").eq("event_id", eventId),
       supabase
         .from("matches")
         .select("id, team_a_id, team_b_id, court_id, start_time")
@@ -1409,10 +1422,17 @@ export async function assignMatchScheduleForPool(
   if (allPeriodsRes.error) {
     return { scheduled: 0, unscheduled: 0, error: allPeriodsRes.error.message, overflowPeriodNames: [] };
   }
+  if (eventPoolsRes.error) {
+    return { scheduled: 0, unscheduled: 0, error: eventPoolsRes.error.message, overflowPeriodNames: [] };
+  }
   if (!periodRes.data) {
     return { scheduled: 0, unscheduled: 0, error: "Periode ikke fundet.", overflowPeriodNames: [] };
   }
   const allPeriods = (allPeriodsRes.data ?? []) as TournamentPeriodRow[];
+  const blockedOverflowPeriodIds = dedicatedPeriodIdsForOtherPools(
+    (eventPoolsRes.data ?? []) as Array<{ id: string; period_id: string | null }>,
+    poolId,
+  );
   if (allPeriods.length === 0) {
     return {
       scheduled: 0,
@@ -1639,6 +1659,7 @@ export async function assignMatchScheduleForPool(
     timing,
     roundsPerMatch,
     existingOccupancy: externalOccupancy,
+    blockedOverflowPeriodIds,
   };
 
   const poolInputsAll = toScheduleInputs(poolMatchesAll);
@@ -1697,6 +1718,7 @@ export async function assignMatchScheduleForPool(
         roundsPerMatch,
         existingOccupancy,
         teamRounds,
+        blockedOverflowPeriodIds,
       },
       toScheduleInputs(matchesToSchedule),
     );
@@ -1730,6 +1752,7 @@ export async function assignMatchScheduleForPool(
         roundsPerMatch,
         existingOccupancy: retryOccupancy,
         teamRounds,
+        blockedOverflowPeriodIds,
       },
       toScheduleInputs(retryRows),
     );
@@ -1765,6 +1788,7 @@ export async function assignMatchScheduleForPool(
         existingOccupancy: relaxedOccupancy,
         teamRounds,
         teamRestMinutes: Math.max(0, Math.floor(roundLen / 2)),
+        blockedOverflowPeriodIds,
       },
       toScheduleInputs(relaxedRows),
     );
@@ -1799,6 +1823,7 @@ export async function assignMatchScheduleForPool(
         roundsPerMatch,
         existingOccupancy: lastOccupancy,
         teamRestMinutes: 0,
+        blockedOverflowPeriodIds,
       },
       toScheduleInputs(lastRows),
       lastOccupancy,
@@ -1866,7 +1891,7 @@ export async function assignMatchScheduleForPool(
     unscheduled: unscheduled.length + (assignments.length - saved),
     error:
       unscheduled.length > 0
-        ? `${unscheduled.length} kamp(e) kunne ikke få bane/tid (bane optaget, periode fuld eller hold skal hvile mellem egne kampe).`
+        ? `${unscheduled.length} kamp(e) kunne ikke få bane/tid i puljens periode (bane optaget, perioden fuld eller hold skal hvile mellem egne kampe). Tjek Opsætning → Haller & baner.`
         : saved < assignments.length
           ? "Nogle kampe blev planlagt men kunne ikke gemmes."
           : null,

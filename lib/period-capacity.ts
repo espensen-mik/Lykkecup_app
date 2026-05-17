@@ -81,10 +81,24 @@ export function schedulingEpochStartMinutes(
   return min < 24 * 60 ? min : 0;
 }
 
-/** Puljens periode først, derefter andre perioder kun ved overflow (fx Eftermiddag fuld → Formiddag-huller). */
+/** Perioder der er tildelt andre puljer — må ikke bruges til overflow (reserveret til dem). */
+export function dedicatedPeriodIdsForOtherPools(
+  allPools: readonly { id: string; period_id: string | null }[],
+  currentPoolId: string,
+): Set<string> {
+  const blocked = new Set<string>();
+  for (const p of allPools) {
+    if (p.id === currentPoolId) continue;
+    if (p.period_id) blocked.add(p.period_id);
+  }
+  return blocked;
+}
+
+/** Puljens periode først, derefter andre perioder kun ved overflow (ikke andre puljers tildelte periode). */
 export function periodsToTryForScheduling(
   periods: readonly TournamentPeriodRow[],
   primaryPeriodId: string,
+  options?: { blockedPeriodIds?: ReadonlySet<string> },
 ): TournamentPeriodRow[] {
   const sorted = [...periods].sort(
     (a, b) =>
@@ -95,7 +109,13 @@ export function periodsToTryForScheduling(
   if (!primary) return sorted;
   /** Hele dagen: kun bane-tilgængelighed, ingen overflow til Formiddag/Eftermiddag. */
   if (isAllDayPeriod(primary)) return [primary];
-  return [primary, ...sorted.filter((p) => p.id !== primaryPeriodId)];
+  const blocked = options?.blockedPeriodIds;
+  return [
+    primary,
+    ...sorted.filter(
+      (p) => p.id !== primaryPeriodId && (!blocked || !blocked.has(p.id)),
+    ),
+  ];
 }
 
 /** @deprecated Brug {@link periodsToTryForScheduling} */

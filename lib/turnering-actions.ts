@@ -9,7 +9,11 @@ import {
   assignMatchScheduleForLevelAllDay,
   assignMatchScheduleForPool,
 } from "@/lib/turnering-scheduler";
-import { isAllDayPeriod, type TournamentPeriodRow } from "@/lib/tournament-periods";
+import {
+  isAllDayPeriod,
+  periodWindowMinutes,
+  type TournamentPeriodRow,
+} from "@/lib/tournament-periods";
 
 export type TurneringActionResult = {
   ok: boolean;
@@ -695,7 +699,19 @@ export async function generateAllPoolMatchesForLevelAction(
     scheduleError = schedule.error;
     overflowNames.push(...schedule.overflowPeriodNames);
   } else {
-    for (const poolId of generatedPoolIds) {
+    const periodStartByPoolId = new Map(
+      generatedPoolIds.map((poolId) => {
+        const pool = levelPools.find((p) => p.id === poolId);
+        const period = allPeriods.find((p) => p.id === pool?.period_id);
+        const win = period ? periodWindowMinutes(period) : null;
+        return [poolId, win?.startMinutes ?? 0] as const;
+      }),
+    );
+    const scheduleOrder = [...generatedPoolIds].sort(
+      (a, b) => (periodStartByPoolId.get(b) ?? 0) - (periodStartByPoolId.get(a) ?? 0),
+    );
+
+    for (const poolId of scheduleOrder) {
       const schedule = await assignMatchScheduleForPool(supabase, poolId);
       scheduled += schedule.scheduled;
       unscheduled += schedule.unscheduled;
