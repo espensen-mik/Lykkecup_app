@@ -380,7 +380,7 @@ export function LykkecupRegnemaskine({
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Kapacitet kommer fra baner, åbningstider og pauser under Haller &amp; baner. Niveau med 2 runder pr. kamp (fx ROCK)
-            tæller dobbelt i krævede runder. Kapacitet vs. plan = runder tilgængelige minus krævede runder.
+            tæller dobbelt i krævede og brugte runder. Kapacitet vs. plan = runder tilgængelige minus krævede runder.
           </p>
         </div>
       ) : null}

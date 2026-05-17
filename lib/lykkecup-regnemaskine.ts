@@ -3,6 +3,37 @@ import { compareCourtTypes, timeToMinutes } from "@/lib/baner-tider";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
 import { courtTypeForLevel, defaultRoundsPerMatchForLevel } from "@/lib/level-court-settings";
 
+/** Planlagte runder pr. bane (kampe × runder pr. kamp for puljens niveau). */
+export function computeScheduledRoundsByCourtId(
+  matches: readonly { court_id: string; pool_id: string }[],
+  poolLevelById: ReadonlyMap<string, string | null>,
+  levelScheduleRows: readonly { level: string; rounds_per_match?: number | null }[],
+): Record<string, number> {
+  const rpmByLevel = new Map<string, number>();
+  for (const row of levelScheduleRows) {
+    const key = canonicalBanerLevelLabel(row.level);
+    const rpm = row.rounds_per_match;
+    rpmByLevel.set(
+      key,
+      rpm != null && Number.isFinite(rpm) && rpm >= 1
+        ? Math.min(4, Math.floor(rpm))
+        : defaultRoundsPerMatchForLevel(key),
+    );
+  }
+
+  const out: Record<string, number> = {};
+  for (const m of matches) {
+    if (!m.court_id) continue;
+    const level = poolLevelById.get(m.pool_id) ?? null;
+    const rpm =
+      level != null
+        ? (rpmByLevel.get(canonicalBanerLevelLabel(level)) ?? defaultRoundsPerMatchForLevel(level))
+        : 1;
+    out[m.court_id] = (out[m.court_id] ?? 0) + rpm;
+  }
+  return out;
+}
+
 /** Standard kampe pr. hold når DB-felt er null. */
 export const DEFAULT_PLAN_MATCHES_PER_TEAM = 5;
 

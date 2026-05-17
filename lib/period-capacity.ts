@@ -12,6 +12,8 @@ import {
   type RegnemaskineAvailability,
 } from "@/lib/lykkecup-regnemaskine";
 import {
+  isAllDayPeriod,
+  periodWindowForScheduling,
   periodWindowMinutes,
   type PeriodsBundle,
   type PoolPeriodAssignmentRow,
@@ -66,16 +68,21 @@ export function clipAvailabilityToPeriod(
   return out;
 }
 
-export function schedulingEpochStartMinutes(periods: readonly Pick<TournamentPeriodRow, "start_time" | "end_time">[]): number {
+export function schedulingEpochStartMinutes(
+  periods: readonly Pick<TournamentPeriodRow, "start_time" | "end_time" | "is_all_day" | "name">[],
+): number {
   let min = 24 * 60;
   for (const p of periods) {
-    const win = periodWindowMinutes(p);
+    const win = isAllDayPeriod(p)
+      ? periodWindowForScheduling(p)
+      : periodWindowMinutes(p);
     if (win) min = Math.min(min, win.startMinutes);
   }
   return min < 24 * 60 ? min : 0;
 }
 
-export function laterPeriodsForOverflow(
+/** Puljens periode først, derefter alle andre perioder (fx Formiddag-huller til Eftermiddag-pulje). */
+export function periodsToTryForScheduling(
   periods: readonly TournamentPeriodRow[],
   primaryPeriodId: string,
 ): TournamentPeriodRow[] {
@@ -84,9 +91,19 @@ export function laterPeriodsForOverflow(
       a.sort_order - b.sort_order ||
       (periodWindowMinutes(a)?.startMinutes ?? 0) - (periodWindowMinutes(b)?.startMinutes ?? 0),
   );
-  const idx = sorted.findIndex((p) => p.id === primaryPeriodId);
-  if (idx < 0) return sorted.length > 0 ? [sorted[0]!] : [];
-  return sorted.slice(idx);
+  const primary = sorted.find((p) => p.id === primaryPeriodId);
+  if (!primary) return sorted;
+  /** Hele dagen: kun bane-tilgængelighed, ingen overflow til Formiddag/Eftermiddag. */
+  if (isAllDayPeriod(primary)) return [primary];
+  return [primary, ...sorted.filter((p) => p.id !== primaryPeriodId)];
+}
+
+/** @deprecated Brug {@link periodsToTryForScheduling} */
+export function laterPeriodsForOverflow(
+  periods: readonly TournamentPeriodRow[],
+  primaryPeriodId: string,
+): TournamentPeriodRow[] {
+  return periodsToTryForScheduling(periods, primaryPeriodId);
 }
 
 type TeamRow = { pool_id: string | null; level: string | null };
@@ -145,7 +162,9 @@ export function computePeriodCapacityHints(
   const timing = conservativeRoundTimingFromSchedule(baner.levelSettings);
 
   return periods.map((period) => {
-    const periodWin = periodWindowMinutes(period);
+    const periodWin = isAllDayPeriod(period)
+      ? periodWindowForScheduling(period, baseAvailability, activeCourtIds)
+      : periodWindowMinutes(period);
     if (!periodWin) {
       return {
         periodId: period.id,
@@ -158,7 +177,16 @@ export function computePeriodCapacityHints(
       };
     }
 
-    const clippedAvail = clipAvailabilityToPeriod(baseAvailability, activeCourtIds, periodWin);
+    let clippedAvail = isAllDayPeriod(period)
+      ? baseAvailability.filter((a) => activeCourtIds.includes(a.courtId))
+      : clipAvailabilityToPeriod(baseAvailability, activeCourtIds, periodWin);
+    if (isAllDayPeriod(period) && clippedAvail.length === 0) {
+      clippedAvail = activeCourtIds.map((courtId) => ({
+        courtId,
+        startMinutes: periodWin.startMinutes,
+        endMinutes: periodWin.endMinutes,
+      }));
+    }
     const capRows = computeCourtCapacities(courts, clippedAvail, breaks, timing);
     const slotsByType = sumSlotsByCourtType(capRows);
     const totalSlots = slotsByType.reduce((s, r) => s + r.totalSlots, 0);

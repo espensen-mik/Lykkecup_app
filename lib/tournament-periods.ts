@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatTimeForInput, timeInputToTimestamptz, timeToMinutes, validateAvailability } from "@/lib/baner-tider";
+import type { RegnemaskineAvailability } from "@/lib/lykkecup-regnemaskine";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
+
+export const ALL_DAY_PERIOD_NAME = "Hele dagen";
+
+/** Standard planlægningsvindue når baner ikke har eksplicit tilgængelighed. */
+export const ALL_DAY_SCHEDULING_START_MINUTES = 6 * 60;
+export const ALL_DAY_SCHEDULING_END_MINUTES = 22 * 60;
 
 export type TournamentPeriodRow = {
   id: string;
@@ -9,6 +16,7 @@ export type TournamentPeriodRow = {
   start_time: string;
   end_time: string;
   sort_order: number;
+  is_all_day: boolean;
 };
 
 export type PoolPeriodAssignmentRow = {
@@ -30,6 +38,18 @@ export const DEFAULT_PERIODS: Array<{ name: string; start: string; end: string }
   { name: "Eftermiddag", start: "12:00", end: "17:00" },
 ];
 
+export const ALL_DAY_PERIOD_PRESET = {
+  name: ALL_DAY_PERIOD_NAME,
+  start: "06:00",
+  end: "22:00",
+} as const;
+
+export function isAllDayPeriod(
+  period: Pick<TournamentPeriodRow, "is_all_day" | "name">,
+): boolean {
+  return period.is_all_day === true || period.name.trim().toLowerCase() === ALL_DAY_PERIOD_NAME.toLowerCase();
+}
+
 export function periodWindowMinutes(period: Pick<TournamentPeriodRow, "start_time" | "end_time">): {
   startMinutes: number;
   endMinutes: number;
@@ -40,7 +60,43 @@ export function periodWindowMinutes(period: Pick<TournamentPeriodRow, "start_tim
   return { startMinutes, endMinutes };
 }
 
-export function formatPeriodRange(period: Pick<TournamentPeriodRow, "start_time" | "end_time">): string {
+/** Planlægningsvindue: for «Hele dagen» = banernes tilgængelighed (ikke Formiddag/Eftermiddag). */
+export function periodWindowForScheduling(
+  period: Pick<TournamentPeriodRow, "start_time" | "end_time" | "is_all_day" | "name">,
+  baseAvailability?: readonly RegnemaskineAvailability[],
+  courtIds?: readonly string[],
+): { startMinutes: number; endMinutes: number } | null {
+  if (!isAllDayPeriod(period)) {
+    return periodWindowMinutes(period);
+  }
+
+  if (baseAvailability && courtIds && courtIds.length > 0) {
+    const courtSet = new Set(courtIds);
+    let min = ALL_DAY_SCHEDULING_END_MINUTES;
+    let max = ALL_DAY_SCHEDULING_START_MINUTES;
+    for (const row of baseAvailability) {
+      if (!courtSet.has(row.courtId)) continue;
+      if (row.endMinutes <= row.startMinutes) continue;
+      min = Math.min(min, row.startMinutes);
+      max = Math.max(max, row.endMinutes);
+    }
+    if (max > min) {
+      return { startMinutes: min, endMinutes: max };
+    }
+  }
+
+  return {
+    startMinutes: ALL_DAY_SCHEDULING_START_MINUTES,
+    endMinutes: ALL_DAY_SCHEDULING_END_MINUTES,
+  };
+}
+
+export function formatPeriodRange(
+  period: Pick<TournamentPeriodRow, "start_time" | "end_time" | "is_all_day" | "name">,
+): string {
+  if (isAllDayPeriod(period)) {
+    return "Hele dagen (bane-tider)";
+  }
   const a = formatTimeForInput(period.start_time);
   const b = formatTimeForInput(period.end_time);
   if (!a || !b) return "—";
@@ -52,7 +108,7 @@ export async function fetchPeriodsBundle(supabase: SupabaseClient): Promise<Peri
   const [periodsRes, poolsRes] = await Promise.all([
     supabase
       .from("tournament_periods")
-      .select("id, event_id, name, start_time, end_time, sort_order")
+      .select("id, event_id, name, start_time, end_time, sort_order, is_all_day")
       .eq("event_id", eventId)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
@@ -73,7 +129,12 @@ export async function fetchPeriodsBundle(supabase: SupabaseClient): Promise<Peri
   }
 
   return {
-    periods: (periodsRes.data ?? []) as TournamentPeriodRow[],
+    periods: ((periodsRes.data ?? []) as Array<TournamentPeriodRow & { is_all_day?: boolean }>).map(
+      (p) => ({
+        ...p,
+        is_all_day: p.is_all_day === true,
+      }),
+    ),
     pools: (poolsRes.data ?? []) as PoolPeriodAssignmentRow[],
     error: null,
   };
@@ -83,17 +144,26 @@ export function validatePeriodTimes(start: string, end: string): string | null {
   return validateAvailability(start, end);
 }
 
-export function periodInsertPayload(name: string, start: string, end: string, sortOrder: number) {
+export function periodInsertPayload(
+  name: string,
+  start: string,
+  end: string,
+  sortOrder: number,
+  isAllDay = false,
+) {
   const start_time = timeInputToTimestamptz(start);
   const end_time = timeInputToTimestamptz(end);
   if (!start_time || !end_time) throw new Error("Ugyldigt tidsformat.");
-  const err = validatePeriodTimes(start, end);
-  if (err) throw new Error(err);
+  if (!isAllDay) {
+    const err = validatePeriodTimes(start, end);
+    if (err) throw new Error(err);
+  }
   return {
     event_id: TURNERING_EVENT_ID,
     name: name.trim(),
     start_time,
     end_time,
     sort_order: sortOrder,
+    is_all_day: isAllDay,
   };
 }

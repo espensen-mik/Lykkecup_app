@@ -8,9 +8,11 @@ import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { formatTimeForInput } from "@/lib/baner-tider";
 import type { PeriodCapacityHint } from "@/lib/period-capacity";
 import {
+  ALL_DAY_PERIOD_PRESET,
   DEFAULT_PERIODS,
   fetchPeriodsBundle,
   formatPeriodRange,
+  isAllDayPeriod,
   periodInsertPayload,
   type PeriodsBundle,
   type PoolPeriodAssignmentRow,
@@ -127,22 +129,33 @@ export function PerioderPanel({
 
   async function savePeriod(id: string) {
     const draft = drafts[id];
-    if (!draft) return;
-    const err = validatePeriodTimes(draft.start, draft.end);
-    if (err) {
-      setError(err);
-      return;
+    const row = periods.find((p) => p.id === id);
+    if (!draft || !row) return;
+    const allDay = isAllDayPeriod(row);
+    if (!allDay) {
+      const err = validatePeriodTimes(draft.start, draft.end);
+      if (err) {
+        setError(err);
+        return;
+      }
     }
     setBusy(true);
     setError(null);
     try {
-      const payload = periodInsertPayload(draft.name, draft.start, draft.end, 0);
+      const payload = periodInsertPayload(
+        draft.name,
+        allDay ? ALL_DAY_PERIOD_PRESET.start : draft.start,
+        allDay ? ALL_DAY_PERIOD_PRESET.end : draft.end,
+        row.sort_order,
+        allDay,
+      );
       const { error: upErr } = await supabase
         .from("tournament_periods")
         .update({
           name: payload.name,
           start_time: payload.start_time,
           end_time: payload.end_time,
+          is_all_day: payload.is_all_day,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);
@@ -151,6 +164,33 @@ export function PerioderPanel({
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunne ikke gemme.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addAllDayPeriod() {
+    const existing = periods.some((p) => isAllDayPeriod(p));
+    if (existing) {
+      setError("«Hele dagen» findes allerede — tildel puljen den periode nedenfor.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const payload = periodInsertPayload(
+        ALL_DAY_PERIOD_PRESET.name,
+        ALL_DAY_PERIOD_PRESET.start,
+        ALL_DAY_PERIOD_PRESET.end,
+        periods.length,
+        true,
+      );
+      const { error: insErr } = await supabase.from("tournament_periods").insert(payload);
+      if (insErr) throw new Error(insErr.message);
+      setToast("«Hele dagen» oprettet — kampe planlægges efter bane-tider, ikke Formiddag/Eftermiddag.");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kunne ikke oprette Hele dagen.");
     } finally {
       setBusy(false);
     }
@@ -246,8 +286,9 @@ export function PerioderPanel({
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Turneringsperioder</h2>
         <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
           Hver pulje tildeles én periode (fx Formiddag). Planlægningen starter i den periode; hvis banerne er
-          optaget, flyttes enkelte kampe automatisk til senere perioder (fx Eftermiddag). Kapacitet nedenfor
-          hjælper med at fordele puljer — røde tal betyder sandsynlig mangel på banetid.
+          optaget, flyttes enkelte kampe automatisk til andre perioder — medmindre puljen er sat til{" "}
+          <strong className="font-medium">Hele dagen</strong>, hvor systemet kun bruger bane-tiderne fra Opsætning.
+          Kapacitet nedenfor hjælper med at fordele puljer.
         </p>
       </div>
 
@@ -282,11 +323,19 @@ export function PerioderPanel({
           {periods.map((period) => {
             const draft = drafts[period.id] ?? draftFromRow(period);
             const cap = capacityByPeriodId.get(period.id);
+            const allDay = isAllDayPeriod(period);
             return (
               <li
                 key={period.id}
                 className="rounded-xl border border-lc-border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50"
               >
+                {allDay ? (
+                  <p className="mb-3 rounded-lg border border-sky-200/80 bg-sky-50/90 px-3 py-2 text-xs text-sky-950 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-100">
+                    <span className="font-semibold">Hele dagen</span> — planlægning følger kun Stor/Mini-banernes
+                    tilgængelighed (fx 10:00–17:00), ikke Formiddag/Eftermiddag. Velegnet til niveauer der deles
+                    baner med andre puljer på tværs af dagen.
+                  </p>
+                ) : null}
                 {cap && cap.assignedPoolCount > 0 ? (
                   <div
                     className={`mb-3 rounded-lg border px-3 py-2 text-xs ${
@@ -330,6 +379,8 @@ export function PerioderPanel({
                       }
                     />
                   </div>
+                  {!allDay ? (
+                    <>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Start</label>
                     <input
@@ -358,6 +409,12 @@ export function PerioderPanel({
                       }
                     />
                   </div>
+                    </>
+                  ) : (
+                    <p className="pb-2 text-xs text-gray-500 dark:text-gray-400">
+                      Klokkeslet bruges kun i oversigten — planlægning styres af bane-tider.
+                    </p>
+                  )}
                   <button
                     type="button"
                     disabled={busy}
@@ -421,6 +478,19 @@ export function PerioderPanel({
           >
             <Plus className="h-4 w-4" aria-hidden />
             Tilføj
+          </button>
+          <button
+            type="button"
+            disabled={busy || periods.some((p) => isAllDayPeriod(p))}
+            onClick={() => void addAllDayPeriod()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-100 disabled:opacity-50 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-100 dark:hover:bg-sky-950/60"
+            title={
+              periods.some((p) => isAllDayPeriod(p))
+                ? "Hele dagen findes allerede"
+                : "Planlæg efter bane-tilgængelighed hele dagen"
+            }
+          >
+            Hele dagen
           </button>
         </div>
       </div>

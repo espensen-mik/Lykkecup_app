@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canonicalBanerLevelLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
+import { computeScheduledRoundsByCourtId } from "@/lib/lykkecup-regnemaskine";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
 /** DB enum `court_type`: mini (tidligere small), kort (ny), stor (tidligere large). */
@@ -101,7 +102,7 @@ export type BanerTiderBundle = {
   /** Gemte niveau → banetype; tom rækker bruger defaults i `courtTypeForLevel`. */
   levelCourtSettings: LevelCourtSettingRow[];
   levelKeys: string[];
-  /** Kampe med tildelt `court_id` pr. bane (brugt kapacitet indtil global scheduler). */
+  /** Planlagte runder pr. bane (sum af runder pr. kamp for planlagte kampe). */
   scheduledSlotsByCourtId: Record<string, number>;
   error: string | null;
 };
@@ -280,7 +281,7 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
 
   const courtIds = courts.map((c) => c.id);
 
-  const [availRes, breaksRes, levelRes, levelCourtRes, matchesRes] = await Promise.all([
+  const [availRes, breaksRes, levelRes, levelCourtRes, matchesRes, poolsRes] = await Promise.all([
     courtIds.length
       ? supabase
           .from("court_availability")
@@ -303,7 +304,8 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
       )
       .eq("event_id", eventId),
     supabase.from("level_court_settings").select("id, event_id, level, court_type").eq("event_id", eventId),
-    supabase.from("matches").select("court_id").eq("event_id", eventId).not("court_id", "is", null),
+    supabase.from("matches").select("court_id, pool_id").eq("event_id", eventId).not("court_id", "is", null),
+    supabase.from("pools").select("id, level").eq("event_id", eventId),
   ]);
 
   const err =
@@ -312,6 +314,7 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
     levelRes.error?.message ??
     levelCourtRes.error?.message ??
     matchesRes.error?.message ??
+    poolsRes.error?.message ??
     null;
   if (err) {
     return {
@@ -325,12 +328,6 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
       scheduledSlotsByCourtId: {},
       error: err,
     };
-  }
-
-  const scheduledSlotsByCourtId: Record<string, number> = {};
-  for (const row of (matchesRes.data ?? []) as { court_id: string | null }[]) {
-    if (!row.court_id) continue;
-    scheduledSlotsByCourtId[row.court_id] = (scheduledSlotsByCourtId[row.court_id] ?? 0) + 1;
   }
 
   const levelSettingsRaw = (levelRes.data ?? []).map((row) => {
@@ -352,6 +349,15 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
   for (const row of levelSettings) {
     levelSet.add(canonicalBanerLevelLabel(row.level));
   }
+
+  const poolLevelById = new Map(
+    ((poolsRes.data ?? []) as { id: string; level: string | null }[]).map((p) => [p.id, p.level]),
+  );
+  const scheduledSlotsByCourtId = computeScheduledRoundsByCourtId(
+    (matchesRes.data ?? []) as { court_id: string; pool_id: string }[],
+    poolLevelById,
+    levelSettings,
+  );
 
   const levelCourtSettings = dedupeLevelCourtSettingsRows((levelCourtRes.data ?? []) as LevelCourtSettingRow[]);
   for (const row of levelCourtSettings) {
