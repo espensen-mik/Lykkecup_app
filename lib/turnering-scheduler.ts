@@ -626,6 +626,98 @@ function scheduleLevelPeriodPoolsIndividually(
   return { assignments, unscheduled };
 }
 
+/** Planlæg puljer periode for periode med delt bane-occupancy (mere robust end én samlet rækkefølge). */
+function scheduleLevelPoolsByPeriodAcrossCourts(
+  periodsById: ReadonlyMap<string, TournamentPeriodRow>,
+  matches: readonly ScheduleMatchWithPeriod[],
+  poolBase: SchedulePoolBase,
+  occupancySeed: readonly OccupiedSlot[],
+  teamRoundsSeed: TeamRoundTracker,
+  restAttempts: readonly number[],
+): { assignments: ScheduleAssignment[]; unscheduled: string[] } {
+  let occupancy: OccupiedSlot[] = [...occupancySeed];
+  const teamRounds = createTeamRoundTracker();
+  for (const [teamId, endMin] of teamRoundsSeed) teamRounds.set(teamId, endMin);
+
+  const assignments: ScheduleAssignment[] = [];
+  let remaining = [...matches];
+  const courtOrder = [...poolBase.courtIds].sort((a, b) => a.localeCompare(b));
+
+  const periodOrder = [...new Set(matches.map((m) => m.primaryPeriodId))].sort((a, b) => {
+    const wa = periodWindowMinutes(periodsById.get(a)!);
+    const wb = periodWindowMinutes(periodsById.get(b)!);
+    return (wa?.startMinutes ?? 0) - (wb?.startMinutes ?? 0);
+  });
+
+  for (const periodId of periodOrder) {
+    while (remaining.some((m) => m.primaryPeriodId === periodId)) {
+      const period = periodsById.get(periodId);
+      if (!period) break;
+
+      const periodWin = periodWindowForScheduling(period, poolBase.baseAvailability, poolBase.courtIds);
+      if (!periodWin) break;
+
+      const availability = availabilityForPeriodScheduling(
+        poolBase.courtIds,
+        poolBase.baseAvailability,
+        periodWin,
+        period,
+      );
+
+      const batch = remaining.filter((m) => m.primaryPeriodId === periodId);
+      let progressed = false;
+
+      for (const rest of restAttempts) {
+        const trialRounds = createTeamRoundTracker();
+        for (const [teamId, endMin] of teamRounds) trialRounds.set(teamId, endMin);
+
+        const result = scheduleMatchesAcrossCourts(
+          batch,
+          {
+            period,
+            roundSlotEpochStartMinutes: poolBase.roundSlotEpochStartMinutes,
+            courtIds: poolBase.courtIds,
+            courtTypes: poolBase.courtTypes,
+            levelKey: poolBase.levelKey,
+            levelCourtRows: poolBase.levelCourtRows,
+            availability,
+            breaks: poolBase.breaks,
+            timing: poolBase.timing,
+            roundsPerMatch: poolBase.roundsPerMatch,
+            existingOccupancy: occupancy,
+            teamRestMinutes: rest,
+          },
+          courtOrder,
+          occupancy,
+          trialRounds,
+        );
+
+        if (result.assignments.length === 0) continue;
+
+        assignments.push(...result.assignments);
+        for (const [teamId, endMin] of trialRounds) teamRounds.set(teamId, endMin);
+        for (const a of result.assignments) {
+          occupancy.push({
+            courtId: a.courtId,
+            startMinutes: a.startMinutes,
+            endMinutes: a.endMinutes,
+          });
+          const m = batch.find((row) => row.id === a.matchId);
+          if (m) recordTeamsAfterMatch(teamRounds, m.teamAId, m.teamBId, a.endMinutes);
+        }
+        const placedIds = new Set(result.assignments.map((a) => a.matchId));
+        remaining = remaining.filter((m) => !placedIds.has(m.id));
+        progressed = true;
+        if (result.unscheduled.length === 0) break;
+      }
+
+      if (!progressed) break;
+    }
+  }
+
+  return { assignments, unscheduled: remaining.map((m) => m.id) };
+}
+
 function deterministicShuffle<T>(items: readonly T[], seed: number): T[] {
   const arr = [...items];
   let s = (seed + 1) | 0;
@@ -1330,7 +1422,7 @@ export async function assignMatchScheduleForLevelPeriodPools(
   const roundLen = roundLengthMinutes(timing);
   const roundSlotEpochStart = schedulingEpochStartMinutes(allPeriods);
 
-  const allLevelMatchIds = new Set(poolMatchesAll.map((m) => m.id));
+  const unscheduledBatchIds = new Set(poolMatches.map((m) => m.id));
   const poolTeamIds = new Set(poolMatchesAll.flatMap((m) => [m.team_a_id, m.team_b_id]));
 
   const externalOccupancy: OccupiedSlot[] = [];
@@ -1341,8 +1433,7 @@ export async function assignMatchScheduleForLevelPeriodPools(
     start_time: string;
     end_time: string;
   }>) {
-    if (allLevelMatchIds.has(m.id)) continue;
-    if (m.pool_id && poolIdSet.has(m.pool_id)) continue;
+    if (unscheduledBatchIds.has(m.id)) continue;
     const s = timeToMinutes(m.start_time);
     const e = timeToMinutes(m.end_time);
     if (s == null || e == null || e <= s) continue;
@@ -1365,7 +1456,7 @@ export async function assignMatchScheduleForLevelPeriodPools(
       start_time: string;
       end_time: string;
     }>) {
-      if (allLevelMatchIds.has(row.id)) continue;
+      if (unscheduledBatchIds.has(row.id)) continue;
       if (!poolTeamIds.has(row.team_a_id) && !poolTeamIds.has(row.team_b_id)) continue;
       const startMinutes = timeToMinutes(row.start_time);
       const endMinutes = timeToMinutes(row.end_time);
@@ -1464,6 +1555,36 @@ export async function assignMatchScheduleForLevelPeriodPools(
     }
   }
 
+  if (unscheduled.length > 0) {
+    const teamRounds = createTeamRoundTracker();
+    for (const [teamId, endMin] of externalTeamSeed) teamRounds.set(teamId, endMin);
+    let occupancy: OccupiedSlot[] = [...externalOccupancy];
+    for (const a of assignments) {
+      occupancy.push({
+        courtId: a.courtId,
+        startMinutes: a.startMinutes,
+        endMinutes: a.endMinutes,
+      });
+      const m = matchInputs.find((row) => row.id === a.matchId);
+      if (m) recordTeamsAfterMatch(teamRounds, m.teamAId, m.teamBId, a.endMinutes);
+    }
+    const batch = scheduleLevelPoolsByPeriodAcrossCourts(
+      periodsById,
+      matchInputs.filter((m) => unscheduled.includes(m.id)),
+      poolBase,
+      occupancy,
+      teamRounds,
+      restAttempts,
+    );
+    if (batch.assignments.length > 0) {
+      const existingIds = new Set(assignments.map((a) => a.matchId));
+      for (const a of batch.assignments) {
+        if (!existingIds.has(a.matchId)) assignments.push(a);
+      }
+      unscheduled = batch.unscheduled;
+    }
+  }
+
   if (assignments.length === 0) {
     return {
       scheduled: 0,
@@ -1519,7 +1640,7 @@ export async function assignMatchScheduleForLevelPeriodPools(
     unscheduled: stillUnscheduled,
     error:
       stillUnscheduled > 0
-        ? `${stillUnscheduled} kamp(e) kunne ikke få bane/tid i puljernes perioder — tjek Mini-bane-tilgængelighed Formiddag/Eftermiddag og andre niveauers kampe på samme baner.`
+        ? `${stillUnscheduled} kamp(e) kunne ikke få bane/tid i puljernes perioder — ledige runder i Hal M er hele dagen; planlæggeren skal også finde huller i Formiddag/Eftermiddag uden at andre niveauers kampe eller hold-pauser blokerer.`
         : saved < assignments.length
           ? "Nogle kampe blev planlagt men kunne ikke gemmes."
           : null,
@@ -2197,7 +2318,7 @@ export async function assignMatchScheduleForPool(
     start_time: string;
     end_time: string;
   }>) {
-    if (allPoolMatchIds.has(m.id)) continue;
+    if (matchIds.has(m.id)) continue;
     const s = timeToMinutes(m.start_time);
     const e = timeToMinutes(m.end_time);
     if (s == null || e == null || e <= s) continue;
@@ -2219,7 +2340,7 @@ export async function assignMatchScheduleForPool(
       start_time: string;
       end_time: string;
     }>) {
-      if (allPoolMatchIds.has(row.id)) continue;
+      if (matchIds.has(row.id)) continue;
       if (!poolTeamIds.has(row.team_a_id) && !poolTeamIds.has(row.team_b_id)) continue;
       const startMinutes = timeToMinutes(row.start_time);
       const endMinutes = timeToMinutes(row.end_time);
