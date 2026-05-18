@@ -172,8 +172,8 @@ function GuideSections() {
       <section>
         <h3 className="font-semibold text-gray-900 dark:text-white">Roller</h3>
         <p className="mt-2">
-          Din rolle (fx administrator eller bruger) styrker på sigt, hvad du må se og gøre. Indtil videre er funktionerne
-          ens for de fleste — kontakt den tekniske ansvarlige, hvis du mangler adgang til noget.
+          Alle indloggede brugere (administrator og bruger) har adgang til samme funktioner i kontrolpanelet, herunder
+          Turnering, Puljer, Turneringsplan og Kampprogram.
         </p>
       </section>
 
