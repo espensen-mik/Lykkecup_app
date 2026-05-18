@@ -2,6 +2,7 @@ import type { CourtAvailabilityRow, CourtBreakRow, CourtRow, LevelCourtSettingLi
 import { compareCourtTypes, timeToMinutes } from "@/lib/baner-tider";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
 import { courtTypeForLevel, defaultRoundsPerMatchForLevel } from "@/lib/level-court-settings";
+import { findLevelScheduleRow } from "@/lib/puljer";
 import { plannedPoolMatchCount } from "@/lib/turnering";
 
 /** Planlagte runder pr. bane (kampe × runder pr. kamp for puljens niveau). */
@@ -451,12 +452,8 @@ export function buildRegnemaskineLevelPlans(
   defaultMatchesPerTeam: number,
   levelCourtRows: readonly LevelCourtSettingLike[],
 ): RegnemaskineLevelPlan[] {
-  const byLevel = new Map<string, LevelPlanPersisted & { rounds_per_match?: number | null }>();
-  for (const r of levelScheduleRows) {
-    byLevel.set(canonicalBanerLevelLabel(r.level), r);
-  }
   return levels.map((l) => {
-    const row = byLevel.get(canonicalBanerLevelLabel(l.levelKey));
+    const row = findLevelScheduleRow(l.levelKey, levelScheduleRows);
     const matchesPerTeam =
       row != null &&
       row.plan_matches_per_team != null &&

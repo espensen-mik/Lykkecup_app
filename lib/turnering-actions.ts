@@ -624,8 +624,10 @@ export async function generatePoolMatchesAction(
 
   if (scheduleErr) return { ok: false, message: scheduleErr.message };
 
-  const poolLevel = canonicalBanerLevelLabel(pool.level ?? levelKey);
-  const matchesPerTeam = poolPlanningHint(poolLevel, scheduleRows ?? []).matchesPerTeam;
+  // Brug niveau fra Turneringsplan (levelKey), ikke kun pool.level — ellers kan «TurboStars» vs
+  // «TurboStars (4-17 år)» give standard 5 kampe/hold i stedet for gemt værdi.
+  const planningLevel = canonicalBanerLevelLabel(levelKey);
+  const matchesPerTeam = poolPlanningHint(planningLevel, scheduleRows ?? []).matchesPerTeam;
   const pairings = generateRoundRobinMatches(
     teams as { id: string; sort_order: number; name: string }[],
     matchesPerTeam,
@@ -656,7 +658,7 @@ export async function generatePoolMatchesAction(
   if (options?.skipSchedule) {
     return {
       ok: true,
-      message: `${pool.name}: ${payload.length} kampe oprettet.`,
+      message: `${pool.name}: ${payload.length} kampe oprettet (${matchesPerTeam} kampe/hold).`,
       matchCount: payload.length,
       scheduled: 0,
     };
@@ -694,7 +696,7 @@ export async function generatePoolMatchesAction(
 
   return {
     ok: schedule.unscheduled === 0,
-    message: `${pool.name}: ${payload.length} kampe genereret — ${schedule.scheduled} med bane og tid.${partial}${overflow}${
+    message: `${pool.name}: ${payload.length} kampe genereret (${matchesPerTeam} kampe/hold) — ${schedule.scheduled} med bane og tid.${partial}${overflow}${
       schedule.error ? ` ${schedule.error}` : ""
     }`,
     matchCount: payload.length,

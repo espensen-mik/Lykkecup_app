@@ -1,4 +1,4 @@
-import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
+import { canonicalBanerLevelLabel, formatLevelShortLabel } from "@/lib/holddannelse";
 import { DEFAULT_PLAN_MATCHES_PER_TEAM } from "@/lib/lykkecup-regnemaskine";
 
 /** Maks. hold pr. pulje (kapacitet i AutoPulje). */
@@ -22,12 +22,28 @@ export type PoolPlanningHint = {
   recommendedTeamCount: number;
 };
 
+/** Find Opsætning → Kampe row even when pool/team level strings differ slightly (fx «TurboStars» vs «TurboStars (4-17 år)»). */
+export function findLevelScheduleRow<T extends { level: string; plan_matches_per_team: number | null }>(
+  levelKey: string,
+  levelScheduleRows: readonly T[],
+): T | undefined {
+  const canon = canonicalBanerLevelLabel(levelKey);
+  const exact = levelScheduleRows.find((r) => canonicalBanerLevelLabel(r.level) === canon);
+  if (exact) return exact;
+
+  const short = formatLevelShortLabel(levelKey).toLowerCase();
+  if (!short || short === "ukendt niveau") return undefined;
+
+  return levelScheduleRows.find(
+    (r) => formatLevelShortLabel(r.level).toLowerCase() === short,
+  );
+}
+
 export function poolPlanningHint(
   levelKey: string,
   levelScheduleRows: readonly { level: string; plan_matches_per_team: number | null }[],
 ): PoolPlanningHint {
-  const canon = canonicalBanerLevelLabel(levelKey);
-  const row = levelScheduleRows.find((r) => canonicalBanerLevelLabel(r.level) === canon);
+  const row = findLevelScheduleRow(levelKey, levelScheduleRows);
   const matchesPerTeam =
     row?.plan_matches_per_team != null &&
     Number.isFinite(row.plan_matches_per_team) &&
