@@ -21,6 +21,7 @@ import { poolPlanningHint, poolTeamCountStatus } from "@/lib/puljer";
 import {
   analyzePoolMatchSync,
   MATCH_RELAXED_TEAM_REST_NOTICE,
+  MATCH_UNSCHEDULED_NOTICE,
   plannedPoolMatchCount,
   type MatchRow,
 } from "@/lib/turnering";
@@ -96,6 +97,14 @@ export function TurneringPlanWorkspace({
 
   const courtNameById = useMemo(() => new Map(courts.map((c) => [c.id, c.name])), [courts]);
   const periodNameById = useMemo(() => new Map(periods.map((p) => [p.id, p.name])), [periods]);
+  const failureReasonByMatchId = useMemo(
+    () => new Map(schedulingFailures.map((f) => [f.matchId, f.reason])),
+    [schedulingFailures],
+  );
+  const unscheduledMatchCount = useMemo(
+    () => matches.filter((m) => !m.court_id || !m.start_time).length,
+    [matches],
+  );
 
   const teamsByPool = useMemo(() => {
     const byPool = new Map<string, TeamRow[]>();
@@ -229,10 +238,12 @@ export function TurneringPlanWorkspace({
     setActionMsg(null);
     setConfirmRegeneratePoolId(null);
 
+    setSchedulingFailures([]);
     try {
       const result = await generatePoolMatchesAction(pool.id, levelKey, regenerate);
       setActionMsg(result.message);
-      if (result.ok) router.refresh();
+      setSchedulingFailures(result.schedulingFailures ?? []);
+      if (result.ok || (result.scheduled ?? 0) > 0) router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ukendt fejl";
       setActionMsg(`Kunne ikke generere kampe: ${message}`);
@@ -391,25 +402,35 @@ export function TurneringPlanWorkspace({
           </div>
         ) : null}
 
-        {actionMsg ? (
+        {actionMsg || schedulingFailures.length > 0 ? (
           <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
-            <p>{actionMsg}</p>
+            {actionMsg ? <p>{actionMsg}</p> : null}
             {schedulingFailures.length > 0 ? (
-              <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t border-gray-200 pt-2 text-xs dark:border-gray-600">
-                {schedulingFailures.slice(0, 12).map((row) => (
-                  <li key={row.matchId}>
-                    <span className="font-medium text-gray-900 dark:text-gray-100">{row.label}</span>
-                    <span className="text-gray-600 dark:text-gray-400"> — {row.reason}</span>
-                  </li>
-                ))}
-                {schedulingFailures.length > 12 ? (
-                  <li className="text-gray-500 dark:text-gray-400">
-                    … og {schedulingFailures.length - 12} kampe mere
-                  </li>
-                ) : null}
-              </ul>
+              <div className={actionMsg ? "mt-2 border-t border-gray-200 pt-2 dark:border-gray-600" : ""}>
+                <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">Hvorfor mangler bane/tid?</p>
+                <ul className="mt-1 max-h-48 space-y-1 overflow-y-auto text-xs">
+                  {schedulingFailures.slice(0, 20).map((row) => (
+                    <li key={row.matchId}>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">{row.label}</span>
+                      <span className="text-amber-800 dark:text-amber-300"> — {row.reason}</span>
+                    </li>
+                  ))}
+                  {schedulingFailures.length > 20 ? (
+                    <li className="text-gray-500 dark:text-gray-400">
+                      … og {schedulingFailures.length - 20} kampe mere
+                    </li>
+                  ) : null}
+                </ul>
+              </div>
             ) : null}
           </div>
+        ) : null}
+
+        {unscheduledMatchCount > 0 && schedulingFailures.length === 0 ? (
+          <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
+            {unscheduledMatchCount} kamp(e) mangler bane/tid. Brug «Planlæg manglende» på puljen eller «Generer kampe for alle
+            puljer» igen — derefter vises årsag pr. kamp her.
+          </p>
         ) : null}
 
         {hasDuplicatePoolNames ? (
@@ -652,9 +673,17 @@ export function TurneringPlanWorkspace({
                             {match.court_id ? courtNameById.get(match.court_id) ?? "Bane" : "—"}
                           </td>
                           <td className="px-2 py-2">
-                            {match.schedule_relaxed_team_rest ? (
+                            {failureReasonByMatchId.get(match.id) ? (
+                              <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                                {failureReasonByMatchId.get(match.id)}
+                              </span>
+                            ) : match.schedule_relaxed_team_rest ? (
                               <span className="text-xs font-medium text-red-600 dark:text-red-400">
                                 {MATCH_RELAXED_TEAM_REST_NOTICE}
+                              </span>
+                            ) : !match.court_id || !match.start_time ? (
+                              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                                {MATCH_UNSCHEDULED_NOTICE}
                               </span>
                             ) : (
                               <span className="text-xs text-gray-400 dark:text-gray-500">—</span>

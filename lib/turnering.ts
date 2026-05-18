@@ -59,6 +59,8 @@ export type MatchRow = {
 export const MATCH_RELAXED_TEAM_REST_NOTICE =
   "Hold-pause ikke overholdt (min. 1 runde)";
 
+export const MATCH_UNSCHEDULED_NOTICE = "Mangler bane og tid";
+
 export type TurneringPlanLevelBundle = {
   /** Fra Opsætning → Kampe (`plan_matches_per_team`). */
   planMatchesPerTeam: number;

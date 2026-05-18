@@ -515,7 +515,13 @@ export async function generatePoolMatchesAction(
   levelKey: string,
   regenerate: boolean,
   options?: { skipSchedule?: boolean },
-): Promise<TurneringActionResult & { scheduled?: number; matchCount?: number }> {
+): Promise<
+  TurneringActionResult & {
+    scheduled?: number;
+    matchCount?: number;
+    schedulingFailures?: SchedulingFailureRow[];
+  }
+> {
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -616,18 +622,25 @@ export async function generatePoolMatchesAction(
 
   const partial =
     schedule.unscheduled > 0
-      ? ` ${schedule.unscheduled} kampe mangler stadig bane/tid.`
+      ? ` ${schedule.unscheduled} kampe mangler stadig bane/tid — se årsager nedenfor.`
       : "";
   const overflow =
     schedule.overflowPeriodNames.length > 0
       ? ` Nogle kampe ligger i ${schedule.overflowPeriodNames.join(", ")} fordi puljens periode var fuld.`
       : "";
 
+  const schedulingFailures = schedule.unscheduledDetails?.length
+    ? await buildSchedulingFailureRows(supabase, schedule.unscheduledDetails)
+    : undefined;
+
   return {
-    ok: true,
-    message: `${pool.name}: ${payload.length} kampe genereret — ${schedule.scheduled} med bane og tid.${partial}${overflow}`,
+    ok: schedule.unscheduled === 0,
+    message: `${pool.name}: ${payload.length} kampe genereret — ${schedule.scheduled} med bane og tid.${partial}${overflow}${
+      schedule.error ? ` ${schedule.error}` : ""
+    }`,
     matchCount: payload.length,
     scheduled: schedule.scheduled,
+    schedulingFailures,
   };
 }
 
@@ -811,16 +824,35 @@ export async function generateAllPoolMatchesForLevelAction(
 
   const ok = errors.length === 0 && unscheduled === 0 && scheduled > 0;
 
-  const schedulingFailures =
+  let schedulingFailures =
     unscheduledDetails.length > 0
       ? await buildSchedulingFailureRows(supabase, unscheduledDetails)
       : undefined;
+
+  if (unscheduled > 0 && (!schedulingFailures || schedulingFailures.length === 0)) {
+    const { data: unscheduledRows } = await supabase
+      .from("matches")
+      .select("id, team_a_id, team_b_id, pool_id")
+      .eq("event_id", TURNERING_EVENT_ID)
+      .in("pool_id", generatedPoolIds)
+      .or("court_id.is.null,start_time.is.null");
+    if (unscheduledRows?.length) {
+      schedulingFailures = await buildSchedulingFailureRows(
+        supabase,
+        unscheduledRows.map((m) => ({
+          matchId: m.id,
+          code: "unknown" as const,
+          message: scheduleError ?? "Kunne ikke placeres — prøv «Planlæg manglende» igen",
+        })),
+      );
+    }
+  }
 
   return {
     ok,
     message: `${normalizedLevel}: ${totalMatchCount} kampe i ${generatedPoolIds.length} pulje(r) — ${scheduled} med bane og tid.${partial}${overflow}${skipNote}${errNote}${
       scheduleError && scheduled === 0 ? ` ${scheduleError}` : ""
-    }`,
+    }${unscheduled > 0 ? " Se årsager nedenfor." : ""}`,
     matchCount: totalMatchCount,
     scheduled,
     schedulingFailures,
@@ -927,12 +959,32 @@ export async function schedulePoolMatchesAction(
     };
   }
 
+  let schedulingFailures = schedulingFailuresFromSchedule;
+  if (schedule.unscheduled > 0 && (!schedulingFailures || schedulingFailures.length === 0)) {
+    const { data: rows } = await supabase
+      .from("matches")
+      .select("id")
+      .eq("event_id", TURNERING_EVENT_ID)
+      .eq("pool_id", poolId)
+      .or("court_id.is.null,start_time.is.null");
+    if (rows?.length) {
+      schedulingFailures = await buildSchedulingFailureRows(
+        supabase,
+        rows.map((m) => ({
+          matchId: m.id,
+          code: "unknown" as const,
+          message: schedule.error ?? "Kunne ikke placeres",
+        })),
+      );
+    }
+  }
+
   return {
     ok: schedule.unscheduled === 0,
     message: `${pool.name}: ${schedule.scheduled} kamp(e) planlagt.${partial}${overflow}${
       schedule.error ? ` ${schedule.error}` : ""
-    }`,
+    }${schedule.unscheduled > 0 ? " Se årsager nedenfor." : ""}`,
     scheduled: schedule.scheduled,
-    schedulingFailures: schedulingFailuresFromSchedule,
+    schedulingFailures,
   };
 }

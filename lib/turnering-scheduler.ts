@@ -2383,24 +2383,49 @@ async function assignMatchScheduleForPoolIds(
   }
 
   const assignedIds = new Set(assignments.map((a) => a.matchId));
-  const reportStillUnscheduled = poolMatchesAll.filter(
-    (m) => m.pool_id === reportPoolId && !assignedIds.has(m.id),
-  ).length;
-  const reportSaved = reportPoolMatches.length - reportStillUnscheduled;
+  const stillUnscheduledCount = poolMatches.filter((m) => !assignedIds.has(m.id)).length;
+  const periodsById = new Map(allPeriods.map((p) => [p.id, p]));
+  const periodInputsAll: ScheduleMatchWithPeriod[] = poolMatchesAll.map((m) => ({
+    id: m.id,
+    levelKey,
+    teamAId: m.team_a_id,
+    teamBId: m.team_b_id,
+    primaryPeriodId,
+  }));
+  const unscheduledIds = poolMatches.filter((m) => !assignedIds.has(m.id)).map((m) => m.id);
+  const { occupancy: diagOccupancy, teamRounds: diagTeamRounds } = schedulingStateAfterAssignments(
+    externalOccupancy,
+    externalTeamSeed,
+    assignments,
+    periodInputsAll,
+  );
+  const unscheduledDetails =
+    unscheduledIds.length > 0
+      ? diagnoseUnscheduledMatches(
+          unscheduledIds,
+          periodInputsAll,
+          periodsById,
+          poolBase,
+          diagOccupancy,
+          diagTeamRounds,
+          teamRestMinutesBetweenMatches(roundLen),
+        )
+      : undefined;
   const relaxedScheduled = assignments.filter((a) => a.relaxedTeamRest).length;
 
   return {
-    scheduled: reportSaved,
-    unscheduled: reportStillUnscheduled,
+    scheduled: saved,
+    unscheduled: stillUnscheduledCount,
     error:
-      reportStillUnscheduled > 0
-        ? `${reportStillUnscheduled} kamp(e) i puljen kunne ikke placeres — tjek bane-kapacitet for ${levelKey}.`
+      stillUnscheduledCount > 0
+        ? `${stillUnscheduledCount} kamp(e) mangler bane/tid — se listen nedenfor.`
         : saved < assignments.length
           ? "Nogle kampe blev planlagt men kunne ikke gemmes."
           : relaxedScheduled > 0
             ? `${relaxedScheduled} kamp(e) planlagt uden fuld hold-pause — markeret med rød note under Genererede kampe.`
             : null,
     overflowPeriodNames,
+    unscheduledDetails,
   };
 }
 
