@@ -2180,12 +2180,18 @@ async function assignMatchScheduleForPoolIds(
     existingOccupancy: externalOccupancy,
   };
 
-  const poolInputsAll = poolMatchesAll.map((m) => ({
-    id: m.id,
-    levelKey,
-    teamAId: m.team_a_id,
-    teamBId: m.team_b_id,
-  }));
+  const toScheduleInputs = (rows: typeof poolMatches) =>
+    rows.map((m) => ({
+      id: m.id,
+      levelKey,
+      teamAId: m.team_a_id,
+      teamBId: m.team_b_id,
+    }));
+
+  const teamRounds = createTeamRoundTracker();
+  for (const [teamId, endMin] of externalTeamSeed) teamRounds.set(teamId, endMin);
+
+  const existingOccupancy: OccupiedSlot[] = [...externalOccupancy];
 
   const restAttempts = [
     teamRestMinutesBetweenMatches(roundLen),
@@ -2197,23 +2203,23 @@ async function assignMatchScheduleForPoolIds(
   let unscheduled: string[] = poolMatches.map((m) => m.id);
   let overflowPeriodNames: string[] = [];
 
-  const maxMatches = 30;
+  const maxMatchesFast = 80;
   if (process.env.NODE_ENV === "development") {
     console.info(
-      `[scheduler] Hele dagen ${levelKey}: ${poolIds.length} puljer, ${poolMatchesAll.length} kampe, ${eligibleCourtIds.length} baner`,
+      `[scheduler] Hele dagen ${levelKey}: ${poolIds.length} puljer, ${poolMatches.length} kampe uden tid, ${eligibleCourtIds.length} baner`,
     );
   }
-  if (poolMatchesAll.length <= maxMatches) {
+  if (poolMatches.length <= maxMatchesFast) {
     for (const rest of restAttempts) {
       const solved = schedulePoolFast(
         allPeriods,
         primaryPeriodId,
         poolBase,
-        poolInputsAll,
+        toScheduleInputs(poolMatches),
         externalTeamSeed,
         rest,
       );
-      if (solved && solved.assignments.length === poolMatchesAll.length) {
+      if (solved && solved.assignments.length === poolMatches.length) {
         assignments = solved.assignments;
         unscheduled = [];
         overflowPeriodNames = solved.overflowPeriodNames;
@@ -2222,21 +2228,147 @@ async function assignMatchScheduleForPoolIds(
     }
   }
 
+  const matchesToSchedule =
+    unscheduled.length > 0
+      ? [...poolMatches]
+          .filter((m) => unscheduled.includes(m.id))
+          .sort((a, b) => {
+            const pressure = (m: (typeof poolMatches)[0]) =>
+              Math.max(teamRounds.get(m.team_a_id) ?? -Infinity, teamRounds.get(m.team_b_id) ?? -Infinity);
+            return pressure(b) - pressure(a);
+          })
+      : [];
+
+  if (unscheduled.length > 0 && matchesToSchedule.length > 0) {
+    const greedyResult = scheduleMatchesWithPeriodOverflow(
+      allPeriods,
+      primaryPeriodId,
+      {
+        ...poolBase,
+        teamRounds,
+      },
+      toScheduleInputs(matchesToSchedule),
+    );
+    assignments = greedyResult.assignments;
+    unscheduled = greedyResult.unscheduled;
+    overflowPeriodNames = greedyResult.overflowPeriodNames;
+
+    if (unscheduled.length > 0) {
+      const retryOccupancy: OccupiedSlot[] = [...existingOccupancy];
+      for (const a of assignments) {
+        retryOccupancy.push({
+          courtId: a.courtId,
+          startMinutes: a.startMinutes,
+          endMinutes: a.endMinutes,
+        });
+      }
+      const unscheduledSet = new Set(unscheduled);
+      const retryRows = matchesToSchedule.filter((m) => unscheduledSet.has(m.id));
+      const retry = scheduleMatchesWithPeriodOverflow(
+        allPeriods,
+        primaryPeriodId,
+        {
+          ...poolBase,
+          existingOccupancy: retryOccupancy,
+          teamRounds,
+        },
+        toScheduleInputs(retryRows),
+      );
+      assignments = [...assignments, ...retry.assignments];
+      unscheduled = retry.unscheduled;
+      overflowPeriodNames = [...new Set([...overflowPeriodNames, ...retry.overflowPeriodNames])];
+    }
+
+    if (unscheduled.length > 0) {
+      const relaxedOccupancy: OccupiedSlot[] = [...existingOccupancy];
+      for (const a of assignments) {
+        relaxedOccupancy.push({
+          courtId: a.courtId,
+          startMinutes: a.startMinutes,
+          endMinutes: a.endMinutes,
+        });
+      }
+      const unscheduledSet = new Set(unscheduled);
+      const relaxedRows = matchesToSchedule.filter((m) => unscheduledSet.has(m.id));
+      const relaxed = scheduleMatchesWithPeriodOverflow(
+        allPeriods,
+        primaryPeriodId,
+        {
+          ...poolBase,
+          existingOccupancy: relaxedOccupancy,
+          teamRounds,
+          teamRestMinutes: Math.max(0, Math.floor(roundLen / 2)),
+        },
+        toScheduleInputs(relaxedRows),
+      );
+      assignments = [...assignments, ...relaxed.assignments];
+      unscheduled = relaxed.unscheduled;
+      overflowPeriodNames = [...new Set([...overflowPeriodNames, ...relaxed.overflowPeriodNames])];
+    }
+
+    if (unscheduled.length > 0) {
+      const lastOccupancy: OccupiedSlot[] = [...existingOccupancy];
+      for (const a of assignments) {
+        lastOccupancy.push({
+          courtId: a.courtId,
+          startMinutes: a.startMinutes,
+          endMinutes: a.endMinutes,
+        });
+      }
+      const unscheduledSet = new Set(unscheduled);
+      const lastRows = matchesToSchedule.filter((m) => unscheduledSet.has(m.id));
+      const lastChance = scheduleMatchesIndividually(
+        allPeriods,
+        primaryPeriodId,
+        {
+          ...poolBase,
+          existingOccupancy: lastOccupancy,
+          teamRestMinutes: 0,
+        },
+        toScheduleInputs(lastRows),
+        lastOccupancy,
+        teamRounds,
+      );
+      assignments = [...assignments, ...lastChance.assignments];
+      unscheduled = lastChance.unscheduled;
+      overflowPeriodNames = [
+        ...new Set([...overflowPeriodNames, ...lastChance.overflowPeriodNames]),
+      ];
+    }
+  }
+
   if (assignments.length === 0) {
+    const periodInputs: ScheduleMatchWithPeriod[] = poolMatches.map((m) => ({
+      id: m.id,
+      levelKey,
+      teamAId: m.team_a_id,
+      teamBId: m.team_b_id,
+      primaryPeriodId,
+    }));
+    const unscheduledDetails = diagnoseUnscheduledMatches(
+      unscheduled,
+      periodInputs,
+      new Map(allPeriods.map((p) => [p.id, p])),
+      { ...poolBase, courtIds: eligibleCourtIds },
+      existingOccupancy,
+      teamRounds,
+      teamRestMinutesBetweenMatches(roundLen),
+    );
     return {
       scheduled: 0,
       unscheduled: reportUnscheduledBefore,
       error:
-        poolMatchesAll.length > maxMatches
-          ? `For mange kampe (${poolMatchesAll.length}) til automatisk planlægning på niveauet.`
-          : "Ingen komplet plan fundet for niveauets puljer — tjek bane-tider og kapacitet under Opsætning → Haller & baner.",
+        poolMatches.length > maxMatchesFast
+          ? `For mange kampe (${poolMatches.length}) til hurtig planlægning — prøv at planlæg puljerne en ad gangen.`
+          : "Ingen kampe kunne placeres — tjek bane-tider under Opsætning → Haller & baner.",
       overflowPeriodNames: [],
+      unscheduledDetails,
     };
   }
 
   const fullRestMinutes = teamRestMinutesBetweenMatches(roundLen);
   const matchTeamsById = new Map(
-    poolInputsAll.map((m) => [m.id, { teamAId: m.teamAId, teamBId: m.teamBId }] as const),
+    poolMatches.map((m) => [m.id, { teamAId: m.team_a_id, teamBId: m.team_b_id }]),
   );
   annotateRelaxedTeamRestOnAssignments(assignments, matchTeamsById, externalTeamSeed, fullRestMinutes);
 
@@ -2611,7 +2743,6 @@ export async function assignMatchScheduleForPool(
     blockedOverflowPeriodIds,
   };
 
-  const poolInputsAll = toScheduleInputs(poolMatchesAll);
   const restAttempts = [
     teamRestMinutesBetweenMatches(roundLen),
     Math.max(0, Math.floor(roundLen / 2)),
@@ -2623,17 +2754,17 @@ export async function assignMatchScheduleForPool(
   let overflowPeriodNames: string[] = [];
 
   /** Hurtig planlægning af hele puljen (flere rækkefølger). */
-  if (poolMatchesAll.length <= 30) {
+  if (poolMatches.length <= 80) {
     for (const rest of restAttempts) {
       const solved = schedulePoolFast(
         allPeriods,
         pool.period_id,
         poolBase,
-        poolInputsAll,
+        toScheduleInputs(poolMatches),
         externalTeamSeed,
         rest,
       );
-      if (solved && solved.assignments.length === poolMatchesAll.length) {
+      if (solved && solved.assignments.length === poolMatches.length) {
         assignments = solved.assignments;
         unscheduled = [];
         overflowPeriodNames = solved.overflowPeriodNames;
