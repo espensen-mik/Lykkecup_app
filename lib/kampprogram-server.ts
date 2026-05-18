@@ -7,7 +7,11 @@ import type {
   KampprogramMatch,
   KampprogramPeriod,
 } from "@/lib/kampprogram";
-import { buildLevelTimingByLevel, isOrphanKampprogramMatch } from "@/lib/kampprogram";
+import {
+  buildKampprogramCourtAvailabilityByCourtId,
+  buildLevelTimingByLevel,
+  isOrphanKampprogramMatch,
+} from "@/lib/kampprogram";
 import { buildTeamDetailsById, type TeamPlayerLite } from "@/lib/team-detail";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 import { isAllDayPeriod, periodWindowMinutes } from "@/lib/tournament-periods";
@@ -20,6 +24,7 @@ const empty: KampprogramBundle = {
   levels: [],
   periods: [],
   levelTimingByLevel: {},
+  courtAvailabilityByCourtId: {},
   teamDetails: {},
   stats: { total: 0, scheduled: 0, unscheduled: 0, orphanMatches: 0 },
   error: null,
@@ -29,7 +34,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
   const eventId = TURNERING_EVENT_ID;
   const client = await createServerSupabase();
 
-  const [matchesRes, teamsRes, poolsRes, periodsRes, venuesRes, levelScheduleRes, membersRes, playersRes, coachesRes, teamCoachesRes] =
+  const [matchesRes, teamsRes, poolsRes, periodsRes, venuesRes, levelScheduleRes, availabilityRes, membersRes, playersRes, coachesRes, teamCoachesRes] =
     await Promise.all([
       client
         .from("matches")
@@ -51,6 +56,10 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
         .from("level_schedule_settings")
         .select("level, match_duration_minutes, break_between_matches_minutes, rounds_per_match")
         .eq("event_id", eventId),
+      client
+        .from("court_availability")
+        .select("court_id, start_time, end_time")
+        .eq("event_id", eventId),
       client.from("team_members").select("id, team_id, player_id").eq("event_id", eventId),
       client.from("players").select("id, name, home_club, age").eq("event_id", eventId),
       client.from("coaches").select("id, name, home_club, age").eq("event_id", eventId),
@@ -64,6 +73,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     periodsRes.error?.message ??
     venuesRes.error?.message ??
     levelScheduleRes.error?.message ??
+    availabilityRes.error?.message ??
     membersRes.error?.message ??
     playersRes.error?.message ??
     coachesRes.error?.message ??
@@ -142,7 +152,12 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       venueName: c.venue_id ? (venueById.get(c.venue_id) ?? null) : null,
       sortOrder: c.sort_order ?? 0,
     }))
-    .sort((a, b) => compareCourtNamesForSchedule(a.name, b.name) || a.sortOrder - b.sortOrder);
+    .sort(
+      (a, b) =>
+        (a.venueName ?? "").localeCompare(b.venueName ?? "", "da", { sensitivity: "base" }) ||
+        compareCourtNamesForSchedule(a.name, b.name) ||
+        a.sortOrder - b.sortOrder,
+    );
 
   const levelSet = new Set<string>();
   const matches: KampprogramMatch[] = [];
@@ -213,6 +228,14 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     }>,
   );
 
+  const courtAvailabilityByCourtId = buildKampprogramCourtAvailabilityByCourtId(
+    (availabilityRes.data ?? []) as Array<{
+      court_id: string;
+      start_time: string;
+      end_time: string;
+    }>,
+  );
+
   const scheduled = matches.filter((m) => m.isScheduled).length;
   const orphanMatches = matches.filter((m) => m.isOrphan).length;
 
@@ -222,6 +245,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     levels: [...levelSet].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" })),
     periods,
     levelTimingByLevel,
+    courtAvailabilityByCourtId,
     teamDetails,
     stats: {
       total: matches.length,

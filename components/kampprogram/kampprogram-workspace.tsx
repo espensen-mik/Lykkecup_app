@@ -393,9 +393,16 @@ export function KampprogramWorkspace({ initial }: Props) {
         filtered,
         initial.levelTimingByLevel,
         initial.courts,
+        initial.courtAvailabilityByCourtId,
         sortByDisplayName,
       ),
-    [filtered, initial.levelTimingByLevel, initial.courts, sortByDisplayName],
+    [
+      filtered,
+      initial.levelTimingByLevel,
+      initial.courts,
+      initial.courtAvailabilityByCourtId,
+      sortByDisplayName,
+    ],
   );
 
   const courtTimelines = useMemo(() => {

@@ -8,7 +8,12 @@ import {
 } from "@/lib/baner-tider";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
 import { defaultRoundsPerMatchForLevel } from "@/lib/level-court-settings";
-import { roundLengthMinutes, type RoundTiming } from "@/lib/lykkecup-regnemaskine";
+import {
+  availabilityRowsToRegnemaskineAvailability,
+  roundLengthMinutes,
+  type RoundTiming,
+} from "@/lib/lykkecup-regnemaskine";
+import type { CourtAvailabilityRow } from "@/lib/baner-tider";
 
 /** Client-safe types for kampprogram (ingen server-imports). */
 
@@ -40,6 +45,71 @@ export type KampprogramCourt = {
   venueName: string | null;
   sortOrder: number;
 };
+
+export type KampprogramCourtAvailabilityWindow = {
+  startMinutes: number;
+  endMinutes: number;
+};
+
+/** Spilletid pr. bane fra Haller & baner (tom = antages tilgængelig hele dagen). */
+export type KampprogramCourtAvailabilityByCourtId = Record<
+  string,
+  readonly KampprogramCourtAvailabilityWindow[]
+>;
+
+export function buildKampprogramCourtAvailabilityByCourtId(
+  rows: readonly Pick<CourtAvailabilityRow, "court_id" | "start_time" | "end_time">[],
+): KampprogramCourtAvailabilityByCourtId {
+  const out: Record<string, KampprogramCourtAvailabilityWindow[]> = {};
+  const asRows = rows.map(
+    (r) =>
+      ({
+        id: "",
+        event_id: "",
+        court_id: r.court_id,
+        start_time: r.start_time,
+        end_time: r.end_time,
+      }) satisfies CourtAvailabilityRow,
+  );
+  for (const a of availabilityRowsToRegnemaskineAvailability(asRows)) {
+    const list = out[a.courtId] ?? [];
+    list.push({ startMinutes: a.startMinutes, endMinutes: a.endMinutes });
+    out[a.courtId] = list;
+  }
+  return out;
+}
+
+/** Bane kan bruges i hele tidsrummet (som scheduleren kræver for en kamp). */
+export function isCourtPlayableAtSlot(
+  courtId: string,
+  slotStartMinutes: number,
+  slotEndMinutes: number,
+  availabilityByCourtId: KampprogramCourtAvailabilityByCourtId,
+): boolean {
+  const windows = availabilityByCourtId[courtId];
+  if (!windows || windows.length === 0) return true;
+  return windows.some(
+    (w) => w.startMinutes <= slotStartMinutes && w.endMinutes >= slotEndMinutes,
+  );
+}
+
+function compareKampprogramRowByCourt(a: KampprogramTableRow, b: KampprogramTableRow): number {
+  const pack = (row: KampprogramTableRow) =>
+    row.type === "match"
+      ? { name: row.match.courtName, venue: row.match.venueName }
+      : { name: row.courtName, venue: row.venueName };
+  const pa = pack(a);
+  const pb = pack(b);
+  const byVenue = (pa.venue ?? "").localeCompare(pb.venue ?? "", "da", { sensitivity: "base" });
+  if (byVenue !== 0) return byVenue;
+  return compareCourtNamesForSchedule(pa.name, pb.name);
+}
+
+function compareKampprogramCourts(a: KampprogramCourt, b: KampprogramCourt): number {
+  const byVenue = (a.venueName ?? "").localeCompare(b.venueName ?? "", "da", { sensitivity: "base" });
+  if (byVenue !== 0) return byVenue;
+  return compareCourtNamesForSchedule(a.name, b.name) || a.sortOrder - b.sortOrder;
+}
 
 /** Kampe hvis pulje eller hold ikke findes længere (typisk efter sletning i Puljer). */
 export function isOrphanKampprogramMatch(
@@ -219,12 +289,7 @@ function kampprogramSlotStartMinutes(t: string): number | null {
 }
 
 function sortKampprogramRowsByCourt(rows: KampprogramTableRow[]): KampprogramTableRow[] {
-  const courtLabel = (row: KampprogramTableRow) =>
-    row.type === "match"
-      ? formatCourtWithVenue(row.match.courtName ?? "—", row.match.venueName)
-      : formatCourtWithVenue(row.courtName, row.venueName);
-
-  return [...rows].sort((a, b) => courtLabel(a).localeCompare(courtLabel(b), "da"));
+  return [...rows].sort(compareKampprogramRowByCourt);
 }
 
 function roundSlotEndMinutes(
@@ -244,6 +309,7 @@ function injectEmptyCourtsIntoRound(
   matchRows: KampprogramTableRow[],
   courts: readonly KampprogramCourt[],
   startMinutes: number,
+  availabilityByCourtId: KampprogramCourtAvailabilityByCourtId,
 ): KampprogramTableRow[] {
   if (courts.length === 0) return matchRows;
 
@@ -254,12 +320,16 @@ function injectEmptyCourtsIntoRound(
       .filter((id): id is string => Boolean(id)),
   );
 
+  const slotEndMinutes = roundSlotEndMinutes(matchRows, startMinutes);
   const slotStart = minutesToSlotIso(startMinutes);
-  const slotEnd = minutesToSlotIso(roundSlotEndMinutes(matchRows, startMinutes));
+  const slotEnd = minutesToSlotIso(slotEndMinutes);
   if (!slotStart || !slotEnd) return matchRows;
 
   const idleRows: KampprogramTableRow[] = courts
     .filter((court) => !busyCourtIds.has(court.id))
+    .filter((court) =>
+      isCourtPlayableAtSlot(court.id, startMinutes, slotEndMinutes, availabilityByCourtId),
+    )
     .map((court) => ({
       type: "idle" as const,
       courtId: court.id,
@@ -294,6 +364,7 @@ export function groupKampprogramByRound(
   matches: readonly KampprogramMatch[],
   timingByLevel: Readonly<Record<string, KampprogramLevelTiming>>,
   courts: readonly KampprogramCourt[],
+  availabilityByCourtId: KampprogramCourtAvailabilityByCourtId,
   sortByTeamDisplayName?: (teamAId: string, teamBId: string) => number,
 ): KampprogramRoundGroup[] {
   const groups = new Map<number, KampprogramTableRow[]>();
@@ -316,22 +387,20 @@ export function groupKampprogramByRound(
     sortByTeamDisplayName ??
     ((a, b) => a.localeCompare(b, "da"));
 
-  const courtsSorted = [...courts].sort(
-    (a, b) =>
-      compareCourtNamesForSchedule(a.name, b.name) ||
-      (a.venueName ?? "").localeCompare(b.venueName ?? "", "da"),
-  );
+  const courtsSorted = [...courts].sort(compareKampprogramCourts);
 
   return keys.map((startMinutes, index) => {
     const matchRows = [...(groups.get(startMinutes) ?? [])];
     matchRows.sort((a, b) => {
       if (a.type !== "match" || b.type !== "match") return 0;
-      return (
-        compareCourtNamesForSchedule(a.match.courtName, b.match.courtName) ||
-        teamSort(a.match.teamAId, b.match.teamAId)
-      );
+      return compareKampprogramRowByCourt(a, b) || teamSort(a.match.teamAId, b.match.teamAId);
     });
-    const roundRows = injectEmptyCourtsIntoRound(matchRows, courtsSorted, startMinutes);
+    const roundRows = injectEmptyCourtsIntoRound(
+      matchRows,
+      courtsSorted,
+      startMinutes,
+      availabilityByCourtId,
+    );
     const startTime = minutesToSlotIso(startMinutes) ?? minutesToTimeInput(startMinutes);
     return {
       roundNumber: index + 1,
@@ -410,6 +479,7 @@ export type KampprogramBundle = {
   levels: string[];
   periods: KampprogramPeriod[];
   levelTimingByLevel: Record<string, KampprogramLevelTiming>;
+  courtAvailabilityByCourtId: KampprogramCourtAvailabilityByCourtId;
   teamDetails: Record<string, TeamDetailView>;
   stats: {
     total: number;
