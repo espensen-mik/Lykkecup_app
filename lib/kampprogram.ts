@@ -213,32 +213,56 @@ export function expandMatchToTableRows(
   return rows;
 }
 
+/** Klokkeslæt-nøgle til runde-gruppering (undgår split pga. forskellige ISO-strenge for samme tid). */
+function kampprogramSlotStartMinutes(t: string): number | null {
+  return timeToMinutes(t);
+}
+
+function roundTimeLabelFromRows(rows: readonly KampprogramTableRow[]): string {
+  let minStart: number | null = null;
+  let maxEnd: number | null = null;
+  for (const row of rows) {
+    if (row.type !== "match") continue;
+    const s = kampprogramSlotStartMinutes(row.slotStartTime);
+    const e = kampprogramSlotStartMinutes(row.slotEndTime);
+    if (s != null) minStart = minStart == null ? s : Math.min(minStart, s);
+    if (e != null) maxEnd = maxEnd == null ? e : Math.max(maxEnd, e);
+  }
+  if (minStart == null) return "—";
+  const start = formatTimeForInput(minutesToTimeInput(minStart));
+  if (maxEnd == null || maxEnd <= minStart) return start;
+  const end = formatTimeForInput(minutesToTimeInput(maxEnd));
+  return start && end ? `${start}–${end}` : start;
+}
+
 /** Gruppér planlagte kampe i kronologiske runder (samme starttid = samme runde på tværs af baner). */
 export function groupKampprogramByRound(
   matches: readonly KampprogramMatch[],
   timingByLevel: Readonly<Record<string, KampprogramLevelTiming>>,
   sortByTeamDisplayName?: (teamAId: string, teamBId: string) => number,
 ): KampprogramRoundGroup[] {
-  const groups = new Map<string, KampprogramTableRow[]>();
+  const groups = new Map<number, KampprogramTableRow[]>();
 
   for (const m of matches) {
     if (!m.isScheduled || !m.startTime) continue;
     const timing = resolveKampprogramLevelTiming(m.levelKey, timingByLevel);
     for (const row of expandMatchToTableRows(m, timing)) {
       if (row.type !== "match") continue;
-      const list = groups.get(row.slotStartTime) ?? [];
+      const slotMin = kampprogramSlotStartMinutes(row.slotStartTime);
+      if (slotMin == null) continue;
+      const list = groups.get(slotMin) ?? [];
       list.push(row);
-      groups.set(row.slotStartTime, list);
+      groups.set(slotMin, list);
     }
   }
 
-  const keys = [...groups.keys()].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  const keys = [...groups.keys()].sort((a, b) => a - b);
   const teamSort =
     sortByTeamDisplayName ??
     ((a, b) => a.localeCompare(b, "da"));
 
-  return keys.map((startTime, index) => {
-    const roundRows = [...(groups.get(startTime) ?? [])];
+  return keys.map((startMinutes, index) => {
+    const roundRows = [...(groups.get(startMinutes) ?? [])];
     roundRows.sort((a, b) => {
       if (a.type !== "match" || b.type !== "match") return 0;
       return (
@@ -246,15 +270,12 @@ export function groupKampprogramByRound(
         teamSort(a.match.teamAId, b.match.teamAId)
       );
     });
-    const sample = roundRows.find((r) => r.type === "match");
-    const start = sample?.type === "match" ? formatTimeForInput(sample.slotStartTime) : "";
-    const end = sample?.type === "match" ? formatTimeForInput(sample.slotEndTime) : "";
-    const timeLabel = start && end ? `${start}–${end}` : start ?? "—";
+    const startTime = minutesToSlotIso(startMinutes) ?? minutesToTimeInput(startMinutes);
     return {
       roundNumber: index + 1,
       label: `Runde ${index + 1}`,
       startTime,
-      timeLabel,
+      timeLabel: roundTimeLabelFromRows(roundRows),
       rows: roundRows,
     };
   });
