@@ -10,10 +10,12 @@ import { compareCourtNamesForSchedule, formatTimeForInput } from "@/lib/baner-ti
 import { formatLevelShortLabel } from "@/lib/holddannelse";
 import { getLevelVisualClasses } from "@/lib/level-colors";
 import {
+  buildCourtTimelineRows,
   formatCourtWithVenue,
   groupKampprogramByRound,
   type KampprogramBundle,
   type KampprogramMatch,
+  type KampprogramTableRow,
 } from "@/lib/kampprogram";
 import { kontrolCenterTeamDisplayName, type TeamDetailView } from "@/lib/team-detail";
 import { ManualScheduleDialog } from "@/components/turnering/manual-schedule-dialog";
@@ -162,6 +164,139 @@ function MatchTable({
   );
 }
 
+function KampprogramTimelineTable({
+  rows,
+  showCourt,
+  teamDetails,
+  onOpenTeam,
+}: {
+  rows: KampprogramTableRow[];
+  showCourt: boolean;
+  teamDetails: Record<string, TeamDetailView>;
+  onOpenTeam: (teamId: string) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 dark:text-gray-400">Ingen kampe planlagt på denne bane.</p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-200 bg-gray-50/90 text-left text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
+            {showCourt ? <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Bane</th> : null}
+            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Tid</th>
+            <th className="min-w-[14rem] px-3 py-2.5 font-semibold uppercase tracking-wide">Kamp</th>
+            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Niveau</th>
+            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Pulje</th>
+            <th
+              className="px-3 py-2.5 font-semibold uppercase tracking-wide"
+              title="Puljens tildelte periode — ikke klokkeslæt"
+            >
+              Pulje-periode
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => {
+            const zebra =
+              index % 2 === 0
+                ? "bg-white dark:bg-gray-900/25"
+                : "bg-gray-50/95 dark:bg-gray-800/40";
+
+            if (row.type === "idle") {
+              return (
+                <tr
+                  key={`idle-${row.courtId}-${row.startTime}`}
+                  className={`border-b border-gray-100 last:border-0 dark:border-gray-800/80 ${zebra}`}
+                >
+                  {showCourt ? (
+                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400">
+                      {formatCourtWithVenue(row.courtName, row.venueName)}
+                    </td>
+                  ) : null}
+                  <td className="px-3 py-3 tabular-nums text-gray-500 dark:text-gray-400">
+                    {fmtTimeRange(row.startTime, row.endTime)}
+                  </td>
+                  <td colSpan={4} className="px-3 py-3 italic text-gray-500 dark:text-gray-400">
+                    Ledig bane
+                  </td>
+                </tr>
+              );
+            }
+
+            const m = row.match;
+            const lv = getLevelVisualClasses(m.levelKey);
+            const detailA = teamDetailOrFallback(m.teamAId, teamDetails);
+            const detailB = teamDetailOrFallback(m.teamBId, teamDetails);
+
+            return (
+              <tr
+                key={`${m.id}-${row.slotStartTime}`}
+                className={`border-b border-gray-100 last:border-0 dark:border-gray-800/80 ${zebra}`}
+              >
+                {showCourt ? (
+                  <td className="px-3 py-3 text-gray-900 dark:text-white">
+                    {m.courtName ? (
+                      <span className="font-medium">{formatCourtWithVenue(m.courtName, m.venueName)}</span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                ) : null}
+                <td className="px-3 py-3 tabular-nums font-medium text-gray-700 dark:text-gray-200">
+                  <span>{fmtTimeRange(row.slotStartTime, row.slotEndTime)}</span>
+                  {row.segmentLabel ? (
+                    <span className="mt-0.5 block text-xs font-medium text-teal-800 dark:text-teal-300">
+                      {row.segmentLabel}
+                    </span>
+                  ) : null}
+                </td>
+                <td className="px-3 py-3">
+                  <div className="flex min-w-0 max-w-[22rem] flex-wrap items-center gap-x-1.5 gap-y-0.5 sm:flex-nowrap">
+                    <TeamNameWithHover
+                      detail={detailA}
+                      onOpenDetail={() => onOpenTeam(m.teamAId)}
+                      maxWidthClass="max-w-[8.75rem] sm:max-w-[9.5rem]"
+                    />
+                    <span
+                      className="shrink-0 text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500"
+                      aria-hidden
+                    >
+                      Vs.
+                    </span>
+                    <TeamNameWithHover
+                      detail={detailB}
+                      onOpenDetail={() => onOpenTeam(m.teamBId)}
+                      maxWidthClass="max-w-[8.75rem] sm:max-w-[9.5rem]"
+                    />
+                  </div>
+                </td>
+                <td className="px-3 py-3">
+                  <span className={lv.badge} title={m.levelKey}>
+                    {formatLevelShortLabel(m.levelKey)}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.poolName}</td>
+                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  <span>{m.periodName ?? "—"}</span>
+                  {m.scheduledOutsidePoolPeriod ? (
+                    <span className="mt-0.5 block text-xs font-medium text-amber-800 dark:text-amber-300">
+                      Spillet uden for pulje-periode
+                    </span>
+                  ) : null}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Kpi({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
@@ -253,9 +388,18 @@ export function KampprogramWorkspace({ initial }: Props) {
   }, [filtered, initial.courts, sortByDisplayName]);
 
   const roundGroups = useMemo(
-    () => groupKampprogramByRound(filtered, sortByDisplayName),
-    [filtered, sortByDisplayName],
+    () => groupKampprogramByRound(filtered, initial.levelTimingByLevel, sortByDisplayName),
+    [filtered, initial.levelTimingByLevel, sortByDisplayName],
   );
+
+  const courtTimelines = useMemo(() => {
+    return initial.courts.map((court) => {
+      const matches = byCourt.map.get(court.id) ?? [];
+      const rows = buildCourtTimelineRows(court, matches, initial.levelTimingByLevel);
+      const idleCount = rows.filter((r) => r.type === "idle").length;
+      return { court, matches, rows, idleCount };
+    });
+  }, [initial.courts, initial.levelTimingByLevel, byCourt]);
 
   const unscheduledFiltered = useMemo(() => filtered.filter((m) => !m.isScheduled), [filtered]);
 
@@ -387,10 +531,7 @@ export function KampprogramWorkspace({ initial }: Props) {
         </div>
       ) : view === "court" ? (
         <div className="space-y-6">
-          {initial.courts.map((court) => {
-            const rows = byCourt.map.get(court.id) ?? [];
-            if (rows.length === 0 && hideUnscheduled) return null;
-            return (
+          {courtTimelines.map(({ court, matches, rows, idleCount }) => (
               <section
                 key={court.id}
                 className="rounded-lg border border-lc-border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50"
@@ -402,10 +543,12 @@ export function KampprogramWorkspace({ initial }: Props) {
                   ) : null}
                 </h2>
                 <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                  {rows.length} kamp{rows.length === 1 ? "" : "e"}
+                  {matches.length === 0
+                    ? "Ingen kampe planlagt"
+                    : `${matches.length} kamp${matches.length === 1 ? "" : "e"}${idleCount > 0 ? ` · ${idleCount} ledig${idleCount === 1 ? "" : "e"} interval${idleCount === 1 ? "" : "er"}` : ""}`}
                 </p>
                 <div className="mt-3">
-                  <MatchTable
+                  <KampprogramTimelineTable
                     rows={rows}
                     showCourt={false}
                     teamDetails={teamDetails}
@@ -413,8 +556,7 @@ export function KampprogramWorkspace({ initial }: Props) {
                   />
                 </div>
               </section>
-            );
-          })}
+            ))}
           {byCourt.unassigned.length > 0 ? (
             <section className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
               <h2 className="text-base font-semibold text-amber-900 dark:text-amber-100">Ikke planlagt</h2>
@@ -440,7 +582,7 @@ export function KampprogramWorkspace({ initial }: Props) {
             <p className="text-sm text-gray-500 dark:text-gray-400">Ingen planlagte kampe matcher filtrene.</p>
           ) : (
             roundGroups.map((round) => {
-              const rows = round.matches;
+              const matchRows = round.rows.filter((r) => r.type === "match");
               return (
                 <section
                   key={round.startTime}
@@ -448,11 +590,12 @@ export function KampprogramWorkspace({ initial }: Props) {
                 >
                   <h2 className="text-base font-semibold text-gray-900 dark:text-white">{round.label}</h2>
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    {round.timeLabel} · {rows.length} kamp{rows.length === 1 ? "" : "e"} samtidig på tværs af baner
+                    {round.timeLabel} · {matchRows.length} kamp{matchRows.length === 1 ? "" : "e"} samtidig på tværs
+                    af baner
                   </p>
                   <div className="mt-3">
-                    <MatchTable
-                      rows={rows}
+                    <KampprogramTimelineTable
+                      rows={round.rows}
                       showCourt
                       teamDetails={teamDetails}
                       onOpenTeam={setPreviewTeamId}

@@ -10,6 +10,7 @@ import type {
   CourtRow,
   CourtType,
   LevelScheduleRow,
+  VenueRow,
 } from "@/lib/baner-tider";
 import {
   formatTimeForInput,
@@ -167,7 +168,8 @@ export function BanerTiderWorkspace({
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initial.error);
 
-  const [venueModal, setVenueModal] = useState(false);
+  type VenueModalState = { kind: "create" } | { kind: "edit"; venue: VenueRow };
+  const [venueModal, setVenueModal] = useState<VenueModalState | null>(null);
   const [courtModal, setCourtModal] = useState<{ venueId: string } | null>(null);
   const [editCourt, setEditCourt] = useState<CourtRow | null>(null);
 
@@ -244,17 +246,27 @@ export function BanerTiderWorkspace({
     }
   }
 
-  async function handleCreateVenue(e: React.FormEvent) {
+  async function handleSaveVenue(e: React.FormEvent) {
     e.preventDefault();
+    if (!venueModal) return;
     const name = venueName.trim();
     if (!name) return;
     const err = await run(async () => {
-      const { error: insErr } = await supabase.from("venues").insert({
-        event_id: eventId,
-        name,
-        sort_order: 999,
-      });
-      if (insErr) return insErr.message;
+      if (venueModal.kind === "create") {
+        const { error: insErr } = await supabase.from("venues").insert({
+          event_id: eventId,
+          name,
+          sort_order: 999,
+        });
+        if (insErr) return insErr.message;
+        return null;
+      }
+      const { error: upErr } = await supabase
+        .from("venues")
+        .update({ name })
+        .eq("id", venueModal.venue.id)
+        .eq("event_id", eventId);
+      if (upErr) return upErr.message;
       return null;
     });
     if (err) {
@@ -262,8 +274,8 @@ export function BanerTiderWorkspace({
       return;
     }
     setVenueName("");
-    setVenueModal(false);
-    setToast("Hal oprettet.");
+    setVenueModal(null);
+    setToast(venueModal.kind === "create" ? "Hal oprettet." : "Hal omdøbt.");
     refresh();
   }
 
@@ -613,7 +625,7 @@ export function BanerTiderWorkspace({
               disabled={busy}
               onClick={() => {
                 setVenueName("");
-                setVenueModal(true);
+                setVenueModal({ kind: "create" });
               }}
               className="rounded-lg bg-[#14b8a6] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#0d9488] disabled:opacity-50"
             >
@@ -636,18 +648,31 @@ export function BanerTiderWorkspace({
                       <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Hal</p>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{v.name}</h3>
                     </div>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => {
-                        setCourtModal({ venueId: v.id });
-                        setCourtName("");
-                        setCourtType("stor");
-                      }}
-                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
-                    >
-                      Tilføj bane
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setVenueName(v.name);
+                          setVenueModal({ kind: "edit", venue: v });
+                        }}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+                      >
+                        Omdøb hal
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setCourtModal({ venueId: v.id });
+                          setCourtName("");
+                          setCourtType("stor");
+                        }}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+                      >
+                        Tilføj bane
+                      </button>
+                    </div>
                   </div>
                   <ul className="mt-4 space-y-3">
                     {(courtsByVenue.get(v.id) ?? []).length === 0 ? (
@@ -828,8 +853,12 @@ export function BanerTiderWorkspace({
         />
       ) : null}
 
-      <Modal open={venueModal} title="Opret hal" onClose={() => setVenueModal(false)}>
-        <form className="space-y-4" onSubmit={handleCreateVenue}>
+      <Modal
+        open={venueModal != null}
+        title={venueModal?.kind === "edit" ? "Omdøb hal" : "Opret hal"}
+        onClose={() => setVenueModal(null)}
+      >
+        <form className="space-y-4" onSubmit={handleSaveVenue}>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Navn</label>
             <input
@@ -837,7 +866,7 @@ export function BanerTiderWorkspace({
               className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
               value={venueName}
               onChange={(e) => setVenueName(e.target.value)}
-              placeholder="F.eks. Hal A"
+              placeholder="F.eks. Hal L"
             />
           </div>
           <button
@@ -845,7 +874,7 @@ export function BanerTiderWorkspace({
             disabled={busy}
             className="w-full rounded-lg bg-[#14b8a6] py-2 text-sm font-semibold text-white hover:bg-[#0d9488] disabled:opacity-50"
           >
-            Opret
+            {venueModal?.kind === "edit" ? "Gem navn" : "Opret"}
           </button>
         </form>
       </Modal>

@@ -7,7 +7,7 @@ import type {
   KampprogramMatch,
   KampprogramPeriod,
 } from "@/lib/kampprogram";
-import { isOrphanKampprogramMatch } from "@/lib/kampprogram";
+import { buildLevelTimingByLevel, isOrphanKampprogramMatch } from "@/lib/kampprogram";
 import { buildTeamDetailsById, type TeamPlayerLite } from "@/lib/team-detail";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 import { isAllDayPeriod, periodWindowMinutes } from "@/lib/tournament-periods";
@@ -19,6 +19,7 @@ const empty: KampprogramBundle = {
   courts: [],
   levels: [],
   periods: [],
+  levelTimingByLevel: {},
   teamDetails: {},
   stats: { total: 0, scheduled: 0, unscheduled: 0, orphanMatches: 0 },
   error: null,
@@ -28,7 +29,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
   const eventId = TURNERING_EVENT_ID;
   const client = await createServerSupabase();
 
-  const [matchesRes, teamsRes, poolsRes, periodsRes, venuesRes, membersRes, playersRes, coachesRes, teamCoachesRes] =
+  const [matchesRes, teamsRes, poolsRes, periodsRes, venuesRes, levelScheduleRes, membersRes, playersRes, coachesRes, teamCoachesRes] =
     await Promise.all([
       client
         .from("matches")
@@ -46,6 +47,10 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
         .eq("event_id", eventId)
         .order("sort_order", { ascending: true }),
       client.from("venues").select("id, name").eq("event_id", eventId),
+      client
+        .from("level_schedule_settings")
+        .select("level, match_duration_minutes, break_between_matches_minutes, rounds_per_match")
+        .eq("event_id", eventId),
       client.from("team_members").select("id, team_id, player_id").eq("event_id", eventId),
       client.from("players").select("id, name, home_club, age").eq("event_id", eventId),
       client.from("coaches").select("id, name, home_club, age").eq("event_id", eventId),
@@ -58,6 +63,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     poolsRes.error?.message ??
     periodsRes.error?.message ??
     venuesRes.error?.message ??
+    levelScheduleRes.error?.message ??
     membersRes.error?.message ??
     playersRes.error?.message ??
     coachesRes.error?.message ??
@@ -198,6 +204,15 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     name: p.name,
   }));
 
+  const levelTimingByLevel = buildLevelTimingByLevel(
+    (levelScheduleRes.data ?? []) as Array<{
+      level: string;
+      match_duration_minutes: number | null;
+      break_between_matches_minutes: number | null;
+      rounds_per_match: number | null;
+    }>,
+  );
+
   const scheduled = matches.filter((m) => m.isScheduled).length;
   const orphanMatches = matches.filter((m) => m.isOrphan).length;
 
@@ -206,6 +221,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     courts,
     levels: [...levelSet].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" })),
     periods,
+    levelTimingByLevel,
     teamDetails,
     stats: {
       total: matches.length,
