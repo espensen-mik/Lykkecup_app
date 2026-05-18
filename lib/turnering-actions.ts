@@ -9,6 +9,9 @@ import {
   assignMatchScheduleForLevelAllDay,
   assignMatchScheduleForLevelPeriodPools,
   assignMatchScheduleForPool,
+  listManualScheduleSlotsForMatch,
+  minutesToTimestamptz,
+  type ManualScheduleSlotOption,
   type UnscheduledMatchDetail,
 } from "@/lib/turnering-scheduler";
 import {
@@ -482,6 +485,7 @@ export async function updateMatchScheduleAction(
   courtId: string | null,
   startTimeIso: string,
   endTimeIso: string,
+  options?: { scheduleRelaxedTeamRest?: boolean },
 ): Promise<TurneringActionResult> {
   const supabase = await createServerSupabase();
   const {
@@ -497,7 +501,7 @@ export async function updateMatchScheduleAction(
       court_id: courtId,
       start_time: startTimeIso,
       end_time: endTimeIso,
-      schedule_relaxed_team_rest: false,
+      schedule_relaxed_team_rest: options?.scheduleRelaxedTeamRest ?? false,
     })
     .eq("id", matchId)
     .eq("event_id", TURNERING_EVENT_ID);
@@ -506,8 +510,63 @@ export async function updateMatchScheduleAction(
 
   revalidatePath("/turnering/plan");
   revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
+  revalidatePath("/kampprogram");
 
   return { ok: true, message: "Kamp opdateret." };
+}
+
+export type ManualScheduleSlotsActionResult = TurneringActionResult & {
+  levelKey?: string | null;
+  teamALabel?: string | null;
+  teamBLabel?: string | null;
+  teamRestMinutes?: number;
+  slots?: ManualScheduleSlotOption[];
+};
+
+export async function fetchManualScheduleSlotsAction(
+  matchId: string,
+): Promise<ManualScheduleSlotsActionResult> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Du skal være logget ind." };
+  }
+
+  const result = await listManualScheduleSlotsForMatch(supabase, matchId);
+  if (!result.ok) {
+    return { ok: false, message: result.error ?? "Kunne ikke hente ledige tider." };
+  }
+
+  return {
+    ok: true,
+    message: result.slots.length > 0 ? `${result.slots.length} ledige tider fundet.` : "Ingen ledige tider fundet.",
+    levelKey: result.levelKey,
+    teamALabel: result.teamALabel,
+    teamBLabel: result.teamBLabel,
+    teamRestMinutes: result.teamRestMinutes,
+    slots: result.slots,
+  };
+}
+
+export async function applyManualScheduleSlotAction(
+  matchId: string,
+  levelKey: string,
+  courtId: string,
+  startMinutes: number,
+  endMinutes: number,
+  respectsTeamRest: boolean,
+): Promise<TurneringActionResult> {
+  const startTimeIso = minutesToTimestamptz(startMinutes);
+  const endTimeIso = minutesToTimestamptz(endMinutes);
+  if (!startTimeIso || !endTimeIso) {
+    return { ok: false, message: "Ugyldige tider." };
+  }
+
+  return updateMatchScheduleAction(matchId, levelKey, courtId, startTimeIso, endTimeIso, {
+    scheduleRelaxedTeamRest: !respectsTeamRest,
+  });
 }
 
 export async function generatePoolMatchesAction(

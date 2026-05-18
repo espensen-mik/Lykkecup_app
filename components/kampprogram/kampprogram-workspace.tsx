@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Trash2 } from "lucide-react";
+import { CalendarClock, Loader2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { TeamDetailModal, TeamNameWithHover } from "@/components/teams/team-detail-ui";
@@ -16,6 +16,7 @@ import {
   type KampprogramMatch,
 } from "@/lib/kampprogram";
 import { kontrolCenterTeamDisplayName, type TeamDetailView } from "@/lib/team-detail";
+import { ManualScheduleDialog } from "@/components/turnering/manual-schedule-dialog";
 
 type ViewMode = "court" | "rounds";
 
@@ -48,13 +49,17 @@ function teamDetailOrFallback(
 function MatchTable({
   rows,
   showCourt,
+  showManualSchedule,
   teamDetails,
   onOpenTeam,
+  onManualSchedule,
 }: {
   rows: KampprogramMatch[];
   showCourt: boolean;
+  showManualSchedule?: boolean;
   teamDetails: Record<string, TeamDetailView>;
   onOpenTeam: (teamId: string) => void;
+  onManualSchedule?: (match: KampprogramMatch) => void;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">Ingen kampe i dette udsnit.</p>;
@@ -69,7 +74,12 @@ function MatchTable({
             <th className="min-w-[14rem] px-3 py-2.5 font-semibold uppercase tracking-wide">Kamp</th>
             <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Niveau</th>
             <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Pulje</th>
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Periode</th>
+            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide" title="Puljens tildelte periode — ikke klokkeslæt">
+              Pulje-periode
+            </th>
+            {showManualSchedule ? (
+              <th className="px-3 py-2.5 font-semibold uppercase tracking-wide w-36" />
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -121,7 +131,28 @@ function MatchTable({
                   </span>
                 </td>
                 <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.poolName}</td>
-                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.periodName ?? "—"}</td>
+                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">
+                  <span>{m.periodName ?? "—"}</span>
+                  {m.scheduledOutsidePoolPeriod ? (
+                    <span className="mt-0.5 block text-xs font-medium text-amber-800 dark:text-amber-300">
+                      Spillet uden for pulje-periode
+                    </span>
+                  ) : null}
+                </td>
+                {showManualSchedule ? (
+                  <td className="px-3 py-3">
+                    {!m.isScheduled && !m.isOrphan && onManualSchedule ? (
+                      <button
+                        type="button"
+                        onClick={() => onManualSchedule(m)}
+                        className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50/80 px-2 py-1 text-xs font-medium text-teal-900 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-950/70"
+                      >
+                        <CalendarClock className="h-3 w-3" aria-hidden />
+                        Planlæg manuelt
+                      </button>
+                    ) : null}
+                  </td>
+                ) : null}
               </tr>
             );
           })}
@@ -149,6 +180,8 @@ export function KampprogramWorkspace({ initial }: Props) {
   const [previewTeamId, setPreviewTeamId] = useState<string | null>(null);
   const [deletingOrphans, setDeletingOrphans] = useState(false);
   const [orphanActionMsg, setOrphanActionMsg] = useState<string | null>(null);
+  const [manualScheduleMatch, setManualScheduleMatch] = useState<KampprogramMatch | null>(null);
+  const [scheduleActionMsg, setScheduleActionMsg] = useState<string | null>(null);
 
   const teamDetails = initial.teamDetails;
   const orphanMatches = useMemo(() => initial.matches.filter((m) => m.isOrphan), [initial.matches]);
@@ -389,12 +422,14 @@ export function KampprogramWorkspace({ initial }: Props) {
                 {byCourt.unassigned.length} kamp{byCourt.unassigned.length === 1 ? "" : "e"} uden bane eller tid
               </p>
               <div className="mt-3">
-                <MatchTable
-                  rows={byCourt.unassigned}
-                  showCourt={false}
-                  teamDetails={teamDetails}
-                  onOpenTeam={setPreviewTeamId}
-                />
+                  <MatchTable
+                    rows={byCourt.unassigned}
+                    showCourt={false}
+                    showManualSchedule
+                    teamDetails={teamDetails}
+                    onOpenTeam={setPreviewTeamId}
+                    onManualSchedule={setManualScheduleMatch}
+                  />
               </div>
             </section>
           ) : null}
@@ -434,8 +469,10 @@ export function KampprogramWorkspace({ initial }: Props) {
                 <MatchTable
                   rows={unscheduledFiltered}
                   showCourt={false}
+                  showManualSchedule
                   teamDetails={teamDetails}
                   onOpenTeam={setPreviewTeamId}
+                  onManualSchedule={setManualScheduleMatch}
                 />
               </div>
             </section>
@@ -449,6 +486,28 @@ export function KampprogramWorkspace({ initial }: Props) {
         detail={previewDetail ?? { teamName: "", nickname: null, players: [], coaches: [] }}
         playerCount={previewDetail?.playerCount ?? 0}
       />
+
+      {manualScheduleMatch ? (
+        <ManualScheduleDialog
+          open
+          onClose={() => setManualScheduleMatch(null)}
+          matchId={manualScheduleMatch.id}
+          levelKey={manualScheduleMatch.levelKey}
+          teamALabel={kontrolCenterTeamDisplayName(
+            teamDetailOrFallback(manualScheduleMatch.teamAId, teamDetails),
+          )}
+          teamBLabel={kontrolCenterTeamDisplayName(
+            teamDetailOrFallback(manualScheduleMatch.teamBId, teamDetails),
+          )}
+          onSuccess={(msg) => setScheduleActionMsg(msg)}
+        />
+      ) : null}
+
+      {scheduleActionMsg ? (
+        <p className="fixed bottom-4 right-4 z-[110] rounded-lg border border-teal-200 bg-white px-4 py-2 text-sm text-teal-900 shadow-lg dark:border-teal-800 dark:bg-gray-900 dark:text-teal-200">
+          {scheduleActionMsg}
+        </p>
+      ) : null}
     </div>
   );
 }

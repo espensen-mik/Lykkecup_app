@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, CalendarClock, CheckCircle2, Loader2, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { ManualScheduleDialog } from "@/components/turnering/manual-schedule-dialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -86,6 +87,7 @@ export function TurneringPlanWorkspace({
   const [editStart, setEditStart] = useState("");
   const [editEnd, setEditEnd] = useState("");
   const [savingMatch, setSavingMatch] = useState(false);
+  const [manualScheduleMatch, setManualScheduleMatch] = useState<MatchRow | null>(null);
 
   useEffect(() => {
     setPools(initialPools);
@@ -690,19 +692,31 @@ export function TurneringPlanWorkspace({
                             )}
                           </td>
                           <td className="px-2 py-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingMatch(match);
-                                setEditCourtId(match.court_id ?? "");
-                                setEditStart(formatTimeForInput(match.start_time));
-                                setEditEnd(formatTimeForInput(match.end_time));
-                              }}
-                              className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-                            >
-                              <Pencil className="h-3 w-3" aria-hidden />
-                              Flyt
-                            </button>
+                            <div className="flex flex-wrap gap-1">
+                              {!match.court_id || !match.start_time ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setManualScheduleMatch(match)}
+                                  className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50/80 px-2 py-1 text-xs font-medium text-teal-900 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200"
+                                >
+                                  <CalendarClock className="h-3 w-3" aria-hidden />
+                                  Planlæg manuelt
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingMatch(match);
+                                  setEditCourtId(match.court_id ?? "");
+                                  setEditStart(formatTimeForInput(match.start_time));
+                                  setEditEnd(formatTimeForInput(match.end_time));
+                                }}
+                                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                              >
+                                <Pencil className="h-3 w-3" aria-hidden />
+                                {match.court_id && match.start_time ? "Flyt" : "Angiv tid"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -821,6 +835,18 @@ export function TurneringPlanWorkspace({
             </form>
           </div>
         </div>
+      ) : null}
+
+      {manualScheduleMatch ? (
+        <ManualScheduleDialog
+          open
+          onClose={() => setManualScheduleMatch(null)}
+          matchId={manualScheduleMatch.id}
+          levelKey={levelKey}
+          teamALabel={teamDetailOrFallback(manualScheduleMatch.team_a_id).teamName}
+          teamBLabel={teamDetailOrFallback(manualScheduleMatch.team_b_id).teamName}
+          onSuccess={(msg) => setActionMsg(msg)}
+        />
       ) : null}
     </div>
   );

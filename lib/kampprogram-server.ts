@@ -10,6 +10,8 @@ import type {
 import { isOrphanKampprogramMatch } from "@/lib/kampprogram";
 import { buildTeamDetailsById, type TeamPlayerLite } from "@/lib/team-detail";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
+import { isAllDayPeriod, periodWindowMinutes } from "@/lib/tournament-periods";
+import { timeToMinutes } from "@/lib/baner-tider";
 import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 
 const empty: KampprogramBundle = {
@@ -40,7 +42,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       client.from("pools").select("id, name, level, period_id").eq("event_id", eventId),
       client
         .from("tournament_periods")
-        .select("id, name, sort_order")
+        .select("id, name, sort_order, start_time, end_time, is_all_day")
         .eq("event_id", eventId)
         .order("sort_order", { ascending: true }),
       client.from("venues").select("id, name").eq("event_id", eventId),
@@ -105,9 +107,15 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
   );
   const teamDetails: KampprogramBundle["teamDetails"] = {};
   for (const [id, detail] of teamDetailsMap) teamDetails[id] = detail;
-  const periodById = new Map(
-    ((periodsRes.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]),
-  );
+  type PeriodRow = {
+    id: string;
+    name: string;
+    start_time: string;
+    end_time: string;
+    is_all_day: boolean;
+  };
+  const periodRows = (periodsRes.data ?? []) as PeriodRow[];
+  const periodById = new Map(periodRows.map((p) => [p.id, p]));
   type CourtRow = { id: string; name: string; venue_id: string | null; sort_order: number | null };
   const courtRows = (courtsRes.data ?? []) as CourtRow[];
 
@@ -156,6 +164,15 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       poolIds,
     );
     const isScheduled = Boolean(row.court_id && row.start_time && row.end_time);
+    const poolPeriod = pool?.period_id ? periodById.get(pool.period_id) : undefined;
+    let scheduledOutsidePoolPeriod = false;
+    if (isScheduled && poolPeriod && row.start_time && !isAllDayPeriod(poolPeriod)) {
+      const matchStart = timeToMinutes(row.start_time);
+      const win = periodWindowMinutes(poolPeriod);
+      if (matchStart != null && win) {
+        scheduledOutsidePoolPeriod = matchStart < win.startMinutes || matchStart >= win.endMinutes;
+      }
+    }
     matches.push({
       id: row.id,
       poolId: row.pool_id,
@@ -164,7 +181,8 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       isOrphan,
       levelKey,
       poolName: pool?.name ?? "Pulje",
-      periodName: pool?.period_id ? (periodById.get(pool.period_id) ?? null) : null,
+      periodName: poolPeriod?.name ?? null,
+      scheduledOutsidePoolPeriod,
       courtId: row.court_id,
       courtName: court?.name ?? null,
       venueName: court?.venueName ?? null,
@@ -175,7 +193,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     });
   }
 
-  const periods: KampprogramPeriod[] = ((periodsRes.data ?? []) as { id: string; name: string }[]).map((p) => ({
+  const periods: KampprogramPeriod[] = periodRows.map((p) => ({
     id: p.id,
     name: p.name,
   }));

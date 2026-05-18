@@ -12,7 +12,10 @@ export type KampprogramMatch = {
   isOrphan: boolean;
   levelKey: string;
   poolName: string;
+  /** Puljens tildelte turneringsperiode (ikke afledt af kampens starttid). */
   periodName: string | null;
+  /** Kampens starttid ligger uden for pulje-periodens klokke-vindue. */
+  scheduledOutsidePoolPeriod: boolean;
   courtId: string | null;
   courtName: string | null;
   venueName: string | null;
