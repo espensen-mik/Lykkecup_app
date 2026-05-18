@@ -16,12 +16,13 @@ export const metadata: Metadata = {
 
 export default async function BanerTiderPage() {
   const supabase = await createServerSupabase();
-  const [bundle, overview, periodsBundle, teamsRes, matchesRes] = await Promise.all([
+  const [bundle, overview, periodsBundle, teamsRes, matchesRes, poolsRes] = await Promise.all([
     fetchBanerTiderData(supabase),
     fetchTurneringDashboardOverview(),
     fetchPeriodsBundle(supabase),
     supabase.from("teams").select("pool_id, level").eq("event_id", TURNERING_EVENT_ID),
     supabase.from("matches").select("pool_id, court_id").eq("event_id", TURNERING_EVENT_ID),
+    supabase.from("pools").select("id, level").eq("event_id", TURNERING_EVENT_ID),
   ]);
   const capacityHints = computePeriodCapacityHints(
     periodsBundle,
@@ -34,7 +35,17 @@ export default async function BanerTiderPage() {
     playerCount: l.playerCount,
     teamCount: l.teamCount,
   }));
+  const pools = (poolsRes.data ?? []) as { id: string; level: string | null }[];
+  const teams = (teamsRes.data ?? []) as { pool_id: string | null }[];
+
   return (
-    <BanerTiderWorkspace initial={bundle} levels={levels} periodsBundle={periodsBundle} capacityHints={capacityHints} />
+    <BanerTiderWorkspace
+      initial={bundle}
+      levels={levels}
+      pools={pools}
+      teams={teams}
+      periodsBundle={periodsBundle}
+      capacityHints={capacityHints}
+    />
   );
 }

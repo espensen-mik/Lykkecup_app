@@ -52,7 +52,12 @@ export type MatchRow = {
   end_time: string | null;
   status: string;
   created_at: string | null;
+  /** Planlagt uden min. 1 rundes pause mellem holdets kampe. */
+  schedule_relaxed_team_rest?: boolean;
 };
+
+export const MATCH_RELAXED_TEAM_REST_NOTICE =
+  "Hold-pause ikke overholdt (min. 1 runde)";
 
 export type TurneringPlanLevelBundle = {
   /** Fra Opsætning → Kampe (`plan_matches_per_team`). */

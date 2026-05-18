@@ -20,6 +20,7 @@ import {
 import { poolPlanningHint, poolTeamCountStatus } from "@/lib/puljer";
 import {
   analyzePoolMatchSync,
+  MATCH_RELAXED_TEAM_REST_NOTICE,
   plannedPoolMatchCount,
   type MatchRow,
 } from "@/lib/turnering";
@@ -625,6 +626,7 @@ export function TurneringPlanWorkspace({
                         <th className="px-2 py-2 font-medium">Hold B</th>
                         <th className="px-2 py-2 font-medium">Tid</th>
                         <th className="px-2 py-2 font-medium">Bane</th>
+                        <th className="px-2 py-2 font-medium">Note</th>
                         <th className="px-2 py-2 font-medium w-16" />
                       </tr>
                     </thead>
@@ -648,6 +650,15 @@ export function TurneringPlanWorkspace({
                           </td>
                           <td className="px-2 py-2 text-gray-600 dark:text-gray-300">
                             {match.court_id ? courtNameById.get(match.court_id) ?? "Bane" : "—"}
+                          </td>
+                          <td className="px-2 py-2">
+                            {match.schedule_relaxed_team_rest ? (
+                              <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                                {MATCH_RELAXED_TEAM_REST_NOTICE}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
+                            )}
                           </td>
                           <td className="px-2 py-2">
                             <button

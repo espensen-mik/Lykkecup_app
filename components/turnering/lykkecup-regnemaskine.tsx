@@ -10,11 +10,13 @@ import {
   availabilityRowsToRegnemaskineAvailability,
   breakRowsToRegnemaskineBreaks,
   buildRegnemaskineLevelPlans,
+  computePoolDemandSnapshot,
   computeRegnemaskineSnapshot,
   conservativeRoundTimingFromSchedule,
   courtsRowsToRegnemaskineCourts,
   DEFAULT_PLAN_MATCHES_PER_TEAM,
 } from "@/lib/lykkecup-regnemaskine";
+import { BaneStatusPanel } from "@/components/turnering/bane-status-panel";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
 export type RegnemaskineLevelInput = {
@@ -22,6 +24,9 @@ export type RegnemaskineLevelInput = {
   playerCount: number;
   teamCount: number;
 };
+
+export type RegnemaskinePoolInput = { id: string; level: string | null };
+export type RegnemaskineTeamPoolInput = { pool_id: string | null };
 
 function courtTypeLabel(t: CourtType): string {
   switch (t) {
@@ -62,11 +67,15 @@ type OpsætningTabId = "haller" | "niveau";
 export function LykkecupRegnemaskine({
   levels,
   baner,
+  pools = [],
+  teams = [],
   embedded = false,
   onOpenTab,
 }: {
   levels: RegnemaskineLevelInput[];
   baner: BanerTiderBundle;
+  pools?: readonly RegnemaskinePoolInput[];
+  teams?: readonly RegnemaskineTeamPoolInput[];
   embedded?: boolean;
   onOpenTab?: (tab: OpsætningTabId) => void;
 }) {
@@ -129,6 +138,11 @@ export function LykkecupRegnemaskine({
 
   const demandRows = snapshot?.levels ?? [];
   const balanceRows = snapshot?.byCourtType ?? [];
+
+  const poolDemand = useMemo(
+    () => computePoolDemandSnapshot(pools, teams, levelPlans),
+    [pools, teams, levelPlans],
+  );
 
   const setMatchesDraft = useCallback((levelKey: string, matches: string) => {
     setMatchesDrafts((prev) => ({ ...prev, [levelKey]: matches }));
@@ -384,6 +398,8 @@ export function LykkecupRegnemaskine({
           </p>
         </div>
       ) : null}
+
+      <BaneStatusPanel baner={baner} snapshot={snapshot} poolDemand={poolDemand} />
     </Wrapper>
   );
 }

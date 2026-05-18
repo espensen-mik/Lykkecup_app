@@ -2,6 +2,7 @@ import type { CourtAvailabilityRow, CourtBreakRow, CourtRow, LevelCourtSettingLi
 import { compareCourtTypes, timeToMinutes } from "@/lib/baner-tider";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
 import { courtTypeForLevel, defaultRoundsPerMatchForLevel } from "@/lib/level-court-settings";
+import { plannedPoolMatchCount } from "@/lib/turnering";
 
 /** Planlagte runder pr. bane (kampe × runder pr. kamp for puljens niveau). */
 export function computeScheduledRoundsByCourtId(
@@ -534,4 +535,94 @@ export function conservativeRoundTimingFromSchedule(
     }
   }
   return best;
+}
+
+export type PoolDemandLevelRow = {
+  level: string;
+  courtType: string;
+  poolCount: number;
+  teamCount: number;
+  totalMatches: number;
+  requiredRounds: number;
+};
+
+export type PoolDemandSnapshot = {
+  byLevel: PoolDemandLevelRow[];
+  byCourtType: CourtTypeCapacityRow[];
+  totals: {
+    poolCount: number;
+    teamCount: number;
+    totalMatches: number;
+    requiredRounds: number;
+  };
+};
+
+/** Behov fra faktiske puljer og hold (opdateres med kampe/hold-indstillinger). */
+export function computePoolDemandSnapshot(
+  pools: readonly { id: string; level: string | null }[],
+  teams: readonly { pool_id: string | null }[],
+  levelPlans: readonly Pick<RegnemaskineLevelPlan, "level" | "matchesPerTeam" | "roundsPerMatch" | "courtType">[],
+): PoolDemandSnapshot {
+  const teamCountByPool = new Map<string, number>();
+  for (const t of teams) {
+    if (!t.pool_id) continue;
+    teamCountByPool.set(t.pool_id, (teamCountByPool.get(t.pool_id) ?? 0) + 1);
+  }
+
+  const planByLevel = new Map(
+    levelPlans.map((p) => [canonicalBanerLevelLabel(p.level), p] as const),
+  );
+
+  const byLevel = new Map<string, PoolDemandLevelRow>();
+  let poolCount = 0;
+  let teamCount = 0;
+  let totalMatches = 0;
+  let requiredRounds = 0;
+
+  for (const pool of pools) {
+    const tc = teamCountByPool.get(pool.id) ?? 0;
+    const level = canonicalBanerLevelLabel(pool.level ?? "");
+    const plan = planByLevel.get(level);
+    if (!plan) continue;
+
+    const matches = plannedPoolMatchCount(tc, plan.matchesPerTeam);
+    const rounds = matches * Math.max(1, Math.floor(plan.roundsPerMatch));
+
+    poolCount += 1;
+    teamCount += tc;
+    totalMatches += matches;
+    requiredRounds += rounds;
+
+    const prev = byLevel.get(level);
+    if (prev) {
+      prev.poolCount += 1;
+      prev.teamCount += tc;
+      prev.totalMatches += matches;
+      prev.requiredRounds += rounds;
+    } else {
+      byLevel.set(level, {
+        level,
+        courtType: plan.courtType,
+        poolCount: 1,
+        teamCount: tc,
+        totalMatches: matches,
+        requiredRounds: rounds,
+      });
+    }
+  }
+
+  const levelRows = [...byLevel.values()].sort((a, b) => a.level.localeCompare(b.level, "da"));
+  const roundsByType = new Map<string, number>();
+  for (const r of levelRows) {
+    roundsByType.set(r.courtType, (roundsByType.get(r.courtType) ?? 0) + r.requiredRounds);
+  }
+  const byCourtType = [...roundsByType.entries()]
+    .map(([courtType, totalSlots]) => ({ courtType, totalSlots }))
+    .sort((a, b) => compareCourtTypes(a.courtType, b.courtType));
+
+  return {
+    byLevel: levelRows,
+    byCourtType,
+    totals: { poolCount, teamCount, totalMatches, requiredRounds },
+  };
 }

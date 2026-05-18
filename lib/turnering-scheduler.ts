@@ -253,6 +253,8 @@ export type ScheduleAssignment = {
   startMinutes: number;
   endMinutes: number;
   roundIndex: number;
+  /** Kamp placeret uden min. 1 rundes pause for et eller begge hold. */
+  relaxedTeamRest?: boolean;
 };
 
 type SchedulePeriodContext = {
@@ -1314,6 +1316,123 @@ export function diagnoseUnscheduledMatch(
   return { matchId: match.id, code: "unknown", message: SCHEDULE_FAILURE_MESSAGES.unknown };
 }
 
+type MatchTeams = { teamAId: string; teamBId: string };
+
+/** Sæt `relaxedTeamRest` ud fra om placeringen overholder fuld hold-pause. */
+export function annotateRelaxedTeamRestOnAssignments(
+  assignments: ScheduleAssignment[],
+  matchById: ReadonlyMap<string, MatchTeams>,
+  teamSeed: TeamRoundTracker,
+  requiredRestMinutes: number,
+): void {
+  if (requiredRestMinutes <= 0) {
+    for (const a of assignments) a.relaxedTeamRest = false;
+    return;
+  }
+
+  const tracker = createTeamRoundTracker();
+  for (const [teamId, endMin] of teamSeed) tracker.set(teamId, endMin);
+
+  const ordered = [...assignments].sort(
+    (a, b) => a.startMinutes - b.startMinutes || a.matchId.localeCompare(b.matchId),
+  );
+
+  for (const a of ordered) {
+    const m = matchById.get(a.matchId);
+    if (!m) {
+      a.relaxedTeamRest = false;
+      continue;
+    }
+    a.relaxedTeamRest = !teamsCanPlayAt(tracker, m.teamAId, m.teamBId, a.startMinutes, requiredRestMinutes);
+    recordTeamsAfterMatch(tracker, m.teamAId, m.teamBId, a.endMinutes);
+  }
+}
+
+function schedulingStateAfterPartialAssignments(
+  externalOccupancy: readonly OccupiedSlot[],
+  externalTeamSeed: TeamRoundTracker,
+  assignments: readonly ScheduleAssignment[],
+  matchById: ReadonlyMap<string, MatchTeams>,
+): { occupancy: OccupiedSlot[]; teamRounds: TeamRoundTracker } {
+  const occupancy: OccupiedSlot[] = [...externalOccupancy];
+  const teamRounds = createTeamRoundTracker();
+  for (const [teamId, endMin] of externalTeamSeed) teamRounds.set(teamId, endMin);
+  for (const a of assignments) {
+    occupancy.push({
+      courtId: a.courtId,
+      startMinutes: a.startMinutes,
+      endMinutes: a.endMinutes,
+    });
+    const m = matchById.get(a.matchId);
+    if (m) recordTeamsAfterMatch(teamRounds, m.teamAId, m.teamBId, a.endMinutes);
+  }
+  return { occupancy, teamRounds };
+}
+
+/** Sidste forsøg: planlæg resterende kampe uden hold-pause-krav. */
+function tryScheduleRemainingWithoutTeamRest(
+  periodsById: ReadonlyMap<string, TournamentPeriodRow>,
+  remaining: readonly ScheduleMatchWithPeriod[],
+  base: SchedulePoolBase,
+  externalOccupancy: readonly OccupiedSlot[],
+  externalTeamSeed: TeamRoundTracker,
+  existingAssignments: readonly ScheduleAssignment[],
+  matchTeamsById: ReadonlyMap<string, MatchTeams>,
+): { assignments: ScheduleAssignment[]; unscheduled: string[] } {
+  if (remaining.length === 0) {
+    return { assignments: [], unscheduled: [] };
+  }
+
+  const { occupancy, teamRounds } = schedulingStateAfterPartialAssignments(
+    externalOccupancy,
+    externalTeamSeed,
+    existingAssignments,
+    matchTeamsById,
+  );
+
+  return scheduleLevelPeriodPoolsIndividually(periodsById, remaining, base, occupancy, teamRounds, 0);
+}
+
+async function persistScheduleAssignments(
+  supabase: SupabaseClient,
+  assignments: readonly ScheduleAssignment[],
+): Promise<{ saved: number; error: string | null }> {
+  let saved = 0;
+  for (const a of assignments) {
+    const start_time = minutesToTimestamptz(a.startMinutes);
+    const end_time = minutesToTimestamptz(a.endMinutes);
+    if (!start_time || !end_time) continue;
+
+    const { data, error } = await supabase
+      .from("matches")
+      .update({
+        court_id: a.courtId,
+        start_time,
+        end_time,
+        status: "scheduled",
+        schedule_relaxed_team_rest: a.relaxedTeamRest ?? false,
+      })
+      .eq("id", a.matchId)
+      .select("id");
+
+    if (error) {
+      return { saved, error: `Kunne ikke gemme bane/tid: ${error.message}` };
+    }
+    if (!data || data.length === 0) {
+      return {
+        saved,
+        error:
+          "Kunne ikke opdatere kampe i databasen (manglende rettigheder?). Kør migration «matches_schedule_relaxed_team_rest» i Supabase.",
+      };
+    }
+
+    saved += 1;
+    await supabase.from("matches").update({ round_index: a.roundIndex }).eq("id", a.matchId);
+  }
+
+  return { saved, error: null };
+}
+
 export function diagnoseUnscheduledMatches(
   unscheduledIds: readonly string[],
   matchInputs: readonly ScheduleMatchWithPeriod[],
@@ -1701,6 +1820,30 @@ export async function assignMatchScheduleForLevelPeriodPools(
     }
   }
 
+  const matchTeamsById = new Map(
+    matchInputs.map((m) => [m.id, { teamAId: m.teamAId, teamBId: m.teamBId }]),
+  );
+
+  if (unscheduled.length > 0) {
+    const remaining = matchInputs.filter((m) => unscheduled.includes(m.id));
+    const forced = tryScheduleRemainingWithoutTeamRest(
+      periodsById,
+      remaining,
+      poolBase,
+      externalOccupancy,
+      externalTeamSeed,
+      assignments,
+      matchTeamsById,
+    );
+    if (forced.assignments.length > 0) {
+      const existingIds = new Set(assignments.map((a) => a.matchId));
+      for (const a of forced.assignments) {
+        if (!existingIds.has(a.matchId)) assignments.push(a);
+      }
+      unscheduled = forced.unscheduled;
+    }
+  }
+
   if (assignments.length === 0) {
     return {
       scheduled: 0,
@@ -1711,45 +1854,20 @@ export async function assignMatchScheduleForLevelPeriodPools(
     };
   }
 
-  let saved = 0;
-  for (const a of assignments) {
-    const start_time = minutesToTimestamptz(a.startMinutes);
-    const end_time = minutesToTimestamptz(a.endMinutes);
-    if (!start_time || !end_time) continue;
+  const fullRestMinutes = teamRestMinutesBetweenMatches(roundLen);
+  annotateRelaxedTeamRestOnAssignments(assignments, matchTeamsById, externalTeamSeed, fullRestMinutes);
 
-    const { data, error } = await supabase
-      .from("matches")
-      .update({
-        court_id: a.courtId,
-        start_time,
-        end_time,
-        status: "scheduled",
-      })
-      .eq("id", a.matchId)
-      .select("id");
-
-    if (error) {
-      return {
-        scheduled: saved,
-        unscheduled: unscheduledBefore - saved,
-        error: `Kunne ikke gemme bane/tid: ${error.message}`,
-        overflowPeriodNames: [],
-      };
-    }
-    if (!data || data.length === 0) {
-      return {
-        scheduled: saved,
-        unscheduled: unscheduledBefore - saved,
-        error: "Kunne ikke opdatere kampe i databasen (manglende rettigheder?).",
-        overflowPeriodNames: [],
-      };
-    }
-
-    saved += 1;
-    await supabase.from("matches").update({ round_index: a.roundIndex }).eq("id", a.matchId);
+  const { saved, error: saveError } = await persistScheduleAssignments(supabase, assignments);
+  if (saveError) {
+    return {
+      scheduled: saved,
+      unscheduled: unscheduledBefore - saved,
+      error: saveError,
+      overflowPeriodNames: [],
+    };
   }
 
-  const stillUnscheduled = unscheduledBefore - saved;
+  const stillUnscheduled = poolMatches.filter((m) => !assignments.some((a) => a.matchId === m.id)).length;
   const assignedIds = new Set(assignments.map((a) => a.matchId));
   const unscheduledIds = poolMatches.filter((m) => !assignedIds.has(m.id)).map((m) => m.id);
   const { occupancy: diagOccupancy, teamRounds: diagTeamRounds } = schedulingStateAfterAssignments(
@@ -1770,20 +1888,21 @@ export async function assignMatchScheduleForLevelPeriodPools(
 
   const teamRestCount = unscheduledDetails.filter((d) => d.code === "team_rest").length;
   const noSlotCount = unscheduledDetails.filter((d) => d.code === "no_free_slot" || d.code === "no_court_time").length;
+  const relaxedScheduled = assignments.filter((a) => a.relaxedTeamRest).length;
 
   return {
     scheduled: saved,
     unscheduled: stillUnscheduled,
     error:
       stillUnscheduled > 0
-        ? teamRestCount > 0 && teamRestCount >= stillUnscheduled / 2
-          ? `${stillUnscheduled} kamp(e) mangler tid — ofte fordi hold skal have pause mellem kampe (min. 1 runde). Se listen nedenfor.`
-          : noSlotCount > 0
+        ? noSlotCount > 0
             ? `${stillUnscheduled} kamp(e) mangler tid — ingen ledig bane i puljens periode (andre niveauer kan fylde banerne). Se listen nedenfor.`
             : `${stillUnscheduled} kamp(e) kunne ikke placeres. Se listen nedenfor.`
         : saved < assignments.length
           ? "Nogle kampe blev planlagt men kunne ikke gemmes."
-          : null,
+          : relaxedScheduled > 0
+            ? `${relaxedScheduled} kamp(e) planlagt uden fuld hold-pause — markeret med rød note under Genererede kampe.`
+            : null,
     overflowPeriodNames: [],
     unscheduledDetails: stillUnscheduled > 0 ? unscheduledDetails : undefined,
   };
@@ -2115,42 +2234,20 @@ async function assignMatchScheduleForPoolIds(
     };
   }
 
-  let saved = 0;
-  for (const a of assignments) {
-    const start_time = minutesToTimestamptz(a.startMinutes);
-    const end_time = minutesToTimestamptz(a.endMinutes);
-    if (!start_time || !end_time) continue;
+  const fullRestMinutes = teamRestMinutesBetweenMatches(roundLen);
+  const matchTeamsById = new Map(
+    poolInputsAll.map((m) => [m.id, { teamAId: m.teamAId, teamBId: m.teamBId }] as const),
+  );
+  annotateRelaxedTeamRestOnAssignments(assignments, matchTeamsById, externalTeamSeed, fullRestMinutes);
 
-    const { data, error } = await supabase
-      .from("matches")
-      .update({
-        court_id: a.courtId,
-        start_time,
-        end_time,
-        status: "scheduled",
-      })
-      .eq("id", a.matchId)
-      .select("id");
-
-    if (error) {
-      return {
-        scheduled: saved,
-        unscheduled: reportUnscheduledBefore,
-        error: `Kunne ikke gemme bane/tid: ${error.message}`,
-        overflowPeriodNames,
-      };
-    }
-    if (!data || data.length === 0) {
-      return {
-        scheduled: saved,
-        unscheduled: reportUnscheduledBefore,
-        error: "Kunne ikke opdatere kampe i databasen (manglende rettigheder?).",
-        overflowPeriodNames,
-      };
-    }
-
-    saved += 1;
-    await supabase.from("matches").update({ round_index: a.roundIndex }).eq("id", a.matchId);
+  const { saved, error: saveError } = await persistScheduleAssignments(supabase, assignments);
+  if (saveError) {
+    return {
+      scheduled: saved,
+      unscheduled: reportUnscheduledBefore,
+      error: saveError,
+      overflowPeriodNames,
+    };
   }
 
   const assignedIds = new Set(assignments.map((a) => a.matchId));
@@ -2158,6 +2255,7 @@ async function assignMatchScheduleForPoolIds(
     (m) => m.pool_id === reportPoolId && !assignedIds.has(m.id),
   ).length;
   const reportSaved = reportPoolMatches.length - reportStillUnscheduled;
+  const relaxedScheduled = assignments.filter((a) => a.relaxedTeamRest).length;
 
   return {
     scheduled: reportSaved,
@@ -2167,7 +2265,9 @@ async function assignMatchScheduleForPoolIds(
         ? `${reportStillUnscheduled} kamp(e) i puljen kunne ikke placeres — tjek bane-kapacitet for ${levelKey}.`
         : saved < assignments.length
           ? "Nogle kampe blev planlagt men kunne ikke gemmes."
-          : null,
+          : relaxedScheduled > 0
+            ? `${relaxedScheduled} kamp(e) planlagt uden fuld hold-pause — markeret med rød note under Genererede kampe.`
+            : null,
     overflowPeriodNames,
   };
 }
@@ -2686,6 +2786,37 @@ export async function assignMatchScheduleForPool(
   }
   }
 
+  if (unscheduled.length > 0 && pool.period_id) {
+    const remaining: ScheduleMatchWithPeriod[] = poolMatches
+      .filter((m) => unscheduled.includes(m.id))
+      .map((m) => ({
+        id: m.id,
+        levelKey,
+        teamAId: m.team_a_id,
+        teamBId: m.team_b_id,
+        primaryPeriodId: pool.period_id!,
+      }));
+    const matchTeamsByIdPool = new Map(
+      poolMatches.map((m) => [m.id, { teamAId: m.team_a_id, teamBId: m.team_b_id }]),
+    );
+    const forced = tryScheduleRemainingWithoutTeamRest(
+      periodsById,
+      remaining,
+      poolBase,
+      externalOccupancy,
+      externalTeamSeed,
+      assignments,
+      matchTeamsByIdPool,
+    );
+    if (forced.assignments.length > 0) {
+      const existingIds = new Set(assignments.map((a) => a.matchId));
+      for (const a of forced.assignments) {
+        if (!existingIds.has(a.matchId)) assignments.push(a);
+      }
+      unscheduled = forced.unscheduled;
+    }
+  }
+
   if (assignments.length === 0) {
     return {
       scheduled: 0,
@@ -2696,46 +2827,31 @@ export async function assignMatchScheduleForPool(
     };
   }
 
-  let saved = 0;
-  for (const a of assignments) {
-    const start_time = minutesToTimestamptz(a.startMinutes);
-    const end_time = minutesToTimestamptz(a.endMinutes);
-    if (!start_time || !end_time) continue;
+  const fullRestMinutes = teamRestMinutesBetweenMatches(roundLen);
+  const primaryPeriodIdForAnnotate = pool.period_id!;
+  const periodInputsForAnnotate: ScheduleMatchWithPeriod[] = poolMatches.map((m) => ({
+    id: m.id,
+    levelKey,
+    teamAId: m.team_a_id,
+    teamBId: m.team_b_id,
+    primaryPeriodId: primaryPeriodIdForAnnotate,
+  }));
+  const matchTeamsByIdPool = new Map(
+    periodInputsForAnnotate.map((m) => [m.id, { teamAId: m.teamAId, teamBId: m.teamBId }]),
+  );
+  annotateRelaxedTeamRestOnAssignments(assignments, matchTeamsByIdPool, externalTeamSeed, fullRestMinutes);
 
-    const { data, error } = await supabase
-      .from("matches")
-      .update({
-        court_id: a.courtId,
-        start_time,
-        end_time,
-        status: "scheduled",
-      })
-      .eq("id", a.matchId)
-      .select("id");
-
-    if (error) {
-      return {
-        scheduled: saved,
-        unscheduled: poolMatches.length - saved,
-        error: `Kunne ikke gemme bane/tid: ${error.message}`,
-        overflowPeriodNames,
-      };
-    }
-    if (!data || data.length === 0) {
-      return {
-        scheduled: saved,
-        unscheduled: poolMatches.length - saved,
-        error:
-          "Kunne ikke opdatere kampe i databasen (manglende rettigheder?). Kør migration «matches_rls» i Supabase.",
-        overflowPeriodNames,
-      };
-    }
-
-    saved += 1;
-    await supabase.from("matches").update({ round_index: a.roundIndex }).eq("id", a.matchId);
+  const { saved, error: saveError } = await persistScheduleAssignments(supabase, assignments);
+  if (saveError) {
+    return {
+      scheduled: saved,
+      unscheduled: poolMatches.length - saved,
+      error: saveError,
+      overflowPeriodNames,
+    };
   }
 
-  const stillUnscheduledCount = unscheduled.length + (assignments.length - saved);
+  const stillUnscheduledCount = poolMatches.filter((m) => !assignments.some((a) => a.matchId === m.id)).length;
   const primaryPeriodId = pool.period_id!;
   const periodInputs: ScheduleMatchWithPeriod[] = poolMatches.map((m) => ({
     id: m.id,
@@ -2761,19 +2877,19 @@ export async function assignMatchScheduleForPool(
     diagTeamRounds,
     teamRestMinutesBetweenMatches(roundLen),
   );
-  const teamRestCount = unscheduledDetails.filter((d) => d.code === "team_rest").length;
+  const relaxedScheduled = assignments.filter((a) => a.relaxedTeamRest).length;
 
   return {
     scheduled: saved,
     unscheduled: stillUnscheduledCount,
     error:
       stillUnscheduledCount > 0
-        ? teamRestCount > 0 && teamRestCount >= stillUnscheduledCount / 2
-          ? `${stillUnscheduledCount} kamp(e) mangler tid — ofte pga. hold-pause. Se listen nedenfor.`
-          : `${stillUnscheduledCount} kamp(e) mangler tid. Se listen nedenfor.`
+        ? `${stillUnscheduledCount} kamp(e) mangler tid. Se listen nedenfor.`
         : saved < assignments.length
           ? "Nogle kampe blev planlagt men kunne ikke gemmes."
-          : null,
+          : relaxedScheduled > 0
+            ? `${relaxedScheduled} kamp(e) planlagt uden fuld hold-pause — markeret med rød note under Genererede kampe.`
+            : null,
     overflowPeriodNames,
     unscheduledDetails: stillUnscheduledCount > 0 ? unscheduledDetails : undefined,
   };

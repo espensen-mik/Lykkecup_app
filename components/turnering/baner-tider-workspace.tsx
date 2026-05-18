@@ -27,7 +27,12 @@ import {
 } from "@/lib/lykkecup-regnemaskine";
 import { courtTypeForLevel, defaultRoundsPerMatchForLevel } from "@/lib/level-court-settings";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
-import { LykkecupRegnemaskine, type RegnemaskineLevelInput } from "@/components/turnering/lykkecup-regnemaskine";
+import {
+  LykkecupRegnemaskine,
+  type RegnemaskineLevelInput,
+  type RegnemaskinePoolInput,
+  type RegnemaskineTeamPoolInput,
+} from "@/components/turnering/lykkecup-regnemaskine";
 import { PerioderPanel } from "@/components/turnering/perioder-panel";
 import type { PeriodCapacityHint } from "@/lib/period-capacity";
 import type { PeriodsBundle } from "@/lib/tournament-periods";
@@ -141,11 +146,15 @@ function Modal({
 export function BanerTiderWorkspace({
   initial,
   levels,
+  pools = [],
+  teams = [],
   periodsBundle,
   capacityHints,
 }: {
   initial: BanerTiderBundle;
   levels: RegnemaskineLevelInput[];
+  pools?: readonly RegnemaskinePoolInput[];
+  teams?: readonly RegnemaskineTeamPoolInput[];
   periodsBundle: PeriodsBundle;
   capacityHints: PeriodCapacityHint[];
 }) {
@@ -809,7 +818,14 @@ export function BanerTiderWorkspace({
       {tab === "perioder" ? <PerioderPanel initial={periodsBundle} capacityHints={capacityHints} /> : null}
 
       {tab === "kampe" ? (
-        <LykkecupRegnemaskine levels={levels} baner={initial} embedded onOpenTab={setTab} />
+        <LykkecupRegnemaskine
+          levels={levels}
+          baner={initial}
+          pools={pools}
+          teams={teams}
+          embedded
+          onOpenTab={setTab}
+        />
       ) : null}
 
       <Modal open={venueModal} title="Opret hal" onClose={() => setVenueModal(false)}>

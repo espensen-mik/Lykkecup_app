@@ -312,7 +312,9 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
 
   const matchesRes = await client
     .from("matches")
-    .select("id, event_id, pool_id, team_a_id, team_b_id, court_id, start_time, end_time, status, created_at")
+    .select(
+      "id, event_id, pool_id, team_a_id, team_b_id, court_id, start_time, end_time, status, created_at, schedule_relaxed_team_rest",
+    )
     .eq("event_id", eventId)
     .in("pool_id", poolIds)
     .order("created_at", { ascending: true });

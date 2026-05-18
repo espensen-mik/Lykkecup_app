@@ -497,6 +497,7 @@ export async function updateMatchScheduleAction(
       court_id: courtId,
       start_time: startTimeIso,
       end_time: endTimeIso,
+      schedule_relaxed_team_rest: false,
     })
     .eq("id", matchId)
     .eq("event_id", TURNERING_EVENT_ID);
