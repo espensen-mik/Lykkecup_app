@@ -243,6 +243,10 @@ export type ScheduleMatchInput = {
   teamBId: string;
 };
 
+export type ScheduleMatchWithPeriod = ScheduleMatchInput & {
+  primaryPeriodId: string;
+};
+
 export type ScheduleAssignment = {
   matchId: string;
   courtId: string;
@@ -418,10 +422,6 @@ function findAllSlotsForMatch(
   if (primarySlots.length > 0) return sortSlotCandidates(primarySlots);
   return sortSlotCandidates(slots);
 }
-
-type ScheduleMatchWithPeriod = ScheduleMatchInput & {
-  primaryPeriodId: string;
-};
 
 /** Kun puljens tildelte periode — til fælles planlægning af flere puljer på samme niveau. */
 function findSlotsInAssignedPeriodOnly(
@@ -1232,13 +1232,129 @@ export function minutesToTimestamptz(minutes: number): string {
   return timeInputToTimestamptz(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)!;
 }
 
+export type ScheduleFailureCode =
+  | "no_period"
+  | "no_court_time"
+  | "no_free_slot"
+  | "team_rest"
+  | "unknown";
+
+export type UnscheduledMatchDetail = {
+  matchId: string;
+  code: ScheduleFailureCode;
+  message: string;
+};
+
 export type AssignPoolScheduleResult = {
   scheduled: number;
   unscheduled: number;
   error: string | null;
   /** Senere perioder end puljens tildelte periode (fx Eftermiddag ved fuld Formiddag). */
   overflowPeriodNames: string[];
+  unscheduledDetails?: UnscheduledMatchDetail[];
 };
+
+const SCHEDULE_FAILURE_MESSAGES: Record<ScheduleFailureCode, string> = {
+  no_period: "Periode mangler på puljen",
+  no_court_time: "Ingen bane-tid i perioden",
+  no_free_slot: "Ingen tider tilgængelige",
+  team_rest: "Ikke plads til hold-pause (min. 1 runde)",
+  unknown: "Kunne ikke placeres",
+};
+
+/** Hvorfor en kamp ikke fik bane/tid efter planlægning. */
+export function diagnoseUnscheduledMatch(
+  match: ScheduleMatchWithPeriod,
+  periodsById: ReadonlyMap<string, TournamentPeriodRow>,
+  base: SchedulePoolBase,
+  occupancy: readonly OccupiedSlot[],
+  teamRounds: TeamRoundTracker,
+  teamRestMinutes: number,
+): UnscheduledMatchDetail {
+  const period = periodsById.get(match.primaryPeriodId);
+  if (!period) {
+    return { matchId: match.id, code: "no_period", message: SCHEDULE_FAILURE_MESSAGES.no_period };
+  }
+
+  const periodWin = periodWindowForScheduling(period, base.baseAvailability, base.courtIds);
+  if (!periodWin) {
+    return { matchId: match.id, code: "no_court_time", message: SCHEDULE_FAILURE_MESSAGES.no_court_time };
+  }
+
+  const courtOrder = [...base.courtIds].sort((a, b) => a.localeCompare(b));
+  const withoutTeamRest = findSlotsInAssignedPeriodOnly(
+    period,
+    match,
+    courtOrder,
+    base,
+    occupancy,
+    teamRounds,
+    0,
+  );
+
+  if (withoutTeamRest.length === 0) {
+    return { matchId: match.id, code: "no_free_slot", message: SCHEDULE_FAILURE_MESSAGES.no_free_slot };
+  }
+
+  if (teamRestMinutes > 0) {
+    const withTeamRest = findSlotsInAssignedPeriodOnly(
+      period,
+      match,
+      courtOrder,
+      base,
+      occupancy,
+      teamRounds,
+      teamRestMinutes,
+    );
+    if (withTeamRest.length === 0) {
+      return { matchId: match.id, code: "team_rest", message: SCHEDULE_FAILURE_MESSAGES.team_rest };
+    }
+  }
+
+  return { matchId: match.id, code: "unknown", message: SCHEDULE_FAILURE_MESSAGES.unknown };
+}
+
+export function diagnoseUnscheduledMatches(
+  unscheduledIds: readonly string[],
+  matchInputs: readonly ScheduleMatchWithPeriod[],
+  periodsById: ReadonlyMap<string, TournamentPeriodRow>,
+  base: SchedulePoolBase,
+  occupancy: readonly OccupiedSlot[],
+  teamRounds: TeamRoundTracker,
+  teamRestMinutes: number,
+): UnscheduledMatchDetail[] {
+  const byId = new Map(matchInputs.map((m) => [m.id, m]));
+  return unscheduledIds
+    .map((id) => {
+      const match = byId.get(id);
+      if (!match) {
+        return { matchId: id, code: "unknown" as const, message: SCHEDULE_FAILURE_MESSAGES.unknown };
+      }
+      return diagnoseUnscheduledMatch(match, periodsById, base, occupancy, teamRounds, teamRestMinutes);
+    });
+}
+
+function schedulingStateAfterAssignments(
+  externalOccupancy: readonly OccupiedSlot[],
+  externalTeamSeed: TeamRoundTracker,
+  assignments: readonly ScheduleAssignment[],
+  matchInputs: readonly ScheduleMatchWithPeriod[],
+): { occupancy: OccupiedSlot[]; teamRounds: TeamRoundTracker } {
+  const occupancy: OccupiedSlot[] = [...externalOccupancy];
+  const teamRounds = createTeamRoundTracker();
+  for (const [teamId, endMin] of externalTeamSeed) teamRounds.set(teamId, endMin);
+  const matchById = new Map(matchInputs.map((m) => [m.id, m]));
+  for (const a of assignments) {
+    occupancy.push({
+      courtId: a.courtId,
+      startMinutes: a.startMinutes,
+      endMinutes: a.endMinutes,
+    });
+    const m = matchById.get(a.matchId);
+    if (m) recordTeamsAfterMatch(teamRounds, m.teamAId, m.teamBId, a.endMinutes);
+  }
+  return { occupancy, teamRounds };
+}
 
 /**
  * Planlæg flere puljer på samme niveau i én kørsel (fx Formiddag + Eftermiddag).
@@ -1634,17 +1750,42 @@ export async function assignMatchScheduleForLevelPeriodPools(
   }
 
   const stillUnscheduled = unscheduledBefore - saved;
+  const assignedIds = new Set(assignments.map((a) => a.matchId));
+  const unscheduledIds = poolMatches.filter((m) => !assignedIds.has(m.id)).map((m) => m.id);
+  const { occupancy: diagOccupancy, teamRounds: diagTeamRounds } = schedulingStateAfterAssignments(
+    externalOccupancy,
+    externalTeamSeed,
+    assignments,
+    matchInputs,
+  );
+  const unscheduledDetails = diagnoseUnscheduledMatches(
+    unscheduledIds,
+    matchInputs,
+    periodsById,
+    poolBase,
+    diagOccupancy,
+    diagTeamRounds,
+    teamRestMinutesBetweenMatches(roundLen),
+  );
+
+  const teamRestCount = unscheduledDetails.filter((d) => d.code === "team_rest").length;
+  const noSlotCount = unscheduledDetails.filter((d) => d.code === "no_free_slot" || d.code === "no_court_time").length;
 
   return {
     scheduled: saved,
     unscheduled: stillUnscheduled,
     error:
       stillUnscheduled > 0
-        ? `${stillUnscheduled} kamp(e) kunne ikke få bane/tid i puljernes perioder — ledige runder i Hal M er hele dagen; planlæggeren skal også finde huller i Formiddag/Eftermiddag uden at andre niveauers kampe eller hold-pauser blokerer.`
+        ? teamRestCount > 0 && teamRestCount >= stillUnscheduled / 2
+          ? `${stillUnscheduled} kamp(e) mangler tid — ofte fordi hold skal have pause mellem kampe (min. 1 runde). Se listen nedenfor.`
+          : noSlotCount > 0
+            ? `${stillUnscheduled} kamp(e) mangler tid — ingen ledig bane i puljens periode (andre niveauer kan fylde banerne). Se listen nedenfor.`
+            : `${stillUnscheduled} kamp(e) kunne ikke placeres. Se listen nedenfor.`
         : saved < assignments.length
           ? "Nogle kampe blev planlagt men kunne ikke gemmes."
           : null,
     overflowPeriodNames: [],
+    unscheduledDetails: stillUnscheduled > 0 ? unscheduledDetails : undefined,
   };
 }
 
@@ -2136,6 +2277,7 @@ export async function assignMatchScheduleForPool(
     return { scheduled: 0, unscheduled: 0, error: "Periode ikke fundet.", overflowPeriodNames: [] };
   }
   const allPeriods = (allPeriodsRes.data ?? []) as TournamentPeriodRow[];
+  const periodsById = new Map(allPeriods.map((p) => [p.id, p]));
   const blockedOverflowPeriodIds = dedicatedPeriodIdsForOtherPools(
     (eventPoolsRes.data ?? []) as Array<{ id: string; period_id: string | null }>,
     poolId,
@@ -2593,15 +2735,46 @@ export async function assignMatchScheduleForPool(
     await supabase.from("matches").update({ round_index: a.roundIndex }).eq("id", a.matchId);
   }
 
+  const stillUnscheduledCount = unscheduled.length + (assignments.length - saved);
+  const primaryPeriodId = pool.period_id!;
+  const periodInputs: ScheduleMatchWithPeriod[] = poolMatches.map((m) => ({
+    id: m.id,
+    levelKey,
+    teamAId: m.team_a_id,
+    teamBId: m.team_b_id,
+    primaryPeriodId,
+  }));
+  const assignedIds = new Set(assignments.map((a) => a.matchId));
+  const unscheduledIds = poolMatches.filter((m) => !assignedIds.has(m.id)).map((m) => m.id);
+  const { occupancy: diagOccupancy, teamRounds: diagTeamRounds } = schedulingStateAfterAssignments(
+    externalOccupancy,
+    externalTeamSeed,
+    assignments,
+    periodInputs,
+  );
+  const unscheduledDetails = diagnoseUnscheduledMatches(
+    unscheduledIds,
+    periodInputs,
+    periodsById,
+    poolBase,
+    diagOccupancy,
+    diagTeamRounds,
+    teamRestMinutesBetweenMatches(roundLen),
+  );
+  const teamRestCount = unscheduledDetails.filter((d) => d.code === "team_rest").length;
+
   return {
     scheduled: saved,
-    unscheduled: unscheduled.length + (assignments.length - saved),
+    unscheduled: stillUnscheduledCount,
     error:
-      unscheduled.length > 0
-        ? `${unscheduled.length} kamp(e) kunne ikke få bane/tid i puljens periode (bane optaget, perioden fuld eller hold skal hvile mellem egne kampe). Tjek Opsætning → Haller & baner.`
+      stillUnscheduledCount > 0
+        ? teamRestCount > 0 && teamRestCount >= stillUnscheduledCount / 2
+          ? `${stillUnscheduledCount} kamp(e) mangler tid — ofte pga. hold-pause. Se listen nedenfor.`
+          : `${stillUnscheduledCount} kamp(e) mangler tid. Se listen nedenfor.`
         : saved < assignments.length
           ? "Nogle kampe blev planlagt men kunne ikke gemmes."
           : null,
     overflowPeriodNames,
+    unscheduledDetails: stillUnscheduledCount > 0 ? unscheduledDetails : undefined,
   };
 }

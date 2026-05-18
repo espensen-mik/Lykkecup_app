@@ -75,6 +75,9 @@ export function TurneringPlanWorkspace({
   const [busyPoolIds, setBusyPoolIds] = useState<Set<string>>(new Set());
   const [confirmRegeneratePoolId, setConfirmRegeneratePoolId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [schedulingFailures, setSchedulingFailures] = useState<
+    Array<{ matchId: string; label: string; reason: string }>
+  >([]);
   const [previewTeamId, setPreviewTeamId] = useState<string | null>(null);
   const [editingMatch, setEditingMatch] = useState<MatchRow | null>(null);
   const [editCourtId, setEditCourtId] = useState("");
@@ -248,9 +251,11 @@ export function TurneringPlanWorkspace({
       return next;
     });
     setActionMsg(null);
+    setSchedulingFailures([]);
     try {
       const result = await schedulePoolMatchesAction(pool.id, levelKey);
       setActionMsg(result.message);
+      setSchedulingFailures(result.schedulingFailures ?? []);
       if (result.ok || (result.scheduled ?? 0) > 0) router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ukendt fejl";
@@ -282,10 +287,12 @@ export function TurneringPlanWorkspace({
     setGeneratingAllPools(true);
     setConfirmRegenerateAllPools(false);
     setActionMsg(null);
+    setSchedulingFailures([]);
 
     try {
       const result = await generateAllPoolMatchesForLevelAction(levelKey, regenerate);
       setActionMsg(result.message);
+      setSchedulingFailures(result.schedulingFailures ?? []);
       if (result.ok || (result.scheduled ?? 0) > 0) router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ukendt fejl";
@@ -384,9 +391,24 @@ export function TurneringPlanWorkspace({
         ) : null}
 
         {actionMsg ? (
-          <p className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
-            {actionMsg}
-          </p>
+          <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
+            <p>{actionMsg}</p>
+            {schedulingFailures.length > 0 ? (
+              <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t border-gray-200 pt-2 text-xs dark:border-gray-600">
+                {schedulingFailures.slice(0, 12).map((row) => (
+                  <li key={row.matchId}>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{row.label}</span>
+                    <span className="text-gray-600 dark:text-gray-400"> — {row.reason}</span>
+                  </li>
+                ))}
+                {schedulingFailures.length > 12 ? (
+                  <li className="text-gray-500 dark:text-gray-400">
+                    … og {schedulingFailures.length - 12} kampe mere
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
+          </div>
         ) : null}
 
         {hasDuplicatePoolNames ? (
