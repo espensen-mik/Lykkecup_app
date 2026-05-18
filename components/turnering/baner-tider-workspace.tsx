@@ -34,16 +34,18 @@ import {
   type RegnemaskinePoolInput,
   type RegnemaskineTeamPoolInput,
 } from "@/components/turnering/lykkecup-regnemaskine";
+import { LykkecupPrognose } from "@/components/turnering/lykkecup-prognose";
 import { PerioderPanel } from "@/components/turnering/perioder-panel";
 import type { PeriodCapacityHint } from "@/lib/period-capacity";
 import type { PeriodsBundle } from "@/lib/tournament-periods";
 
-type TabId = "haller" | "niveau" | "kampe" | "perioder";
+type TabId = "haller" | "niveau" | "kampe" | "prognose" | "perioder";
 
 const tabs: { id: TabId; label: string }[] = [
   { id: "haller", label: "Haller & baner" },
   { id: "niveau", label: "Niveau indstillinger" },
   { id: "kampe", label: "Kampe" },
+  { id: "prognose", label: "Prognose" },
   { id: "perioder", label: "Perioder" },
 ];
 
@@ -852,6 +854,8 @@ export function BanerTiderWorkspace({
           onOpenTab={setTab}
         />
       ) : null}
+
+      {tab === "prognose" ? <LykkecupPrognose baner={initial} /> : null}
 
       <Modal
         open={venueModal != null}
