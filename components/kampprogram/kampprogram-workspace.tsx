@@ -388,8 +388,14 @@ export function KampprogramWorkspace({ initial }: Props) {
   }, [filtered, initial.courts, sortByDisplayName]);
 
   const roundGroups = useMemo(
-    () => groupKampprogramByRound(filtered, initial.levelTimingByLevel, sortByDisplayName),
-    [filtered, initial.levelTimingByLevel, sortByDisplayName],
+    () =>
+      groupKampprogramByRound(
+        filtered,
+        initial.levelTimingByLevel,
+        initial.courts,
+        sortByDisplayName,
+      ),
+    [filtered, initial.levelTimingByLevel, initial.courts, sortByDisplayName],
   );
 
   const courtTimelines = useMemo(() => {
@@ -583,6 +589,7 @@ export function KampprogramWorkspace({ initial }: Props) {
           ) : (
             roundGroups.map((round) => {
               const matchRows = round.rows.filter((r) => r.type === "match");
+              const idleCourts = round.rows.filter((r) => r.type === "idle").length;
               return (
                 <section
                   key={round.startTime}
@@ -592,6 +599,9 @@ export function KampprogramWorkspace({ initial }: Props) {
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                     {round.timeLabel} · {matchRows.length} kamp{matchRows.length === 1 ? "" : "e"} samtidig på tværs
                     af baner
+                    {idleCourts > 0
+                      ? ` · ${idleCourts} ledig${idleCourts === 1 ? "" : "e"} bane${idleCourts === 1 ? "" : "r"}`
+                      : ""}
                   </p>
                   <div className="mt-3">
                     <KampprogramTimelineTable

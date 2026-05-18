@@ -218,6 +218,60 @@ function kampprogramSlotStartMinutes(t: string): number | null {
   return timeToMinutes(t);
 }
 
+function sortKampprogramRowsByCourt(rows: KampprogramTableRow[]): KampprogramTableRow[] {
+  const courtLabel = (row: KampprogramTableRow) =>
+    row.type === "match"
+      ? formatCourtWithVenue(row.match.courtName ?? "—", row.match.venueName)
+      : formatCourtWithVenue(row.courtName, row.venueName);
+
+  return [...rows].sort((a, b) => courtLabel(a).localeCompare(courtLabel(b), "da"));
+}
+
+function roundSlotEndMinutes(
+  matchRows: readonly KampprogramTableRow[],
+  startMinutes: number,
+): number {
+  let maxEnd = startMinutes;
+  for (const row of matchRows) {
+    if (row.type !== "match") continue;
+    const e = kampprogramSlotStartMinutes(row.slotEndTime);
+    if (e != null) maxEnd = Math.max(maxEnd, e);
+  }
+  return maxEnd > startMinutes ? maxEnd : startMinutes + DEFAULT_TIMING.roundLengthMinutes;
+}
+
+function injectEmptyCourtsIntoRound(
+  matchRows: KampprogramTableRow[],
+  courts: readonly KampprogramCourt[],
+  startMinutes: number,
+): KampprogramTableRow[] {
+  if (courts.length === 0) return matchRows;
+
+  const busyCourtIds = new Set(
+    matchRows
+      .filter((r): r is Extract<KampprogramTableRow, { type: "match" }> => r.type === "match")
+      .map((r) => r.match.courtId)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  const slotStart = minutesToSlotIso(startMinutes);
+  const slotEnd = minutesToSlotIso(roundSlotEndMinutes(matchRows, startMinutes));
+  if (!slotStart || !slotEnd) return matchRows;
+
+  const idleRows: KampprogramTableRow[] = courts
+    .filter((court) => !busyCourtIds.has(court.id))
+    .map((court) => ({
+      type: "idle" as const,
+      courtId: court.id,
+      courtName: court.name,
+      venueName: court.venueName,
+      startTime: slotStart,
+      endTime: slotEnd,
+    }));
+
+  return sortKampprogramRowsByCourt([...matchRows, ...idleRows]);
+}
+
 function roundTimeLabelFromRows(rows: readonly KampprogramTableRow[]): string {
   let minStart: number | null = null;
   let maxEnd: number | null = null;
@@ -239,6 +293,7 @@ function roundTimeLabelFromRows(rows: readonly KampprogramTableRow[]): string {
 export function groupKampprogramByRound(
   matches: readonly KampprogramMatch[],
   timingByLevel: Readonly<Record<string, KampprogramLevelTiming>>,
+  courts: readonly KampprogramCourt[],
   sortByTeamDisplayName?: (teamAId: string, teamBId: string) => number,
 ): KampprogramRoundGroup[] {
   const groups = new Map<number, KampprogramTableRow[]>();
@@ -261,21 +316,28 @@ export function groupKampprogramByRound(
     sortByTeamDisplayName ??
     ((a, b) => a.localeCompare(b, "da"));
 
+  const courtsSorted = [...courts].sort(
+    (a, b) =>
+      compareCourtNamesForSchedule(a.name, b.name) ||
+      (a.venueName ?? "").localeCompare(b.venueName ?? "", "da"),
+  );
+
   return keys.map((startMinutes, index) => {
-    const roundRows = [...(groups.get(startMinutes) ?? [])];
-    roundRows.sort((a, b) => {
+    const matchRows = [...(groups.get(startMinutes) ?? [])];
+    matchRows.sort((a, b) => {
       if (a.type !== "match" || b.type !== "match") return 0;
       return (
         compareCourtNamesForSchedule(a.match.courtName, b.match.courtName) ||
         teamSort(a.match.teamAId, b.match.teamAId)
       );
     });
+    const roundRows = injectEmptyCourtsIntoRound(matchRows, courtsSorted, startMinutes);
     const startTime = minutesToSlotIso(startMinutes) ?? minutesToTimeInput(startMinutes);
     return {
       roundNumber: index + 1,
       label: `Runde ${index + 1}`,
       startTime,
-      timeLabel: roundTimeLabelFromRows(roundRows),
+      timeLabel: roundTimeLabelFromRows(matchRows),
       rows: roundRows,
     };
   });
