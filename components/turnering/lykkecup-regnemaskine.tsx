@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BanerTiderBundle, CourtType, LevelScheduleRow } from "@/lib/baner-tider";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
-import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
+import { canonicalBanerLevelLabel, formatLevelShortLabel } from "@/lib/holddannelse";
 import {
   availabilityRowsToRegnemaskineAvailability,
   breakRowsToRegnemaskineBreaks,
@@ -17,6 +17,7 @@ import {
   DEFAULT_PLAN_MATCHES_PER_TEAM,
 } from "@/lib/lykkecup-regnemaskine";
 import { BaneStatusPanel } from "@/components/turnering/bane-status-panel";
+import { findLevelScheduleRow } from "@/lib/puljer";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
 export type RegnemaskineLevelInput = {
@@ -49,13 +50,9 @@ function matchesSig(rows: LevelScheduleRow[]): string {
 }
 
 function matchesDraftFromServer(levels: RegnemaskineLevelInput[], scheduleRows: LevelScheduleRow[]): Record<string, string> {
-  const byLevel = new Map<string, LevelScheduleRow>();
-  for (const r of scheduleRows) {
-    byLevel.set(canonicalBanerLevelLabel(r.level), r);
-  }
   const out: Record<string, string> = {};
   for (const l of levels) {
-    const row = byLevel.get(canonicalBanerLevelLabel(l.levelKey));
+    const row = findLevelScheduleRow(l.levelKey, scheduleRows);
     const m = row?.plan_matches_per_team ?? DEFAULT_PLAN_MATCHES_PER_TEAM;
     out[l.levelKey] = String(m);
   }
@@ -158,15 +155,18 @@ export function LykkecupRegnemaskine({
       }
 
       const canon = canonicalBanerLevelLabel(levelKey);
-      const existing = baner.levelSettings.find((r) => canonicalBanerLevelLabel(r.level) === canon);
-
+      const short = formatLevelShortLabel(levelKey).toLowerCase();
+      const matching = baner.levelSettings.filter(
+        (r) => formatLevelShortLabel(r.level).toLowerCase() === short,
+      );
       setSavingLevel(levelKey);
       try {
-        if (existing) {
+        if (matching.length > 0) {
+          const ids = matching.map((r) => r.id);
           const { error: upErr } = await supabase
             .from("level_schedule_settings")
             .update({ plan_matches_per_team: matches })
-            .eq("id", existing.id);
+            .in("id", ids);
           if (upErr) {
             setLocalError(upErr.message);
             return;

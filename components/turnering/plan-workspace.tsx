@@ -346,7 +346,8 @@ export function TurneringPlanWorkspace({
           </p>
         </div>
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          Puljer klar til kampe: <span className="font-semibold">{poolsWithEnoughTeams}</span> · Estimeret antal kampe:{" "}
+          Puljer klar til kampe: <span className="font-semibold">{poolsWithEnoughTeams}</span> · Kampe/hold (Opsætning →
+          Kampe): <span className="font-semibold">{planMatchesPerTeam}</span> · Estimeret antal kampe:{" "}
           <span className="font-semibold">{estimatedTotalMatches}</span>
         </p>
 

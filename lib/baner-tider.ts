@@ -174,18 +174,22 @@ export function validateBreakInsideAvailability(
 }
 
 function mergeLevelScheduleRow(a: LevelScheduleRow, b: LevelScheduleRow): LevelScheduleRow {
-  const prefer = a.level.length <= b.level.length ? a : b;
-  const other = prefer === a ? b : a;
-  const canon = canonicalBanerLevelLabel(prefer.level);
+  const moreSpecific = a.level.length >= b.level.length ? a : b;
+  const other = moreSpecific === a ? b : a;
+  const canon = canonicalBanerLevelLabel(moreSpecific.level);
+  const planMatches =
+    moreSpecific.plan_matches_per_team != null
+      ? moreSpecific.plan_matches_per_team
+      : other.plan_matches_per_team;
   return {
-    ...prefer,
+    ...moreSpecific,
     level: canon,
-    plan_target_players_per_team: prefer.plan_target_players_per_team ?? other.plan_target_players_per_team,
-    plan_matches_per_team: prefer.plan_matches_per_team ?? other.plan_matches_per_team,
-    match_duration_minutes: prefer.match_duration_minutes || other.match_duration_minutes,
+    plan_target_players_per_team: moreSpecific.plan_target_players_per_team ?? other.plan_target_players_per_team,
+    plan_matches_per_team: planMatches,
+    match_duration_minutes: moreSpecific.match_duration_minutes || other.match_duration_minutes,
     break_between_matches_minutes:
-      prefer.break_between_matches_minutes || other.break_between_matches_minutes,
-    rounds_per_match: Math.max(prefer.rounds_per_match ?? 1, other.rounds_per_match ?? 1),
+      moreSpecific.break_between_matches_minutes || other.break_between_matches_minutes,
+    rounds_per_match: Math.max(moreSpecific.rounds_per_match ?? 1, other.rounds_per_match ?? 1),
   };
 }
 

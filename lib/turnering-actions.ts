@@ -624,8 +624,6 @@ export async function generatePoolMatchesAction(
 
   if (scheduleErr) return { ok: false, message: scheduleErr.message };
 
-  // Brug niveau fra Turneringsplan (levelKey), ikke kun pool.level — ellers kan «TurboStars» vs
-  // «TurboStars (4-17 år)» give standard 5 kampe/hold i stedet for gemt værdi.
   const planningLevel = canonicalBanerLevelLabel(levelKey);
   const matchesPerTeam = poolPlanningHint(planningLevel, scheduleRows ?? []).matchesPerTeam;
   const pairings = generateRoundRobinMatches(
