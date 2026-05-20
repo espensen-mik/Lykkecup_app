@@ -1,5 +1,10 @@
 import { timeToMinutes } from "@/lib/baner-tider";
-import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
+import {
+  canonicalBanerLevelLabel,
+  mergeTurneringLevelDisplayLabel,
+  sortLevelKeysForNav,
+  turneringLevelMergeKey,
+} from "@/lib/holddannelse";
 import { isOrphanKampprogramMatch } from "@/lib/kampprogram";
 import type { CheckStatus, LykkecupCheckResult } from "@/lib/lykkecup-check";
 import { findLevelScheduleRow } from "@/lib/puljer";
@@ -176,28 +181,31 @@ function computeLevelBreakdown(input: TurneringsplanStatusInput): Turneringsplan
 
   const levelAgg = new Map<string, TurneringsplanLevelBreakdown>();
 
-  const ensure = (levelKey: string) => {
-    const prev = levelAgg.get(levelKey);
-    if (prev) return prev;
+  const ensure = (levelRaw: string | null | undefined) => {
+    const mergeKey = turneringLevelMergeKey(levelRaw);
+    const prev = levelAgg.get(mergeKey);
+    if (prev) {
+      prev.levelKey = mergeTurneringLevelDisplayLabel(prev.levelKey, levelRaw);
+      return prev;
+    }
     const row: TurneringsplanLevelBreakdown = {
-      levelKey,
+      levelKey: canonicalBanerLevelLabel(levelRaw),
       expected: 0,
       generated: 0,
       scheduled: 0,
       unscheduled: 0,
     };
-    levelAgg.set(levelKey, row);
+    levelAgg.set(mergeKey, row);
     return row;
   };
 
   for (const pool of input.pools) {
-    const levelKey = canonicalBanerLevelLabel(pool.level);
+    const row = ensure(pool.level);
     const teams = teamsByPool.get(pool.id) ?? [];
     const planPerTeam =
-      resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel) ??
-      findLevelScheduleRow(levelKey, input.scheduleRows)?.plan_matches_per_team ??
+      resolvePlanMatchesPerTeam(row.levelKey, input.planMatchesByLevel) ??
+      findLevelScheduleRow(row.levelKey, input.scheduleRows)?.plan_matches_per_team ??
       0;
-    const row = ensure(levelKey);
     row.expected += plannedPoolMatchCount(teams.length, planPerTeam);
 
     for (const m of matchesByPool.get(pool.id) ?? []) {
@@ -210,7 +218,9 @@ function computeLevelBreakdown(input: TurneringsplanStatusInput): Turneringsplan
     }
   }
 
-  return [...levelAgg.values()].sort((a, b) => a.levelKey.localeCompare(b.levelKey, "da"));
+  const rows = [...levelAgg.values()];
+  const order = sortLevelKeysForNav(rows.map((r) => r.levelKey));
+  return order.map((key) => rows.find((r) => r.levelKey === key)!);
 }
 
 function itemFromCheck(result: LykkecupCheckResult, id: string): LykkecupCheckResult["items"][0] | undefined {

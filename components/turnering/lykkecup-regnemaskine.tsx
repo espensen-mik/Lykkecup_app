@@ -17,6 +17,7 @@ import {
   DEFAULT_PLAN_MATCHES_PER_TEAM,
 } from "@/lib/lykkecup-regnemaskine";
 import { BaneStatusPanel } from "@/components/turnering/bane-status-panel";
+import { insertLevelSchedulePlanning, writeLevelSchedulePlanning } from "@/lib/level-schedule-settings";
 import { findLevelScheduleRow, poolPlanningHint } from "@/lib/puljer";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
@@ -242,24 +243,35 @@ export function LykkecupRegnemaskine({
         };
         if (matching.length > 0) {
           const ids = matching.map((r) => r.id);
-          const { error: upErr } = await supabase
-            .from("level_schedule_settings")
-            .update(payload)
-            .in("id", ids);
-          if (upErr) {
-            setLocalError(upErr.message);
+          const writeRes = await writeLevelSchedulePlanning(supabase, ids, payload);
+          if (writeRes.error) {
+            setLocalError(writeRes.error);
+            return;
+          }
+          if (!writeRes.poolColumnsAvailable && (planTargetTeamsPerPool != null || planMaxTeamsPerPool != null)) {
+            setLocalError(
+              "Kampe/hold gemt. Puljestørrelse kræver migration — kør supabase/migrations/20260520130000_level_schedule_pool_settings.sql i Supabase.",
+            );
+            router.refresh();
             return;
           }
         } else {
-          const { error: insErr } = await supabase.from("level_schedule_settings").insert({
+          const insRes = await insertLevelSchedulePlanning(supabase, {
             event_id: eventId,
             level: canon,
             match_duration_minutes: 60,
             break_between_matches_minutes: 5,
             ...payload,
           });
-          if (insErr) {
-            setLocalError(insErr.message);
+          if (insRes.error) {
+            setLocalError(insRes.error);
+            return;
+          }
+          if (!insRes.poolColumnsAvailable && (planTargetTeamsPerPool != null || planMaxTeamsPerPool != null)) {
+            setLocalError(
+              "Kampe/hold gemt. Puljestørrelse kræver migration — kør supabase/migrations/20260520130000_level_schedule_pool_settings.sql i Supabase.",
+            );
+            router.refresh();
             return;
           }
         }

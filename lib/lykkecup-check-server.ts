@@ -1,4 +1,5 @@
 import { createServerSupabase } from "@/lib/auth-server";
+import { fetchLevelSchedulePlanningRows } from "@/lib/level-schedule-settings";
 import { planMatchesByLevelFromScheduleRows } from "@/lib/lykkecup-regnemaskine";
 import { runLykkecupCheck, type LykkecupCheckInput, type LykkecupCheckResult } from "@/lib/lykkecup-check";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
@@ -8,7 +9,7 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
   const eventId = TURNERING_EVENT_ID;
   const client = await createServerSupabase();
 
-  const [playersRes, teamsRes, poolsRes, membersRes, matchesRes, scheduleRes] = await Promise.all([
+  const [playersRes, teamsRes, poolsRes, membersRes, matchesRes] = await Promise.all([
     client.from("players").select("id, name, level").eq("event_id", eventId),
     client
       .from("teams")
@@ -20,11 +21,9 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
       .from("matches")
       .select("id, pool_id, team_a_id, team_b_id, court_id, start_time")
       .eq("event_id", eventId),
-    client
-      .from("level_schedule_settings")
-      .select("level, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool")
-      .eq("event_id", eventId),
   ]);
+
+  const scheduleFetch = await fetchLevelSchedulePlanningRows(client, eventId);
 
   const err =
     playersRes.error?.message ??
@@ -32,7 +31,7 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
     poolsRes.error?.message ??
     membersRes.error?.message ??
     matchesRes.error?.message ??
-    scheduleRes.error?.message ??
+    scheduleFetch.error ??
     null;
 
   if (err) {
@@ -45,12 +44,7 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
     };
   }
 
-  const scheduleRows = (scheduleRes.data ?? []) as {
-    level: string;
-    plan_matches_per_team: number | null;
-    plan_target_teams_per_pool: number | null;
-    plan_max_teams_per_pool: number | null;
-  }[];
+  const scheduleRows = scheduleFetch.rows;
 
   const input: LykkecupCheckInput = {
     players: (playersRes.data ?? []) as LykkecupCheckInput["players"],

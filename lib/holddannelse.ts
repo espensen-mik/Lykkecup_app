@@ -30,6 +30,23 @@ export function formatLevelShortLabel(level: string | null | undefined): string 
   return first ?? cleaned;
 }
 
+/** Stabil sammenlægningsnøgle (fx «TurboStars» og «TurboStars (4-17 år) ****» → samme niveau). */
+export function turneringLevelMergeKey(level: string | null | undefined): string {
+  return formatLevelShortLabel(level).toLowerCase();
+}
+
+/** Kanonisk visningsnavn efter sammenlægning — foretrækker mest specifik (længste) variant. */
+export function mergeTurneringLevelDisplayLabel(
+  current: string | null | undefined,
+  incoming: string | null | undefined,
+): string {
+  const a = canonicalBanerLevelLabel(current);
+  const b = canonicalBanerLevelLabel(incoming);
+  if (a === "Ukendt niveau") return b;
+  if (b === "Ukendt niveau") return a;
+  return a.length >= b.length ? a : b;
+}
+
 export function levelPathSegment(levelKey: string): string {
   return encodeURIComponent(levelKey);
 }

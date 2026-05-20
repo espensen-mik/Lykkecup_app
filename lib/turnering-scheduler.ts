@@ -472,6 +472,86 @@ function findAllSlotsForMatch(
   return sortSlotCandidates(slots);
 }
 
+/**
+ * Manuel planlægning: alle aktive baner (alle størrelser) og alle turneringsperioder.
+ * Ingen filtrering til kun pulje-periode eller kun «rigtig» banetype.
+ */
+function findAllSlotsForMatchManual(
+  periods: readonly TournamentPeriodRow[],
+  match: ScheduleMatchInput,
+  allCourtIds: readonly string[],
+  base: SchedulePoolBase,
+  occupancy: readonly OccupiedSlot[],
+  teamRounds: TeamRoundTracker,
+  teamRestMinutes: number,
+): SlotCandidate[] {
+  const roundLen = roundLengthMinutes(base.timing);
+  if (roundLen <= 0 || allCourtIds.length === 0) return [];
+
+  const blockMinutes = Math.max(1, Math.floor(base.roundsPerMatch)) * roundLen;
+  const tryPeriods = [...periods].sort(
+    (a, b) =>
+      a.sort_order - b.sort_order ||
+      (periodWindowMinutes(a)?.startMinutes ?? 0) - (periodWindowMinutes(b)?.startMinutes ?? 0),
+  );
+  const slots: SlotCandidate[] = [];
+
+  for (const period of tryPeriods) {
+    const periodWin = periodWindowForScheduling(period, base.baseAvailability, base.courtIds);
+    if (!periodWin) continue;
+
+    const availability = availabilityForPeriodScheduling(
+      base.courtIds,
+      base.baseAvailability,
+      periodWin,
+      period,
+    );
+    const ctx: SchedulePeriodContext = {
+      period,
+      roundSlotEpochStartMinutes: base.roundSlotEpochStartMinutes,
+      courtIds: base.courtIds,
+      courtTypes: base.courtTypes,
+      levelKey: base.levelKey,
+      levelCourtRows: base.levelCourtRows,
+      availability,
+      breaks: base.breaks,
+      timing: base.timing,
+      roundsPerMatch: base.roundsPerMatch,
+      existingOccupancy: occupancy,
+      teamRestMinutes,
+    };
+
+    for (let t = periodWin.startMinutes; t + blockMinutes <= periodWin.endMinutes; t += roundLen) {
+      if (!teamsCanPlayAt(teamRounds, match.teamAId, match.teamBId, t, teamRestMinutes)) continue;
+
+      const endMinutes = t + blockMinutes;
+      const roundSlot = roundSlotFromStartMinutes(base.roundSlotEpochStartMinutes, roundLen, t);
+
+      for (const courtId of allCourtIds) {
+        const avail = availabilityWindowsForCourt(courtId, availability);
+        const courtBreaks = breaksForCourt(courtId, base.breaks);
+        const playableWindows = isAllDayPeriod(period)
+          ? avail.filter((w) => w.endMinutes > w.startMinutes)
+          : avail
+              .map((w) => intersectWindow(w, periodWin))
+              .filter((w): w is { startMinutes: number; endMinutes: number } => w != null);
+        if (playableWindows.length === 0) continue;
+        if (isIntervalFree(courtId, t, endMinutes, occupancy, courtBreaks, playableWindows)) {
+          slots.push({
+            courtId,
+            startMinutes: t,
+            endMinutes,
+            roundSlot,
+            periodId: period.id,
+          });
+        }
+      }
+    }
+  }
+
+  return sortSlotCandidates(slots);
+}
+
 /** Kun puljens tildelte periode — til fælles planlægning af flere puljer på samme niveau. */
 function findSlotsInAssignedPeriodOnly(
   period: TournamentPeriodRow,
@@ -3340,6 +3420,7 @@ export async function assignMatchScheduleForPool(
 export type ManualScheduleSlotOption = {
   courtId: string;
   courtName: string;
+  courtType: CourtType;
   venueName: string | null;
   startMinutes: number;
   endMinutes: number;
@@ -3347,6 +3428,10 @@ export type ManualScheduleSlotOption = {
   respectsTeamRest: boolean;
   periodName: string;
   isOutsidePoolPeriod: boolean;
+  /** Periode er tildelt en anden pulje under Opsætning → Perioder. */
+  isDedicatedOtherPoolPeriod: boolean;
+  /** Banetype matcher niveauets indstilling (Opsætning → Niveau). */
+  isPreferredCourtType: boolean;
 };
 
 export type ManualScheduleSlotsResult = {
@@ -3359,7 +3444,7 @@ export type ManualScheduleSlotsResult = {
   slots: ManualScheduleSlotOption[];
 };
 
-/** Ledige bane/tid til manuel planlægning af én kamp (korrekt banestørrelse, begge hold ledige). */
+/** Ledige bane/tid til manuel planlægning — inkl. andre banestørrelser og alle perioder. */
 export async function listManualScheduleSlotsForMatch(
   supabase: SupabaseClient,
   matchId: string,
@@ -3433,7 +3518,7 @@ export async function listManualScheduleSlotsForMatch(
   const allPeriods = (allPeriodsRes.data ?? []) as TournamentPeriodRow[];
   const periodsById = new Map(allPeriods.map((p) => [p.id, p]));
   const primaryPeriodId = pool.period_id;
-  const blockedOverflowPeriodIds = dedicatedPeriodIdsForOtherPools(
+  const dedicatedOtherPoolPeriodIds = dedicatedPeriodIdsForOtherPools(
     (eventPoolsRes.data ?? []) as Array<{ id: string; period_id: string | null }>,
     pool.id,
   );
@@ -3482,14 +3567,16 @@ export async function listManualScheduleSlotsForMatch(
 
   const levelCourtRows = (levelCourtRes.data ?? []) as LevelCourtSettingLike[];
   const requiredType = requiredCourtTypeForLevel(levelKey, levelCourtRows);
-  const eligibleCourtIds = courtRows
-    .filter((c) => c.is_active && c.court_type === requiredType)
-    .map((c) => c.id);
+  const activeCourtRows = courtRows.filter((c) => c.is_active);
+  const activeCourtIds = activeCourtRows.map((c) => c.id);
+  const preferredCourtIds = new Set(
+    activeCourtRows.filter((c) => c.court_type === requiredType).map((c) => c.id),
+  );
 
-  if (eligibleCourtIds.length === 0) {
+  if (activeCourtIds.length === 0) {
     return {
       ...empty,
-      error: `Ingen aktive baner med type «${requiredType}» for ${levelKey}.`,
+      error: "Ingen aktive baner — opret baner under Opsætning → Haller & baner.",
       levelKey,
       teamALabel,
       teamBLabel,
@@ -3497,6 +3584,7 @@ export async function listManualScheduleSlotsForMatch(
   }
 
   const courtNameById = new Map(courtRows.map((c) => [c.id, c.name]));
+  const courtTypeById = new Map(courtRows.map((c) => [c.id, c.court_type]));
   const venueRes =
     venueIds.length > 0
       ? await supabase.from("venues").select("id, name").in("id", venueIds)
@@ -3537,7 +3625,7 @@ export async function listManualScheduleSlotsForMatch(
   const teamRestMinutes = teamRestMinutesBetweenMatches(roundLen);
   const roundSlotEpochStart = schedulingEpochStartMinutes(allPeriods);
 
-  const poolTeamIds = new Set([matchRow.team_a_id, matchRow.team_b_id]);
+  const matchTeamIds = new Set([matchRow.team_a_id, matchRow.team_b_id]);
   const existingOccupancy: OccupiedSlot[] = [];
   for (const m of (allMatchesRes.data ?? []) as Array<{
     id: string;
@@ -3568,7 +3656,7 @@ export async function listManualScheduleSlotsForMatch(
       end_time: string;
     }>) {
       if (row.id === matchId) continue;
-      if (!poolTeamIds.has(row.team_a_id) && !poolTeamIds.has(row.team_b_id)) continue;
+      if (!matchTeamIds.has(row.team_a_id) && !matchTeamIds.has(row.team_b_id)) continue;
       const startMinutes = timeToMinutes(row.start_time);
       const endMinutes = timeToMinutes(row.end_time);
       if (startMinutes == null || endMinutes == null || endMinutes <= startMinutes) continue;
@@ -3589,7 +3677,7 @@ export async function listManualScheduleSlotsForMatch(
 
   const poolBase: SchedulePoolBase = {
     roundSlotEpochStartMinutes: roundSlotEpochStart,
-    courtIds: eligibleCourtIds,
+    courtIds: activeCourtIds,
     courtTypes,
     levelKey,
     levelCourtRows,
@@ -3598,7 +3686,7 @@ export async function listManualScheduleSlotsForMatch(
     timing,
     roundsPerMatch,
     existingOccupancy,
-    blockedOverflowPeriodIds,
+    blockedOverflowPeriodIds: new Set(),
   };
 
   const matchInput: ScheduleMatchInput = {
@@ -3608,22 +3696,19 @@ export async function listManualScheduleSlotsForMatch(
     teamBId: matchRow.team_b_id,
   };
 
-  const courtOrder = [...eligibleCourtIds].sort((a, b) => a.localeCompare(b));
-  const slotsWithRest = findAllSlotsForMatch(
+  const slotsWithRest = findAllSlotsForMatchManual(
     allPeriods,
-    primaryPeriodId,
     matchInput,
-    courtOrder,
+    activeCourtIds,
     poolBase,
     existingOccupancy,
     teamRounds,
     teamRestMinutes,
   );
-  const slotsRelaxed = findAllSlotsForMatch(
+  const slotsRelaxed = findAllSlotsForMatchManual(
     allPeriods,
-    primaryPeriodId,
     matchInput,
-    courtOrder,
+    activeCourtIds,
     poolBase,
     existingOccupancy,
     teamRounds,
@@ -3638,17 +3723,34 @@ export async function listManualScheduleSlotsForMatch(
     const periodName = period?.name ?? "—";
     const startLabel = minutesToTimeInput(slot.startMinutes);
     const endLabel = minutesToTimeInput(slot.endMinutes);
+    const courtType = courtTypeById.get(slot.courtId) ?? requiredType;
+    const isOutsidePoolPeriod = slot.periodId !== primaryPeriodId;
+    const isDedicatedOtherPoolPeriod =
+      isOutsidePoolPeriod && dedicatedOtherPoolPeriodIds.has(slot.periodId);
     return {
       courtId: slot.courtId,
       courtName: courtNameById.get(slot.courtId) ?? "Bane",
+      courtType,
       venueName: venueByCourtId.get(slot.courtId) ?? null,
       startMinutes: slot.startMinutes,
       endMinutes: slot.endMinutes,
       timeLabel: `${startLabel}–${endLabel}`,
       respectsTeamRest: restKeys.has(`${slot.courtId}:${slot.startMinutes}`),
       periodName,
-      isOutsidePoolPeriod: slot.periodId !== primaryPeriodId,
+      isOutsidePoolPeriod,
+      isDedicatedOtherPoolPeriod,
+      isPreferredCourtType: preferredCourtIds.has(slot.courtId),
     };
+  });
+
+  slots.sort((a, b) => {
+    if (a.isPreferredCourtType !== b.isPreferredCourtType) return a.isPreferredCourtType ? -1 : 1;
+    if (a.isOutsidePoolPeriod !== b.isOutsidePoolPeriod) return a.isOutsidePoolPeriod ? 1 : -1;
+    if (a.isDedicatedOtherPoolPeriod !== b.isDedicatedOtherPoolPeriod) {
+      return a.isDedicatedOtherPoolPeriod ? 1 : -1;
+    }
+    if (a.respectsTeamRest !== b.respectsTeamRest) return a.respectsTeamRest ? -1 : 1;
+    return a.startMinutes - b.startMinutes || a.courtName.localeCompare(b.courtName, "da");
   });
 
   return {

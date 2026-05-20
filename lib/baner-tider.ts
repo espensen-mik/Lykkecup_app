@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canonicalBanerLevelLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
+import { fetchBanerLevelScheduleRows } from "@/lib/level-schedule-settings";
 import { computeScheduledRoundsByCourtId } from "@/lib/lykkecup-regnemaskine";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
@@ -292,7 +293,7 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
 
   const courtIds = courts.map((c) => c.id);
 
-  const [availRes, breaksRes, levelRes, levelCourtRes, matchesRes, poolsRes] = await Promise.all([
+  const [availRes, breaksRes, levelCourtRes, matchesRes, poolsRes] = await Promise.all([
     courtIds.length
       ? supabase
           .from("court_availability")
@@ -308,21 +309,17 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
           .in("court_id", courtIds)
           .order("start_time", { ascending: true })
       : Promise.resolve({ data: [], error: null } as const),
-    supabase
-      .from("level_schedule_settings")
-      .select(
-        "id, event_id, level, match_duration_minutes, break_between_matches_minutes, rounds_per_match, plan_target_players_per_team, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool",
-      )
-      .eq("event_id", eventId),
     supabase.from("level_court_settings").select("id, event_id, level, court_type").eq("event_id", eventId),
     supabase.from("matches").select("court_id, pool_id").eq("event_id", eventId).not("court_id", "is", null),
     supabase.from("pools").select("id, level").eq("event_id", eventId),
   ]);
 
+  const levelFetch = await fetchBanerLevelScheduleRows(supabase, eventId);
+
   const err =
     availRes.error?.message ??
     breaksRes.error?.message ??
-    levelRes.error?.message ??
+    levelFetch.error ??
     levelCourtRes.error?.message ??
     matchesRes.error?.message ??
     poolsRes.error?.message ??
@@ -341,7 +338,7 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
     };
   }
 
-  const levelSettingsRaw = (levelRes.data ?? []).map((row) => {
+  const levelSettingsRaw = (levelFetch.data ?? []).map((row) => {
     const r = row as LevelScheduleRow & {
       rounds_per_match?: number | null;
       plan_target_players_per_team?: number | null;

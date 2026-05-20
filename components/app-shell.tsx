@@ -33,7 +33,12 @@ import { KontrolcenterHelp } from "@/components/kontrolcenter-help";
 import { KontrolcenterLockdownToggle } from "@/components/kontrolcenter-lockdown-toggle";
 import { useKontrolcenterLockdown } from "@/components/kontrolcenter-lockdown-context";
 import { fetchUnhandledClubFeedbackCount } from "@/lib/club-feedback";
-import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
+import {
+  mergeTurneringLevelDisplayLabel,
+  normalizeLevelKey,
+  sortLevelKeysForNav,
+  turneringLevelMergeKey,
+} from "@/lib/holddannelse";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { supabase } from "@/lib/supabase";
 
@@ -130,12 +135,13 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [playersRes, teamsRes] = await Promise.all([
+      const [playersRes, teamsRes, poolsRes] = await Promise.all([
         supabase.from("players").select("level").eq("event_id", LYKKECUP_EVENT_ID),
         supabase.from("teams").select("level").eq("event_id", LYKKECUP_EVENT_ID),
+        supabase.from("pools").select("level").eq("event_id", LYKKECUP_EVENT_ID),
       ]);
       if (cancelled) return;
-      if (playersRes.error || teamsRes.error) return;
+      if (playersRes.error || teamsRes.error || poolsRes.error) return;
 
       const holdKeys = new Set<string>();
       for (const row of (playersRes.data ?? []) as { level: string | null }[]) {
@@ -143,11 +149,18 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       }
       setHoldLevels(sortLevelKeysForNav([...holdKeys]));
 
-      const turneringKeys = new Set<string>();
+      const turneringByMerge = new Map<string, string>();
+      const mergeTurneringLevel = (level: string | null) => {
+        const mk = turneringLevelMergeKey(level);
+        turneringByMerge.set(mk, mergeTurneringLevelDisplayLabel(turneringByMerge.get(mk), level));
+      };
       for (const row of (teamsRes.data ?? []) as { level: string | null }[]) {
-        turneringKeys.add(normalizeLevelKey(row.level));
+        mergeTurneringLevel(row.level);
       }
-      setTurneringLevels(sortLevelKeysForNav([...turneringKeys]));
+      for (const row of (poolsRes.data ?? []) as { level: string | null }[]) {
+        mergeTurneringLevel(row.level);
+      }
+      setTurneringLevels(sortLevelKeysForNav([...turneringByMerge.values()]));
     })();
     return () => {
       cancelled = true;

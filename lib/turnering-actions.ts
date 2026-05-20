@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/auth-server";
 import { canonicalBanerLevelLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
+import { fetchLevelSchedulePlanningRows } from "@/lib/level-schedule-settings";
 import { effectivePoolMaxTeams, poolPlanningHint, suggestNextPoolName } from "@/lib/puljer";
 import { generateRoundRobinMatches, TURNERING_EVENT_ID } from "@/lib/turnering";
 import {
@@ -218,7 +219,7 @@ export async function autoAssignPoolsAction(levelKey: string): Promise<
   const canonLevel = canonicalBanerLevelLabel(levelKey);
   const eventId = TURNERING_EVENT_ID;
 
-  const [teamsRes, poolsRes, membersRes, playersRes, scheduleRes] = await Promise.all([
+  const [teamsRes, poolsRes, membersRes, playersRes] = await Promise.all([
     supabase
       .from("teams")
       .select("id, level, pool_id, name, sort_order")
@@ -229,24 +230,17 @@ export async function autoAssignPoolsAction(levelKey: string): Promise<
       .eq("event_id", eventId),
     supabase.from("team_members").select("team_id, player_id").eq("event_id", eventId),
     supabase.from("players").select("id, age").eq("event_id", eventId),
-    supabase
-      .from("level_schedule_settings")
-      .select("level, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool")
-      .eq("event_id", eventId),
   ]);
 
   if (teamsRes.error) return { ok: false, message: teamsRes.error.message };
   if (poolsRes.error) return { ok: false, message: poolsRes.error.message };
   if (membersRes.error) return { ok: false, message: membersRes.error.message };
   if (playersRes.error) return { ok: false, message: playersRes.error.message };
-  if (scheduleRes.error) return { ok: false, message: scheduleRes.error.message };
 
-  const scheduleRows = (scheduleRes.data ?? []) as {
-    level: string;
-    plan_matches_per_team: number | null;
-    plan_target_teams_per_pool: number | null;
-    plan_max_teams_per_pool: number | null;
-  }[];
+  const scheduleFetch = await fetchLevelSchedulePlanningRows(supabase, eventId);
+  if (scheduleFetch.error) return { ok: false, message: scheduleFetch.error };
+
+  const scheduleRows = scheduleFetch.rows;
   const poolHint = poolPlanningHint(canonLevel, scheduleRows);
   const targetPerPool = poolHint.recommendedTeamCount;
   const maxPerPool = effectivePoolMaxTeams(poolHint);
@@ -646,15 +640,11 @@ export async function generatePoolMatchesAction(
     if (delRes.error) return { ok: false, message: delRes.error.message };
   }
 
-  const { data: scheduleRows, error: scheduleErr } = await supabase
-    .from("level_schedule_settings")
-    .select("level, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool")
-    .eq("event_id", TURNERING_EVENT_ID);
-
-  if (scheduleErr) return { ok: false, message: scheduleErr.message };
+  const scheduleFetch = await fetchLevelSchedulePlanningRows(supabase, TURNERING_EVENT_ID);
+  if (scheduleFetch.error) return { ok: false, message: scheduleFetch.error };
 
   const planningLevel = canonicalBanerLevelLabel(levelKey);
-  const matchesPerTeam = poolPlanningHint(planningLevel, scheduleRows ?? []).matchesPerTeam;
+  const matchesPerTeam = poolPlanningHint(planningLevel, scheduleFetch.rows).matchesPerTeam;
   const pairings = generateRoundRobinMatches(
     teams as { id: string; sort_order: number; name: string }[],
     matchesPerTeam,
