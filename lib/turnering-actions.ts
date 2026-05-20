@@ -14,6 +14,7 @@ import {
   type ManualScheduleSlotOption,
   type UnscheduledMatchDetail,
 } from "@/lib/turnering-scheduler";
+import { planningLockdownBlock } from "@/lib/kontrolcenter-lockdown";
 import {
   isAllDayPeriod,
   periodWindowMinutes,
@@ -84,6 +85,9 @@ export async function createPoolAction(
   levelKey: string,
   options?: { revalidate?: boolean },
 ): Promise<TurneringActionResult & { pool?: CreatedPoolRow }> {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -137,6 +141,9 @@ export async function createPoolAction(
 
 /** Frigør hold der peger på en pulje-id som ikke findes (fx efter sletning). */
 export async function releaseOrphanedPoolTeamsAction(levelKey: string): Promise<TurneringActionResult & { released?: number }> {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -197,6 +204,9 @@ export async function autoAssignPoolsAction(levelKey: string): Promise<
     newPools?: CreatedPoolRow[];
   }
 > {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -378,6 +388,9 @@ export async function autoAssignPoolsAction(levelKey: string): Promise<
 
 /** Ensret `pools.level` til kanonisk navn (fjern stjerner / dubletter som "CoolStars …" vs "CoolStars … *"). */
 export async function normalizePoolLevelLabelsAction(): Promise<TurneringActionResult & { updated?: number }> {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -421,6 +434,9 @@ export async function normalizePoolLevelLabelsAction(): Promise<TurneringActionR
 export async function renumberPoolNamesForLevelAction(
   levelKey: string,
 ): Promise<TurneringActionResult & { updated?: number }> {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -487,6 +503,9 @@ export async function updateMatchScheduleAction(
   endTimeIso: string,
   options?: { scheduleRelaxedTeamRest?: boolean },
 ): Promise<TurneringActionResult> {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -581,6 +600,9 @@ export async function generatePoolMatchesAction(
     schedulingFailures?: SchedulingFailureRow[];
   }
 > {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -714,6 +736,9 @@ export async function generateAllPoolMatchesForLevelAction(
     schedulingFailures?: SchedulingFailureRow[];
   }
 > {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -925,6 +950,9 @@ export async function schedulePoolMatchesAction(
 ): Promise<
   TurneringActionResult & { scheduled?: number; schedulingFailures?: SchedulingFailureRow[] }
 > {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const supabase = await createServerSupabase();
   const {
     data: { user },

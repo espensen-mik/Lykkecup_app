@@ -30,6 +30,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { KontrolcenterHelp } from "@/components/kontrolcenter-help";
+import { KontrolcenterLockdownToggle } from "@/components/kontrolcenter-lockdown-toggle";
+import { useKontrolcenterLockdown } from "@/components/kontrolcenter-lockdown-context";
 import { fetchUnhandledClubFeedbackCount } from "@/lib/club-feedback";
 import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
@@ -91,6 +93,7 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
 }
 
 export function AppShell({ children, currentUser }: { children: React.ReactNode; currentUser: AuthAppUser | null }) {
+  const { planningLockdown } = useKontrolcenterLockdown();
   const authClient = getAuthBrowserClient();
   function initialsFromName(name: string) {
     const parts = name
@@ -852,7 +855,16 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             <Ticket className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
             Billetsalg
           </Link>
+          <KontrolcenterLockdownToggle />
           <KontrolcenterHelp />
+          {planningLockdown ? (
+            <span
+              className="hidden rounded-full border border-amber-200/90 bg-amber-100/95 px-2.5 py-1 text-[0.6875rem] font-bold uppercase tracking-wide text-amber-950 lg:inline-flex dark:border-amber-700 dark:bg-amber-950/70 dark:text-amber-100"
+              title="Holddannelse og Turnering er låst"
+            >
+              Låst
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => void handleLogout()}
