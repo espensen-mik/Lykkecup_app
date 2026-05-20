@@ -99,6 +99,29 @@ function teamsOverlapScheduledInterval(
   return false;
 }
 
+/** Hold-pause: min. `restMinutes` mellem slut på forrige kamp og start på næste (kun nærmeste kampe før/efter). */
+function teamsRespectRestAtInterval(
+  teamAId: string,
+  teamBId: string,
+  startMinutes: number,
+  endMinutes: number,
+  intervals: readonly TeamScheduledInterval[],
+  excludeMatchId: string,
+  restMinutes: number,
+): boolean {
+  if (restMinutes <= 0) return true;
+
+  for (const teamId of [teamAId, teamBId]) {
+    for (const m of intervals) {
+      if (m.id === excludeMatchId) continue;
+      if (m.teamAId !== teamId && m.teamBId !== teamId) continue;
+      if (m.endMinutes <= startMinutes && startMinutes < m.endMinutes + restMinutes) return false;
+      if (m.startMinutes >= endMinutes && m.startMinutes < endMinutes + restMinutes) return false;
+    }
+  }
+  return true;
+}
+
 function resolveSchedulerTimingForLevel(
   levelKey: string,
   levelRows: readonly {
@@ -558,7 +581,6 @@ function findAllSlotsForMatchManual(
   allCourtIds: readonly string[],
   base: SchedulePoolBase,
   occupancy: readonly OccupiedSlot[],
-  teamRounds: TeamRoundTracker,
   teamRestMinutes: number,
   teamIntervals: readonly TeamScheduledInterval[],
   scheduledRoundStartMinutes: readonly number[],
@@ -606,7 +628,16 @@ function findAllSlotsForMatchManual(
         match.id,
       );
       const respectsTeamRest =
-        teamsFree && teamsCanPlayAt(teamRounds, match.teamAId, match.teamBId, t, teamRestMinutes);
+        teamsFree &&
+        teamsRespectRestAtInterval(
+          match.teamAId,
+          match.teamBId,
+          t,
+          endMinutes,
+          teamIntervals,
+          match.id,
+          teamRestMinutes,
+        );
       const roundSlot = roundSlotFromStartMinutes(base.roundSlotEpochStartMinutes, roundLen, t);
 
       for (const courtId of allCourtIds) {
@@ -3617,30 +3648,23 @@ export async function listManualScheduleSlotsForMatch(
           .select("id, venue_id, event_id, name, court_type, is_active, sort_order")
           .eq("event_id", eventId);
 
-  const [courtsRes, availRes, breaksRes, levelRes, levelCourtRes, allMatchesRes, teamHistoryRes] =
-    await Promise.all([
-      courtsQuery,
-      supabase.from("court_availability").select("court_id, start_time, end_time").eq("event_id", eventId),
-      supabase.from("court_breaks").select("court_id, start_time, end_time").eq("event_id", eventId),
-      supabase
-        .from("level_schedule_settings")
-        .select("level, match_duration_minutes, break_between_matches_minutes, rounds_per_match")
-        .eq("event_id", eventId),
-      supabase.from("level_court_settings").select("level, court_type").eq("event_id", eventId),
-      supabase
-        .from("matches")
-        .select("id, team_a_id, team_b_id, court_id, start_time, end_time")
-        .eq("event_id", eventId)
-        .not("court_id", "is", null)
-        .not("start_time", "is", null)
-        .not("end_time", "is", null),
-      supabase
-        .from("matches")
-        .select("id, team_a_id, team_b_id, start_time, end_time")
-        .eq("event_id", eventId)
-        .not("start_time", "is", null)
-        .not("end_time", "is", null),
-    ]);
+  const [courtsRes, availRes, breaksRes, levelRes, levelCourtRes, allMatchesRes] = await Promise.all([
+    courtsQuery,
+    supabase.from("court_availability").select("court_id, start_time, end_time").eq("event_id", eventId),
+    supabase.from("court_breaks").select("court_id, start_time, end_time").eq("event_id", eventId),
+    supabase
+      .from("level_schedule_settings")
+      .select("level, match_duration_minutes, break_between_matches_minutes, rounds_per_match")
+      .eq("event_id", eventId),
+    supabase.from("level_court_settings").select("level, court_type").eq("event_id", eventId),
+    supabase
+      .from("matches")
+      .select("id, team_a_id, team_b_id, court_id, start_time, end_time")
+      .eq("event_id", eventId)
+      .not("court_id", "is", null)
+      .not("start_time", "is", null)
+      .not("end_time", "is", null),
+  ]);
 
   if (courtsRes.error) return { ...empty, error: courtsRes.error.message, levelKey, teamALabel, teamBLabel };
 
@@ -3707,8 +3731,6 @@ export async function listManualScheduleSlotsForMatch(
   const teamIntervals: TeamScheduledInterval[] = [];
   const scheduledRoundStartMinutes = new Set<number>();
 
-  const matchTeamIds = new Set([matchRow.team_a_id, matchRow.team_b_id]);
-
   for (const m of (allMatchesRes.data ?? []) as Array<{
     id: string;
     team_a_id: string;
@@ -3731,36 +3753,6 @@ export async function listManualScheduleSlotsForMatch(
       existingOccupancy.push({ courtId: m.court_id, startMinutes: s, endMinutes: e });
     }
     scheduledRoundStartMinutes.add(s);
-  }
-
-  const teamRounds = createTeamRoundTracker();
-  if (!teamHistoryRes.error) {
-    const history: Array<{
-      team_a_id: string;
-      team_b_id: string;
-      startMinutes: number;
-      endMinutes: number;
-    }> = [];
-    for (const row of (teamHistoryRes.data ?? []) as Array<{
-      id: string;
-      team_a_id: string;
-      team_b_id: string;
-      start_time: string;
-      end_time: string;
-    }>) {
-      if (row.id === matchId) continue;
-      if (!matchTeamIds.has(row.team_a_id) && !matchTeamIds.has(row.team_b_id)) continue;
-      const startMinutes = timeToMinutes(row.start_time);
-      const endMinutes = timeToMinutes(row.end_time);
-      if (startMinutes == null || endMinutes == null || endMinutes <= startMinutes) continue;
-      history.push({
-        team_a_id: row.team_a_id,
-        team_b_id: row.team_b_id,
-        startMinutes,
-        endMinutes,
-      });
-    }
-    seedTeamRoundTrackerFromScheduledMatches(teamRounds, history);
   }
 
   const courtTypes = new Map<string, CourtType>();
@@ -3795,7 +3787,6 @@ export async function listManualScheduleSlotsForMatch(
     activeCourtIds,
     poolBase,
     existingOccupancy,
-    teamRounds,
     teamRestMinutes,
     teamIntervals,
     [...scheduledRoundStartMinutes],

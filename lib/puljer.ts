@@ -67,14 +67,17 @@ function planMaxTeamsFromRow(row: LevelSchedulePlanningRow | undefined): number 
 }
 
 function pickMoreSpecificScheduleRow<T extends LevelSchedulePlanningRow>(a: T, b: T): T {
-  const aVal = planMatchesPerTeamFromRow(a);
-  const bVal = planMatchesPerTeamFromRow(b);
-  if (aVal != null && bVal != null) {
-    return canonicalBanerLevelLabel(a.level).length >= canonicalBanerLevelLabel(b.level).length ? a : b;
-  }
-  if (bVal != null) return b;
-  if (aVal != null) return a;
-  return canonicalBanerLevelLabel(a.level).length >= canonicalBanerLevelLabel(b.level).length ? a : b;
+  const moreSpecific =
+    canonicalBanerLevelLabel(a.level).length >= canonicalBanerLevelLabel(b.level).length ? a : b;
+  const other = moreSpecific === a ? b : a;
+  return {
+    ...moreSpecific,
+    plan_matches_per_team:
+      planMatchesPerTeamFromRow(moreSpecific) ?? planMatchesPerTeamFromRow(other),
+    plan_target_teams_per_pool:
+      moreSpecific.plan_target_teams_per_pool ?? other.plan_target_teams_per_pool,
+    plan_max_teams_per_pool: moreSpecific.plan_max_teams_per_pool ?? other.plan_max_teams_per_pool,
+  };
 }
 
 /**
@@ -99,24 +102,29 @@ export function findLevelScheduleRow<T extends LevelSchedulePlanningRow>(
   levelKey: string,
   levelScheduleRows: readonly T[],
 ): T | undefined {
-  const canon = canonicalBanerLevelLabel(levelKey);
-  const exact = levelScheduleRows.find((r) => canonicalBanerLevelLabel(r.level) === canon);
-  if (
-    planMatchesPerTeamFromRow(exact) != null ||
-    exact?.plan_target_teams_per_pool != null ||
-    exact?.plan_max_teams_per_pool != null
-  ) {
-    return exact;
+  const short = formatLevelShortLabel(levelKey).toLowerCase();
+  if (!short || short === "ukendt niveau") {
+    const canon = canonicalBanerLevelLabel(levelKey);
+    return levelScheduleRows.find((r) => canonicalBanerLevelLabel(r.level) === canon);
   }
 
-  const short = formatLevelShortLabel(levelKey).toLowerCase();
-  if (!short || short === "ukendt niveau") return exact;
+  const matches = levelScheduleRows.filter(
+    (r) => formatLevelShortLabel(r.level).toLowerCase() === short,
+  );
+  if (matches.length === 0) {
+    const canon = canonicalBanerLevelLabel(levelKey);
+    return levelScheduleRows.find((r) => canonicalBanerLevelLabel(r.level) === canon);
+  }
+  return matches.reduce((acc, row) => pickMoreSpecificScheduleRow(acc, row));
+}
 
-  const normalized = normalizeScheduleRowsForPlanning(levelScheduleRows);
-  const merged = normalized.find((r) => formatLevelShortLabel(r.level).toLowerCase() === short);
-  if (merged) return merged;
-
-  return exact;
+/** Kort visning af puljestørrelse fra Opsætning → Kampe. */
+export function formatPoolSizePlanLabel(hint: PoolPlanningHint): string {
+  const target = hint.recommendedTeamCount;
+  if (hint.maxTeamsPerPool != null) {
+    return `mål ${target} · maks ${hint.maxTeamsPerPool} hold/pulje`;
+  }
+  return `mål ${target} hold/pulje (ingen maks sat)`;
 }
 
 export function poolPlanningHint(

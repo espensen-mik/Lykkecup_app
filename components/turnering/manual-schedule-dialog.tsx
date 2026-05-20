@@ -172,8 +172,9 @@ export function ManualScheduleDialog({
             {teamALabel} vs {teamBLabel}
           </p>
           <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-            Alle ledige baner og tider på tværs af perioder og banestørrelser. Tider uden hold-pause eller hvor et
-            hold allerede spiller er markeret — du kan stadig vælge dem.
+            Alle ledige baner og tider på tværs af perioder og banestørrelser. «Uden hold-pause» betyder for lidt
+            tid til nærmeste anden kamp for et hold (min. {teamRestMinutes} min). «Hold optaget» = overlap med
+            anden kamp.
           </p>
         </div>
 

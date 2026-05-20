@@ -84,22 +84,28 @@ export async function fetchPuljerOverview(): Promise<{
   if (teamsRes.error) return { levels: [], error: teamsRes.error.message };
   if (poolsRes.error) return { levels: [], error: poolsRes.error.message };
 
+  const scheduleFetch = await fetchLevelSchedulePlanningRows(client, eventId);
+  if (scheduleFetch.error) return { levels: [], error: scheduleFetch.error };
+
   const teams = (teamsRes.data ?? []) as Pick<TeamRow, "id" | "level" | "pool_id">[];
   const pools = (poolsRes.data ?? []) as { id: string; level: string | null }[];
 
   const levelMap = new Map<string, PuljerOverviewLevel>();
   for (const t of teams) {
     const mergeKey = turneringLevelMergeKey(t.level);
+    const levelKey = canonicalBanerLevelLabel(t.level);
     const row =
       levelMap.get(mergeKey) ??
       {
-        levelKey: canonicalBanerLevelLabel(t.level),
+        levelKey,
         totalTeams: 0,
         poolCount: 0,
         assignedTeams: 0,
         unassignedTeams: 0,
+        poolHint: poolPlanningHint(levelKey, scheduleFetch.rows),
       };
     row.levelKey = mergeTurneringLevelDisplayLabel(row.levelKey, t.level);
+    row.poolHint = poolPlanningHint(row.levelKey, scheduleFetch.rows);
     row.totalTeams += 1;
     if (t.pool_id) row.assignedTeams += 1;
     else row.unassignedTeams += 1;
@@ -108,16 +114,19 @@ export async function fetchPuljerOverview(): Promise<{
 
   for (const p of pools) {
     const mergeKey = turneringLevelMergeKey(p.level);
+    const levelKey = canonicalBanerLevelLabel(p.level);
     const row =
       levelMap.get(mergeKey) ??
       {
-        levelKey: canonicalBanerLevelLabel(p.level),
+        levelKey,
         totalTeams: 0,
         poolCount: 0,
         assignedTeams: 0,
         unassignedTeams: 0,
+        poolHint: poolPlanningHint(levelKey, scheduleFetch.rows),
       };
     row.levelKey = mergeTurneringLevelDisplayLabel(row.levelKey, p.level);
+    row.poolHint = poolPlanningHint(row.levelKey, scheduleFetch.rows);
     row.poolCount += 1;
     levelMap.set(mergeKey, row);
   }
@@ -186,6 +195,7 @@ export async function fetchTurneringLevelData(levelKey: string): Promise<Turneri
     players: [] as TurneringLevelBundle["players"],
     planMatchesPerTeam: poolPlanningHint(canonLevel, []).matchesPerTeam,
     poolHint: poolPlanningHint(canonLevel, []),
+    poolColumnsAvailable: true,
     coaches: [] as HoldCoachRow[],
     teamCoaches: [] as TeamCoachRow[],
   };
@@ -202,6 +212,7 @@ export async function fetchTurneringLevelData(levelKey: string): Promise<Turneri
 
   const poolHint = poolPlanningHint(canonLevel, scheduleFetch.rows);
   const planMatchesPerTeam = poolHint.matchesPerTeam;
+  const poolColumnsAvailable = scheduleFetch.poolColumnsAvailable;
 
   const teams = ((teamsRes.data ?? []) as TeamRow[]).filter(
     (t) => canonicalBanerLevelLabel(t.level) === canonLevel,
@@ -226,7 +237,18 @@ export async function fetchTurneringLevelData(levelKey: string): Promise<Turneri
     a.name.localeCompare(b.name, "da", { sensitivity: "base" }),
   );
   const teamCoaches = (teamCoachesRes.data ?? []) as TeamCoachRow[];
-  return { teams, pools, members, players, planMatchesPerTeam, poolHint, coaches, teamCoaches, error: null };
+  return {
+    teams,
+    pools,
+    members,
+    players,
+    planMatchesPerTeam,
+    poolHint,
+    poolColumnsAvailable,
+    coaches,
+    teamCoaches,
+    error: null,
+  };
 }
 
 export async function fetchTurneringPlanLevelData(levelKey: string): Promise<TurneringPlanLevelBundle> {

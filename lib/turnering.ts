@@ -9,6 +9,7 @@ export type PuljerOverviewLevel = {
   poolCount: number;
   assignedTeams: number;
   unassignedTeams: number;
+  poolHint: PoolPlanningHint;
 };
 
 export type TurneringsplanOverviewLevel = {
@@ -38,6 +39,8 @@ export type TurneringLevelBundle = {
   /** Fra Opsætning → Kampe (`plan_matches_per_team` pr. niveau). */
   planMatchesPerTeam: number;
   poolHint: PoolPlanningHint;
+  /** False når `plan_target_teams_per_pool` / `plan_max_teams_per_pool` mangler i DB. */
+  poolColumnsAvailable: boolean;
   coaches: HoldCoachRow[];
   teamCoaches: TeamCoachRow[];
   error: string | null;

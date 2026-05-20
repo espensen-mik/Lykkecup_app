@@ -75,6 +75,7 @@ export default async function TurneringPuljerLevelPage({ params }: PageProps) {
         initialCoaches={bundle.coaches}
         initialTeamCoaches={bundle.teamCoaches}
         poolHint={bundle.poolHint}
+        poolColumnsAvailable={bundle.poolColumnsAvailable}
       />
     </div>
   );

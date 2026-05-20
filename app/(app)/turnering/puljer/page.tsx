@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { levelPathSegment } from "@/lib/holddannelse";
+import { formatPoolSizePlanLabel } from "@/lib/puljer";
 import { fetchPuljerOverview } from "@/lib/turnering-server";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,9 @@ export default async function TurneringPuljerPage() {
                     <Stat label="Fordelt" value={level.assignedTeams} />
                     <Stat label="Uden pulje" value={level.unassignedTeams} />
                   </dl>
+                  <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                    Opsætning → Kampe: {formatPoolSizePlanLabel(level.poolHint)}
+                  </p>
                   <div className="mt-4">
                     <div className="mb-1 flex justify-between text-[0.6875rem] font-medium text-gray-500 dark:text-gray-400">
                       <span>Puljefordeling</span>

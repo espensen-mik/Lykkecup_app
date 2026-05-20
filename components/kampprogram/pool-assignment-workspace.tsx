@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, ChevronDown, Plus, Search, Sparkles, Users, X } from "lucide-react";
 import {
   effectivePoolMaxTeams,
+  formatPoolSizePlanLabel,
   poolTeamCountStatus,
   roundRobinMatchesPerTeam,
   type PoolPlanningHint,
@@ -57,6 +58,8 @@ type Props = {
   initialCoaches: HoldCoachRow[];
   initialTeamCoaches: TeamCoachRow[];
   poolHint: PoolPlanningHint;
+  /** False when DB migration for pool size columns is missing. */
+  poolColumnsAvailable?: boolean;
 };
 
 function fmtAge(v: number | null): string {
@@ -105,8 +108,7 @@ function PoolCapacityHint({ teamCount, hint }: { teamCount: number; hint: PoolPl
   const status = poolTeamCountStatus(teamCount, hint);
   const cap = effectivePoolMaxTeams(hint);
   const rr = roundRobinMatchesPerTeam(teamCount);
-  const maxLabel =
-    hint.maxTeamsPerPool != null ? `maks ${hint.maxTeamsPerPool}` : `loft ${cap}`;
+  const planLabel = formatPoolSizePlanLabel(hint);
   const labels: Record<typeof status, string> = {
     empty: "Tom pulje",
     too_few: "Tilføj flere hold",
@@ -124,10 +126,12 @@ function PoolCapacityHint({ teamCount, hint }: { teamCount: number; hint: PoolPl
 
   return (
     <div className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+      <p className="text-[0.6875rem] text-gray-500 dark:text-gray-500">{planLabel} · min. 2 hold</p>
       <p>
         <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${colors[status]}`}>{labels[status]}</span>
         <span className="ml-2 tabular-nums">
-          {teamCount} / {hint.recommendedTeamCount} mål ({maxLabel})
+          {teamCount} hold i puljen
+          {hint.maxTeamsPerPool != null ? ` (maks ${hint.maxTeamsPerPool})` : null}
         </span>
       </p>
       {teamCount >= 2 ? (
@@ -148,6 +152,7 @@ export function PoolAssignmentWorkspace({
   initialCoaches,
   initialTeamCoaches,
   poolHint,
+  poolColumnsAvailable = true,
 }: Props) {
   const router = useRouter();
   const supabase = getAuthBrowserClient();
@@ -488,24 +493,25 @@ export function PoolAssignmentWorkspace({
         <Kpi label="Puljer (åbne)" value={`${kpi.openPools}/${kpi.poolCount}`} accent="teal" />
       </section>
 
+      {!poolColumnsAvailable ? (
+        <div className="shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/35 dark:text-amber-100">
+          <p>
+            Puljestørrelse fra Opsætning kan ikke læses — kør migration{" "}
+            <code className="text-xs">20260520130000_level_schedule_pool_settings.sql</code> i Supabase. Indtil da
+            bruges standard (mål = kampe/hold + 1, maks = 64).
+          </p>
+        </div>
+      ) : null}
+
       <div className="shrink-0 rounded-lg border border-teal-200/80 bg-teal-50/60 px-4 py-3 text-sm text-teal-950 dark:border-teal-900/40 dark:bg-teal-950/25 dark:text-teal-100">
         <p>
-          Plan fra{" "}
+          Fra{" "}
           <Link href="/turnering/baner" className="font-semibold underline-offset-2 hover:underline">
             Opsætning → Kampe
           </Link>
-          : <strong className="tabular-nums">{hint.matchesPerTeam}</strong> kampe/hold. I en pulje med alle-mod-alle
-          spiller hvert hold <em>n−1</em> kampe — mål{" "}
-          <strong className="tabular-nums">{hint.recommendedTeamCount}</strong> hold pr. pulje
-          {hint.maxTeamsPerPool != null ? (
-            <>
-              {" "}
-              (maks <strong className="tabular-nums">{hint.maxTeamsPerPool}</strong>)
-            </>
-          ) : (
-            <> (ingen fast maks — sæt under Kampe ved behov)</>
-          )}
-          .
+          : <strong className="tabular-nums">{hint.matchesPerTeam}</strong> kampe/hold ·{" "}
+          <strong>{formatPoolSizePlanLabel(hint)}</strong> · mindst <strong>2</strong> hold pr. pulje (alle-mod-alle).
+          Tilføjelse til pulje blokeres ved maks; AutoPulje fylder op til mål.
         </p>
       </div>
 
