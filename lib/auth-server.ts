@@ -1,14 +1,9 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import type { AuthAppUser } from "@/lib/auth-app-user";
 
-export type AuthAppUser = {
-  id: string;
-  email: string;
-  fullName: string;
-  avatarUrl: string | null;
-  role: "admin" | "user" | null;
-};
+export type { AuthAppUser };
 
 function requiredEnv(name: string): string {
   const value = process.env[name];

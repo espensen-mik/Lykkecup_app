@@ -381,8 +381,20 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
   return { players, teams, members, eventAssignedPlayerIds, coaches, teamCoaches, error: null };
 }
 
-export function nextDefaultTeamName(levelKey: string, existingCount: number): string {
-  return `${levelKey} Hold ${existingCount + 1}`;
+export function nextDefaultTeamName(levelKey: string, teamsAtLevel: readonly { name: string }[]): string {
+  const prefix = `${levelKey} Hold `;
+  let maxHoldNum = 0;
+  for (const t of teamsAtLevel) {
+    if (!t.name.startsWith(prefix)) continue;
+    const tail = t.name.slice(prefix.length).trim();
+    if (!/^\d+$/.test(tail)) continue;
+    const n = Number.parseInt(tail, 10);
+    if (Number.isFinite(n)) maxHoldNum = Math.max(maxHoldNum, n);
+  }
+  const fromPattern = maxHoldNum + 1;
+  const fromCount = teamsAtLevel.length + 1;
+  const nextNum = Math.max(fromPattern, fromCount);
+  return `${levelKey} Hold ${nextNum}`;
 }
 
 /** Én holdblok til print (spillere og trænere er sorteret efter navn). */

@@ -11,10 +11,10 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
-import { isPlanningLockdownPath, PLANNING_LOCKDOWN_MESSAGE } from "@/lib/kontrolcenter-lockdown";
+import type { AuthAppUser } from "@/lib/auth-app-user";
 import { setPlanningLockdownAction } from "@/lib/kontrolcenter-lockdown-actions";
+import { isPlanningLockdownPath, PLANNING_LOCKDOWN_MESSAGE } from "@/lib/kontrolcenter-lockdown-shared";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
-import type { AuthAppUser } from "@/lib/auth-server";
 
 type KontrolcenterLockdownContextValue = {
   planningLockdown: boolean;

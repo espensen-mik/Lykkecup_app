@@ -14,7 +14,7 @@ import {
   type ManualScheduleSlotOption,
   type UnscheduledMatchDetail,
 } from "@/lib/turnering-scheduler";
-import { planningLockdownBlock } from "@/lib/kontrolcenter-lockdown";
+import { planningLockdownBlock } from "@/lib/kontrolcenter-lockdown-server";
 import {
   isAllDayPeriod,
   periodWindowMinutes,

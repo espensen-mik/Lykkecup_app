@@ -441,7 +441,7 @@ export function TeamBuilder({
   const createTeam = useCallback(async () => {
     setActionError(null);
     const maxSort = teams.length ? Math.max(...teams.map((t) => t.sort_order)) : 0;
-    const name = nextDefaultTeamName(canonical, teams.length);
+    const name = nextDefaultTeamName(canonical, teams);
     setBusy(true);
     const { data, error } = await supabase
       .from("teams")

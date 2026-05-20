@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import type { AuthAppUser } from "@/lib/auth-server";
+import type { AuthAppUser } from "@/lib/auth-app-user";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
