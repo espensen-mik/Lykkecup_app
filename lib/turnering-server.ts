@@ -152,7 +152,7 @@ export async function fetchTurneringLevelData(levelKey: string): Promise<Turneri
       client.from("players").select("id, name, home_club, age").eq("event_id", eventId),
       client
         .from("level_schedule_settings")
-        .select("level, plan_matches_per_team")
+        .select("level, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool")
         .eq("event_id", eventId),
       client.from("coaches").select("id, name, home_club, age").eq("event_id", eventId),
       client.from("team_coaches").select("id, event_id, team_id, coach_id").eq("event_id", eventId),
@@ -164,6 +164,7 @@ export async function fetchTurneringLevelData(levelKey: string): Promise<Turneri
     members: [] as TeamMemberRow[],
     players: [] as TurneringLevelBundle["players"],
     planMatchesPerTeam: poolPlanningHint(canonLevel, []).matchesPerTeam,
+    poolHint: poolPlanningHint(canonLevel, []),
     coaches: [] as HoldCoachRow[],
     teamCoaches: [] as TeamCoachRow[],
   };
@@ -176,8 +177,14 @@ export async function fetchTurneringLevelData(levelKey: string): Promise<Turneri
   if (coachesRes.error) return { ...empty, error: coachesRes.error.message };
   if (teamCoachesRes.error) return { ...empty, error: teamCoachesRes.error.message };
 
-  const scheduleRows = (scheduleRes.data ?? []) as { level: string; plan_matches_per_team: number | null }[];
-  const planMatchesPerTeam = poolPlanningHint(canonLevel, scheduleRows).matchesPerTeam;
+  const scheduleRows = (scheduleRes.data ?? []) as {
+    level: string;
+    plan_matches_per_team: number | null;
+    plan_target_teams_per_pool: number | null;
+    plan_max_teams_per_pool: number | null;
+  }[];
+  const poolHint = poolPlanningHint(canonLevel, scheduleRows);
+  const planMatchesPerTeam = poolHint.matchesPerTeam;
 
   const teams = ((teamsRes.data ?? []) as TeamRow[]).filter(
     (t) => canonicalBanerLevelLabel(t.level) === canonLevel,
@@ -202,7 +209,7 @@ export async function fetchTurneringLevelData(levelKey: string): Promise<Turneri
     a.name.localeCompare(b.name, "da", { sensitivity: "base" }),
   );
   const teamCoaches = (teamCoachesRes.data ?? []) as TeamCoachRow[];
-  return { teams, pools, members, players, planMatchesPerTeam, coaches, teamCoaches, error: null };
+  return { teams, pools, members, players, planMatchesPerTeam, poolHint, coaches, teamCoaches, error: null };
 }
 
 export async function fetchTurneringPlanLevelData(levelKey: string): Promise<TurneringPlanLevelBundle> {
@@ -231,17 +238,22 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
       client.from("venues").select("id").eq("event_id", eventId),
       client
         .from("level_schedule_settings")
-        .select("level, plan_matches_per_team, match_duration_minutes, break_between_matches_minutes")
+        .select(
+          "level, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool, match_duration_minutes, break_between_matches_minutes",
+        )
         .eq("event_id", eventId),
     ]);
 
   const scheduleRowsFull = (scheduleRes.data ?? []) as Array<{
     level: string;
     plan_matches_per_team: number | null;
+    plan_target_teams_per_pool: number | null;
+    plan_max_teams_per_pool: number | null;
     match_duration_minutes: number | null;
     break_between_matches_minutes: number | null;
   }>;
-  const planMatchesPerTeam = poolPlanningHint(canonLevel, scheduleRowsFull).matchesPerTeam;
+  const poolHint = poolPlanningHint(canonLevel, scheduleRowsFull);
+  const planMatchesPerTeam = poolHint.matchesPerTeam;
   const levelScheduleRow = scheduleRowsFull.find((r) => canonicalBanerLevelLabel(r.level) === canonLevel);
   const levelTiming: RoundTiming = {
     matchDurationMinutes: levelScheduleRow?.match_duration_minutes ?? 9,
@@ -251,6 +263,7 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
 
   const emptyPlan = {
     planMatchesPerTeam,
+    poolHint,
     teamRestMinutes,
     pools: [] as TurneringPlanLevelBundle["pools"],
     teams: [] as TeamRow[],
@@ -311,6 +324,7 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
   if (poolIds.length === 0) {
     return {
       planMatchesPerTeam,
+      poolHint,
       teamRestMinutes,
       pools,
       teams,
@@ -339,6 +353,7 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
   }
   return {
     planMatchesPerTeam,
+    poolHint,
     teamRestMinutes,
     pools,
     teams,

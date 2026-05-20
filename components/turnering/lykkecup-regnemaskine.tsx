@@ -17,7 +17,7 @@ import {
   DEFAULT_PLAN_MATCHES_PER_TEAM,
 } from "@/lib/lykkecup-regnemaskine";
 import { BaneStatusPanel } from "@/components/turnering/bane-status-panel";
-import { findLevelScheduleRow } from "@/lib/puljer";
+import { findLevelScheduleRow, poolPlanningHint } from "@/lib/puljer";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
 export type RegnemaskineLevelInput = {
@@ -42,9 +42,12 @@ function courtTypeLabel(t: CourtType): string {
   }
 }
 
-function matchesSig(rows: LevelScheduleRow[]): string {
+function planningSig(rows: LevelScheduleRow[]): string {
   return rows
-    .map((r) => `${canonicalBanerLevelLabel(r.level)}:${r.plan_matches_per_team ?? ""}`)
+    .map(
+      (r) =>
+        `${canonicalBanerLevelLabel(r.level)}:${r.plan_matches_per_team ?? ""}:${r.plan_target_teams_per_pool ?? ""}:${r.plan_max_teams_per_pool ?? ""}`,
+    )
     .sort()
     .join("|");
 }
@@ -57,6 +60,40 @@ function matchesDraftFromServer(levels: RegnemaskineLevelInput[], scheduleRows: 
     out[l.levelKey] = String(m);
   }
   return out;
+}
+
+function poolTargetDraftFromServer(
+  levels: RegnemaskineLevelInput[],
+  scheduleRows: LevelScheduleRow[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const l of levels) {
+    const row = findLevelScheduleRow(l.levelKey, scheduleRows);
+    const t = row?.plan_target_teams_per_pool;
+    out[l.levelKey] = t != null ? String(t) : "";
+  }
+  return out;
+}
+
+function poolMaxDraftFromServer(
+  levels: RegnemaskineLevelInput[],
+  scheduleRows: LevelScheduleRow[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const l of levels) {
+    const row = findLevelScheduleRow(l.levelKey, scheduleRows);
+    const m = row?.plan_max_teams_per_pool;
+    out[l.levelKey] = m != null ? String(m) : "";
+  }
+  return out;
+}
+
+function parseOptionalPoolField(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(n) || n < 2 || n > 99) return null;
+  return n;
 }
 
 type OpsætningTabId = "haller" | "niveau";
@@ -83,10 +120,16 @@ export function LykkecupRegnemaskine({
   const [matchesDrafts, setMatchesDrafts] = useState<Record<string, string>>(() =>
     matchesDraftFromServer(levels, baner.levelSettings),
   );
+  const [poolTargetDrafts, setPoolTargetDrafts] = useState<Record<string, string>>(() =>
+    poolTargetDraftFromServer(levels, baner.levelSettings),
+  );
+  const [poolMaxDrafts, setPoolMaxDrafts] = useState<Record<string, string>>(() =>
+    poolMaxDraftFromServer(levels, baner.levelSettings),
+  );
   const [savingLevel, setSavingLevel] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const serverSig = useMemo(() => matchesSig(baner.levelSettings), [baner.levelSettings]);
+  const serverSig = useMemo(() => planningSig(baner.levelSettings), [baner.levelSettings]);
 
   const levelsRef = useRef(levels);
   const scheduleRef = useRef(baner.levelSettings);
@@ -97,6 +140,8 @@ export function LykkecupRegnemaskine({
 
   useEffect(() => {
     setMatchesDrafts(matchesDraftFromServer(levelsRef.current, scheduleRef.current));
+    setPoolTargetDrafts(poolTargetDraftFromServer(levelsRef.current, scheduleRef.current));
+    setPoolMaxDrafts(poolMaxDraftFromServer(levelsRef.current, scheduleRef.current));
   }, [serverSig, levelKeysSig]);
 
   const roundTiming = useMemo(() => conservativeRoundTimingFromSchedule(baner.levelSettings), [baner.levelSettings]);
@@ -145,12 +190,41 @@ export function LykkecupRegnemaskine({
     setMatchesDrafts((prev) => ({ ...prev, [levelKey]: matches }));
   }, []);
 
+  const setPoolTargetDraft = useCallback((levelKey: string, value: string) => {
+    setPoolTargetDrafts((prev) => ({ ...prev, [levelKey]: value }));
+  }, []);
+
+  const setPoolMaxDraft = useCallback((levelKey: string, value: string) => {
+    setPoolMaxDrafts((prev) => ({ ...prev, [levelKey]: value }));
+  }, []);
+
   const saveLevel = useCallback(
     async (levelKey: string) => {
       setLocalError(null);
       const matches = Number.parseInt(matchesDrafts[levelKey] ?? "", 10);
       if (!Number.isFinite(matches) || matches < 0 || matches > 99) {
         setLocalError("Kampe pr. hold skal være mellem 0 og 99.");
+        return;
+      }
+
+      const targetRaw = poolTargetDrafts[levelKey] ?? "";
+      const maxRaw = poolMaxDrafts[levelKey] ?? "";
+      if (targetRaw.trim() && parseOptionalPoolField(targetRaw) == null) {
+        setLocalError("Mål hold/pulje skal være tom eller et tal mellem 2 og 99.");
+        return;
+      }
+      if (maxRaw.trim() && parseOptionalPoolField(maxRaw) == null) {
+        setLocalError("Maks hold/pulje skal være tom eller et tal mellem 2 og 99.");
+        return;
+      }
+      const planTargetTeamsPerPool = parseOptionalPoolField(targetRaw);
+      const planMaxTeamsPerPool = parseOptionalPoolField(maxRaw);
+      if (
+        planTargetTeamsPerPool != null &&
+        planMaxTeamsPerPool != null &&
+        planMaxTeamsPerPool < planTargetTeamsPerPool
+      ) {
+        setLocalError("Maks hold/pulje kan ikke være lavere end mål hold/pulje.");
         return;
       }
 
@@ -161,11 +235,16 @@ export function LykkecupRegnemaskine({
       );
       setSavingLevel(levelKey);
       try {
+        const payload = {
+          plan_matches_per_team: matches,
+          plan_target_teams_per_pool: planTargetTeamsPerPool,
+          plan_max_teams_per_pool: planMaxTeamsPerPool,
+        };
         if (matching.length > 0) {
           const ids = matching.map((r) => r.id);
           const { error: upErr } = await supabase
             .from("level_schedule_settings")
-            .update({ plan_matches_per_team: matches })
+            .update(payload)
             .in("id", ids);
           if (upErr) {
             setLocalError(upErr.message);
@@ -177,7 +256,7 @@ export function LykkecupRegnemaskine({
             level: canon,
             match_duration_minutes: 60,
             break_between_matches_minutes: 5,
-            plan_matches_per_team: matches,
+            ...payload,
           });
           if (insErr) {
             setLocalError(insErr.message);
@@ -189,7 +268,7 @@ export function LykkecupRegnemaskine({
         setSavingLevel(null);
       }
     },
-    [matchesDrafts, baner.levelSettings, supabase, eventId, router],
+    [matchesDrafts, poolTargetDrafts, poolMaxDrafts, baner.levelSettings, supabase, eventId, router],
   );
 
   const totalRequiredMatches = demandRows.reduce((s, r) => s + r.totalMatches, 0);
@@ -239,6 +318,7 @@ export function LykkecupRegnemaskine({
               </>
             )}
             . Én kamp bruger én runde på én bane. Standard er {DEFAULT_PLAN_MATCHES_PER_TEAM} kampe/hold indtil du gemmer andet.
+            Puljestørrelse (mål/maks hold pr. pulje) bruges i Puljer og Turneringsplan — tom mål = kampe/hold + 1.
           </p>
           {baner.error ? (
             <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
@@ -274,13 +354,19 @@ export function LykkecupRegnemaskine({
       ) : null}
 
       <div className="overflow-x-auto rounded-lg border border-gray-100 dark:border-gray-800">
-        <table className="min-w-[560px] w-full border-collapse text-sm">
+        <table className="min-w-[720px] w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-400">
               <th className="px-3 py-2">Niveau</th>
               <th className="px-3 py-2">Spillere</th>
               <th className="px-3 py-2">Hold</th>
               <th className="px-3 py-2">Kampe/hold</th>
+              <th className="px-3 py-2" title="Mål hold pr. pulje (AutoPulje). Tom = kampe/hold + 1">
+                Mål/pulje
+              </th>
+              <th className="px-3 py-2" title="Valgfri hård grænse. Tom = kun systemloft">
+                Maks/pulje
+              </th>
               <th className="px-3 py-2">Bane</th>
               <th className="px-3 py-2">Kampe</th>
               <th className="px-3 py-2">Runder</th>
@@ -290,13 +376,24 @@ export function LykkecupRegnemaskine({
           <tbody>
             {levels.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={10} className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">
                   Ingen niveauer endnu — opret hold i Holddannelse for at se regnestykket.
                 </td>
               </tr>
             ) : (
               demandRows.map((row) => {
                 const matchesVal = matchesDrafts[row.level] ?? String(DEFAULT_PLAN_MATCHES_PER_TEAM);
+                const levelInput = levels.find((l) => l.levelKey === row.level);
+                const poolHintRow = levelInput
+                  ? poolPlanningHint(levelInput.levelKey, [
+                      {
+                        level: levelInput.levelKey,
+                        plan_matches_per_team: Number.parseInt(matchesVal, 10) || DEFAULT_PLAN_MATCHES_PER_TEAM,
+                        plan_target_teams_per_pool: parseOptionalPoolField(poolTargetDrafts[row.level] ?? ""),
+                        plan_max_teams_per_pool: parseOptionalPoolField(poolMaxDrafts[row.level] ?? ""),
+                      },
+                    ])
+                  : null;
                 return (
                   <tr key={row.level} className="border-b border-gray-100 dark:border-gray-800">
                     <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{row.level}</td>
@@ -310,6 +407,28 @@ export function LykkecupRegnemaskine({
                         value={matchesVal}
                         onChange={(e) => setMatchesDraft(row.level, e.target.value)}
                         className="w-16 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm tabular-nums dark:border-gray-600 dark:bg-gray-900"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min={2}
+                        max={99}
+                        placeholder={poolHintRow ? String(poolHintRow.recommendedTeamCount) : "auto"}
+                        value={poolTargetDrafts[row.level] ?? ""}
+                        onChange={(e) => setPoolTargetDraft(row.level, e.target.value)}
+                        className="w-16 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm tabular-nums placeholder:text-gray-400 dark:border-gray-600 dark:bg-gray-900"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min={2}
+                        max={99}
+                        placeholder="—"
+                        value={poolMaxDrafts[row.level] ?? ""}
+                        onChange={(e) => setPoolMaxDraft(row.level, e.target.value)}
+                        className="w-16 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm tabular-nums placeholder:text-gray-400 dark:border-gray-600 dark:bg-gray-900"
                       />
                     </td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{courtTypeLabel(row.courtType as CourtType)}</td>

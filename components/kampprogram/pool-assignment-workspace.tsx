@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ChevronDown, Plus, Search, Sparkles, Users, X } from "lucide-react";
 import {
-  POOL_MAX_TEAMS,
+  effectivePoolMaxTeams,
   poolTeamCountStatus,
   roundRobinMatchesPerTeam,
   type PoolPlanningHint,
@@ -56,7 +56,7 @@ type Props = {
   initialPlayers: PlayerLite[];
   initialCoaches: HoldCoachRow[];
   initialTeamCoaches: TeamCoachRow[];
-  planMatchesPerTeam: number;
+  poolHint: PoolPlanningHint;
 };
 
 function fmtAge(v: number | null): string {
@@ -103,13 +103,16 @@ function teamStats(
 
 function PoolCapacityHint({ teamCount, hint }: { teamCount: number; hint: PoolPlanningHint }) {
   const status = poolTeamCountStatus(teamCount, hint);
+  const cap = effectivePoolMaxTeams(hint);
   const rr = roundRobinMatchesPerTeam(teamCount);
+  const maxLabel =
+    hint.maxTeamsPerPool != null ? `maks ${hint.maxTeamsPerPool}` : `loft ${cap}`;
   const labels: Record<typeof status, string> = {
     empty: "Tom pulje",
     too_few: "Tilføj flere hold",
     good: "Passer til plan",
-    high: "Mange hold",
-    full: "Fuld (max 6)",
+    high: "Over mål",
+    full: hint.maxTeamsPerPool != null ? `Fuld (${hint.maxTeamsPerPool})` : `Fuld (${cap})`,
   };
   const colors: Record<typeof status, string> = {
     empty: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -124,7 +127,7 @@ function PoolCapacityHint({ teamCount, hint }: { teamCount: number; hint: PoolPl
       <p>
         <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${colors[status]}`}>{labels[status]}</span>
         <span className="ml-2 tabular-nums">
-          {teamCount} / {hint.recommendedTeamCount} anbefalet (max {POOL_MAX_TEAMS})
+          {teamCount} / {hint.recommendedTeamCount} mål ({maxLabel})
         </span>
       </p>
       {teamCount >= 2 ? (
@@ -144,17 +147,11 @@ export function PoolAssignmentWorkspace({
   initialPlayers,
   initialCoaches,
   initialTeamCoaches,
-  planMatchesPerTeam,
+  poolHint,
 }: Props) {
   const router = useRouter();
   const supabase = getAuthBrowserClient();
-  const hint = useMemo(
-    (): PoolPlanningHint => ({
-      matchesPerTeam: planMatchesPerTeam,
-      recommendedTeamCount: Math.min(POOL_MAX_TEAMS, Math.max(2, planMatchesPerTeam + 1)),
-    }),
-    [planMatchesPerTeam],
-  );
+  const hint = poolHint;
 
   const [teams, setTeams] = useState<TeamRow[]>(initialTeams);
   const [pools, setPools] = useState<PoolRow[]>(() => sortPoolsForDisplay(initialPools));
@@ -319,8 +316,13 @@ export function PoolAssignmentWorkspace({
         return;
       }
       const countInPool = teams.filter((t) => t.pool_id === nextPoolId).length;
-      if (countInPool >= POOL_MAX_TEAMS) {
-        setActionError(`Puljen har allerede ${POOL_MAX_TEAMS} hold (maksimum).`);
+      const cap = effectivePoolMaxTeams(hint);
+      if (countInPool >= cap) {
+        setActionError(
+          hint.maxTeamsPerPool != null
+            ? `Puljen har allerede ${hint.maxTeamsPerPool} hold (maksimum for niveauet).`
+            : `Puljen har allerede ${cap} hold (systemloft).`,
+        );
         return;
       }
     }
@@ -338,7 +340,7 @@ export function PoolAssignmentWorkspace({
       return;
     }
     setTeams((prev) => prev.map((t) => (t.id === teamId ? { ...t, pool_id: nextPoolId } : t)));
-  }, [poolById, teams]);
+  }, [hint, poolById, teams]);
 
   const addTeamToActivePool = useCallback(
     (teamId: string) => {
@@ -493,8 +495,17 @@ export function PoolAssignmentWorkspace({
             Opsætning → Kampe
           </Link>
           : <strong className="tabular-nums">{hint.matchesPerTeam}</strong> kampe/hold. I en pulje med alle-mod-alle
-          spiller hvert hold <em>n−1</em> kampe — anbefalet{" "}
-          <strong className="tabular-nums">{hint.recommendedTeamCount}</strong> hold pr. pulje (max {POOL_MAX_TEAMS}).
+          spiller hvert hold <em>n−1</em> kampe — mål{" "}
+          <strong className="tabular-nums">{hint.recommendedTeamCount}</strong> hold pr. pulje
+          {hint.maxTeamsPerPool != null ? (
+            <>
+              {" "}
+              (maks <strong className="tabular-nums">{hint.maxTeamsPerPool}</strong>)
+            </>
+          ) : (
+            <> (ingen fast maks — sæt under Kampe ved behov)</>
+          )}
+          .
         </p>
       </div>
 

@@ -1,3 +1,4 @@
+import type { PoolPlanningHint } from "@/lib/puljer";
 import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 
 export const TURNERING_EVENT_ID = "ae74ce1e-9793-48cd-bb1d-c4a248eaf4bf";
@@ -36,6 +37,7 @@ export type TurneringLevelBundle = {
   }[];
   /** Fra Opsætning → Kampe (`plan_matches_per_team` pr. niveau). */
   planMatchesPerTeam: number;
+  poolHint: PoolPlanningHint;
   coaches: HoldCoachRow[];
   teamCoaches: TeamCoachRow[];
   error: string | null;
@@ -64,6 +66,7 @@ export const MATCH_UNSCHEDULED_NOTICE = "Mangler bane og tid";
 export type TurneringPlanLevelBundle = {
   /** Fra Opsætning → Kampe (`plan_matches_per_team`). */
   planMatchesPerTeam: number;
+  poolHint: PoolPlanningHint;
   /** Minutter mellem kampe for samme hold (typisk = én rundes længde). */
   teamRestMinutes: number;
   pools: {

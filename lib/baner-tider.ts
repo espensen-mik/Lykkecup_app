@@ -81,6 +81,10 @@ export type LevelScheduleRow = {
   /** Regnemaskine: null = brug standard i UI */
   plan_target_players_per_team: number | null;
   plan_matches_per_team: number | null;
+  /** Puljer: mål hold pr. pulje; null = kampe/hold + 1 */
+  plan_target_teams_per_pool: number | null;
+  /** Puljer: valgfri hård grænse; null = kun systemloft */
+  plan_max_teams_per_pool: number | null;
 };
 
 export type LevelCourtSettingRow = {
@@ -186,6 +190,9 @@ function mergeLevelScheduleRow(a: LevelScheduleRow, b: LevelScheduleRow): LevelS
     level: canon,
     plan_target_players_per_team: moreSpecific.plan_target_players_per_team ?? other.plan_target_players_per_team,
     plan_matches_per_team: planMatches,
+    plan_target_teams_per_pool:
+      moreSpecific.plan_target_teams_per_pool ?? other.plan_target_teams_per_pool,
+    plan_max_teams_per_pool: moreSpecific.plan_max_teams_per_pool ?? other.plan_max_teams_per_pool,
     match_duration_minutes: moreSpecific.match_duration_minutes || other.match_duration_minutes,
     break_between_matches_minutes:
       moreSpecific.break_between_matches_minutes || other.break_between_matches_minutes,
@@ -304,7 +311,7 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
     supabase
       .from("level_schedule_settings")
       .select(
-        "id, event_id, level, match_duration_minutes, break_between_matches_minutes, rounds_per_match, plan_target_players_per_team, plan_matches_per_team",
+        "id, event_id, level, match_duration_minutes, break_between_matches_minutes, rounds_per_match, plan_target_players_per_team, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool",
       )
       .eq("event_id", eventId),
     supabase.from("level_court_settings").select("id, event_id, level, court_type").eq("event_id", eventId),
@@ -339,14 +346,23 @@ export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<Ban
       rounds_per_match?: number | null;
       plan_target_players_per_team?: number | null;
       plan_matches_per_team?: number | null;
+      plan_target_teams_per_pool?: number | null;
+      plan_max_teams_per_pool?: number | null;
     };
     const rpm = r.rounds_per_match;
+    const clampPoolField = (v: number | null | undefined): number | null => {
+      if (v == null || !Number.isFinite(v)) return null;
+      const n = Math.floor(v);
+      return n >= 2 && n <= 99 ? n : null;
+    };
     return {
       ...r,
       rounds_per_match:
         rpm != null && Number.isFinite(rpm) && rpm >= 1 ? Math.min(4, Math.floor(rpm)) : 1,
       plan_target_players_per_team: r.plan_target_players_per_team ?? null,
       plan_matches_per_team: r.plan_matches_per_team ?? null,
+      plan_target_teams_per_pool: clampPoolField(r.plan_target_teams_per_pool),
+      plan_max_teams_per_pool: clampPoolField(r.plan_max_teams_per_pool),
     };
   });
   const levelSettings = dedupeLevelScheduleRows(levelSettingsRaw);

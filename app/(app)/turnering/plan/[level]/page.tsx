@@ -68,6 +68,7 @@ export default async function TurneringPlanLevelPage({ params }: PageProps) {
       <TurneringPlanWorkspace
         levelKey={levelKey}
         planMatchesPerTeam={bundle.planMatchesPerTeam}
+        poolHint={bundle.poolHint}
         teamRestMinutes={bundle.teamRestMinutes}
         initialPools={bundle.pools}
         initialTeams={bundle.teams}

@@ -20,7 +20,10 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
       .from("matches")
       .select("id, pool_id, team_a_id, team_b_id, court_id, start_time")
       .eq("event_id", eventId),
-    client.from("level_schedule_settings").select("level, plan_matches_per_team").eq("event_id", eventId),
+    client
+      .from("level_schedule_settings")
+      .select("level, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool")
+      .eq("event_id", eventId),
   ]);
 
   const err =
@@ -42,7 +45,12 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
     };
   }
 
-  const scheduleRows = (scheduleRes.data ?? []) as { level: string; plan_matches_per_team: number | null }[];
+  const scheduleRows = (scheduleRes.data ?? []) as {
+    level: string;
+    plan_matches_per_team: number | null;
+    plan_target_teams_per_pool: number | null;
+    plan_max_teams_per_pool: number | null;
+  }[];
 
   const input: LykkecupCheckInput = {
     players: (playersRes.data ?? []) as LykkecupCheckInput["players"],

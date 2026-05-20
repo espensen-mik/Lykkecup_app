@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/auth-server";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
-import { POOL_MAX_TEAMS, poolPlanningHint, suggestNextPoolName } from "@/lib/puljer";
+import { effectivePoolMaxTeams, poolPlanningHint, suggestNextPoolName } from "@/lib/puljer";
 import { generateRoundRobinMatches, TURNERING_EVENT_ID } from "@/lib/turnering";
 import {
   assignMatchScheduleForLevelAllDay,
@@ -229,7 +229,10 @@ export async function autoAssignPoolsAction(levelKey: string): Promise<
       .eq("event_id", eventId),
     supabase.from("team_members").select("team_id, player_id").eq("event_id", eventId),
     supabase.from("players").select("id, age").eq("event_id", eventId),
-    supabase.from("level_schedule_settings").select("level, plan_matches_per_team").eq("event_id", eventId),
+    supabase
+      .from("level_schedule_settings")
+      .select("level, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool")
+      .eq("event_id", eventId),
   ]);
 
   if (teamsRes.error) return { ok: false, message: teamsRes.error.message };
@@ -238,11 +241,15 @@ export async function autoAssignPoolsAction(levelKey: string): Promise<
   if (playersRes.error) return { ok: false, message: playersRes.error.message };
   if (scheduleRes.error) return { ok: false, message: scheduleRes.error.message };
 
-  const scheduleRows = (scheduleRes.data ?? []) as { level: string; plan_matches_per_team: number | null }[];
-  const targetPerPool = Math.min(
-    POOL_MAX_TEAMS,
-    Math.max(2, poolPlanningHint(canonLevel, scheduleRows).matchesPerTeam + 1),
-  );
+  const scheduleRows = (scheduleRes.data ?? []) as {
+    level: string;
+    plan_matches_per_team: number | null;
+    plan_target_teams_per_pool: number | null;
+    plan_max_teams_per_pool: number | null;
+  }[];
+  const poolHint = poolPlanningHint(canonLevel, scheduleRows);
+  const targetPerPool = poolHint.recommendedTeamCount;
+  const maxPerPool = effectivePoolMaxTeams(poolHint);
 
   const levelTeams = (teamsRes.data ?? []).filter(
     (t) => canonicalBanerLevelLabel(t.level) === canonLevel,
@@ -298,7 +305,7 @@ export async function autoAssignPoolsAction(levelKey: string): Promise<
     let best: { poolId: string; count: number } | null = null;
     for (const [poolId, count] of poolState.entries()) {
       if (!openPoolIds.has(poolId)) continue;
-      if (count >= targetPerPool) continue;
+      if (count >= targetPerPool || count >= maxPerPool) continue;
       if (!best || count < best.count) best = { poolId, count };
     }
     return best?.poolId ?? null;
@@ -641,7 +648,7 @@ export async function generatePoolMatchesAction(
 
   const { data: scheduleRows, error: scheduleErr } = await supabase
     .from("level_schedule_settings")
-    .select("level, plan_matches_per_team")
+    .select("level, plan_matches_per_team, plan_target_teams_per_pool, plan_max_teams_per_pool")
     .eq("event_id", TURNERING_EVENT_ID);
 
   if (scheduleErr) return { ok: false, message: scheduleErr.message };
@@ -940,6 +947,74 @@ export async function generateAllPoolMatchesForLevelAction(
     matchCount: totalMatchCount,
     scheduled,
     schedulingFailures,
+  };
+}
+
+/** Slet alle genererede kampe for alle puljer på niveauet — uden at oprette nye. */
+export async function clearAllPoolMatchesForLevelAction(
+  levelKey: string,
+): Promise<TurneringActionResult & { deletedCount?: number }> {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Du skal være logget ind for at fjerne kampe." };
+  }
+
+  const normalizedLevel = canonicalBanerLevelLabel(levelKey);
+
+  const poolsRes = await supabase
+    .from("pools")
+    .select("id, level")
+    .eq("event_id", TURNERING_EVENT_ID);
+
+  if (poolsRes.error) return { ok: false, message: poolsRes.error.message };
+
+  const poolIds = ((poolsRes.data ?? []) as Array<{ id: string; level: string | null }>)
+    .filter((p) => canonicalBanerLevelLabel(p.level) === normalizedLevel)
+    .map((p) => p.id);
+
+  if (poolIds.length === 0) {
+    return { ok: false, message: `${normalizedLevel}: ingen puljer — intet at fjerne.` };
+  }
+
+  const countRes = await supabase
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", TURNERING_EVENT_ID)
+    .in("pool_id", poolIds);
+
+  if (countRes.error) return { ok: false, message: countRes.error.message };
+
+  const existingCount = countRes.count ?? 0;
+  if (existingCount === 0) {
+    return {
+      ok: true,
+      message: `${normalizedLevel}: ingen kampe at fjerne.`,
+      deletedCount: 0,
+    };
+  }
+
+  const delRes = await supabase
+    .from("matches")
+    .delete()
+    .eq("event_id", TURNERING_EVENT_ID)
+    .in("pool_id", poolIds);
+
+  if (delRes.error) return { ok: false, message: delRes.error.message };
+
+  revalidatePath("/turnering/plan");
+  revalidatePath(`/turnering/plan/${encodeURIComponent(normalizedLevel)}`);
+  revalidatePath("/kampprogram");
+
+  return {
+    ok: true,
+    message: `${normalizedLevel}: ${existingCount} kampe fjernet fra alle puljer.`,
+    deletedCount: existingCount,
   };
 }
 

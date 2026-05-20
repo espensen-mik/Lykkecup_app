@@ -12,13 +12,14 @@ import { formatTimeForInput, timeInputToTimestamptz } from "@/lib/baner-tider";
 import { buildTeamDetailsById, type TeamDetailView, type TeamPlayerLite } from "@/lib/team-detail";
 import { levelPathSegment } from "@/lib/holddannelse";
 import {
+  clearAllPoolMatchesForLevelAction,
   generateAllPoolMatchesForLevelAction,
   generatePoolMatchesAction,
   renumberPoolNamesForLevelAction,
   schedulePoolMatchesAction,
   updateMatchScheduleAction,
 } from "@/lib/turnering-actions";
-import { poolPlanningHint, poolTeamCountStatus } from "@/lib/puljer";
+import { effectivePoolMaxTeams, poolTeamCountStatus, type PoolPlanningHint } from "@/lib/puljer";
 import {
   analyzePoolMatchSync,
   MATCH_RELAXED_TEAM_REST_NOTICE,
@@ -44,6 +45,7 @@ type PeriodOption = { id: string; name: string };
 type Props = {
   levelKey: string;
   planMatchesPerTeam: number;
+  poolHint: PoolPlanningHint;
   /** Minutter mellem kampe for samme hold (fra Opsætning → Niveau indstillinger). */
   teamRestMinutes: number;
   initialPools: PoolRow[];
@@ -65,6 +67,7 @@ function fmtTime(ts: string | null): string {
 export function TurneringPlanWorkspace({
   levelKey,
   planMatchesPerTeam,
+  poolHint,
   teamRestMinutes,
   initialPools,
   initialTeams,
@@ -185,11 +188,6 @@ export function TurneringPlanWorkspace({
     [pools, teamsByPool],
   );
 
-  const poolHint = useMemo(
-    () => poolPlanningHint(levelKey, [{ level: levelKey, plan_matches_per_team: planMatchesPerTeam }]),
-    [levelKey, planMatchesPerTeam],
-  );
-
   const poolsInSync = useMemo(() => {
     let synced = 0;
     for (const pool of pools) {
@@ -220,7 +218,9 @@ export function TurneringPlanWorkspace({
 
   const [renumberingPools, setRenumberingPools] = useState(false);
   const [generatingAllPools, setGeneratingAllPools] = useState(false);
+  const [clearingAllPools, setClearingAllPools] = useState(false);
   const [confirmRegenerateAllPools, setConfirmRegenerateAllPools] = useState(false);
+  const [confirmClearAllPools, setConfirmClearAllPools] = useState(false);
 
   async function fixDuplicatePoolNames() {
     setRenumberingPools(true);
@@ -327,11 +327,45 @@ export function TurneringPlanWorkspace({
 
   function onClickGenerateAllPools() {
     if (matches.length > 0) {
+      setConfirmClearAllPools(false);
       setConfirmRegenerateAllPools(true);
       return;
     }
     void generateAllPoolsForLevel(false);
   }
+
+  async function clearAllPoolsForLevel() {
+    if (matches.length === 0) {
+      setActionMsg(`${levelKey}: ingen kampe at fjerne.`);
+      return;
+    }
+
+    setClearingAllPools(true);
+    setConfirmClearAllPools(false);
+    setActionMsg(null);
+    setSchedulingFailures([]);
+
+    try {
+      const result = await clearAllPoolMatchesForLevelAction(levelKey);
+      setActionMsg(result.message);
+      if (result.ok) {
+        setMatches([]);
+        router.refresh();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ukendt fejl";
+      setActionMsg(`Kunne ikke fjerne kampe: ${message}`);
+    } finally {
+      setClearingAllPools(false);
+    }
+  }
+
+  function onClickClearAllPools() {
+    setConfirmRegenerateAllPools(false);
+    setConfirmClearAllPools(true);
+  }
+
+  const levelActionsBusy = generatingAllPools || clearingAllPools;
 
   return (
     <div className="space-y-8">
@@ -369,7 +403,7 @@ export function TurneringPlanWorkspace({
                 </p>
                 <button
                   type="button"
-                  disabled={generatingAllPools}
+                  disabled={levelActionsBusy}
                   onClick={() => void generateAllPoolsForLevel(true)}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
                 >
@@ -382,34 +416,80 @@ export function TurneringPlanWorkspace({
                 </button>
                 <button
                   type="button"
-                  disabled={generatingAllPools}
+                  disabled={levelActionsBusy}
                   onClick={() => setConfirmRegenerateAllPools(false)}
                   className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200"
                 >
                   Annuller
                 </button>
               </>
+            ) : confirmClearAllPools ? (
+              <>
+                <p className="w-full text-sm text-red-800 dark:text-red-200">
+                  Fjern alle {matches.length} kampe på {levelKey}? Puljer og hold påvirkes ikke — du kan generere kampe
+                  igen bagefter.
+                </p>
+                <button
+                  type="button"
+                  disabled={levelActionsBusy}
+                  onClick={() => void clearAllPoolsForLevel()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-950 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100"
+                >
+                  {clearingAllPools ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                  )}
+                  Ja, fjern alle kampe
+                </button>
+                <button
+                  type="button"
+                  disabled={levelActionsBusy}
+                  onClick={() => setConfirmClearAllPools(false)}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200"
+                >
+                  Annuller
+                </button>
+              </>
             ) : (
-              <button
-                type="button"
-                disabled={generatingAllPools || poolsWithEnoughTeams === 0}
-                onClick={() => onClickGenerateAllPools()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0d9488] disabled:opacity-50"
-                title={
-                  poolsWithEnoughTeams === 0
-                    ? "Mindst én pulje med 2 hold kræves"
-                    : matches.length > 0
-                      ? "Sletter og opretter kampe for alle puljer på ny"
-                      : "Opretter kampe for alle puljer med bane og tid"
-                }
-              >
-                {generatingAllPools ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                ) : (
-                  <Sparkles className="h-4 w-4" aria-hidden />
-                )}
-                {matches.length > 0 ? "Regenerer kampe for alle puljer" : "Generer kampe for alle puljer"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  disabled={levelActionsBusy || poolsWithEnoughTeams === 0}
+                  onClick={() => onClickGenerateAllPools()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#14b8a6] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0d9488] disabled:opacity-50"
+                  title={
+                    poolsWithEnoughTeams === 0
+                      ? "Mindst én pulje med 2 hold kræves"
+                      : matches.length > 0
+                        ? "Sletter og opretter kampe for alle puljer på ny"
+                        : "Opretter kampe for alle puljer med bane og tid"
+                  }
+                >
+                  {generatingAllPools ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Sparkles className="h-4 w-4" aria-hidden />
+                  )}
+                  {matches.length > 0 ? "Regenerer kampe for alle puljer" : "Generer kampe for alle puljer"}
+                </button>
+                {matches.length > 0 ? (
+                  <button
+                    type="button"
+                    disabled={levelActionsBusy}
+                    onClick={() => onClickClearAllPools()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-800 hover:bg-red-50 disabled:opacity-50 dark:border-red-900/50 dark:bg-gray-900/50 dark:text-red-200 dark:hover:bg-red-950/30"
+                    title="Slet alle genererede kampe uden at oprette nye"
+                  >
+                    {clearingAllPools ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    ) : (
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    )}
+                    Fjern alle kampe for alle puljer
+                  </button>
+                ) : null}
+              </>
             )}
           </div>
         ) : null}
@@ -518,7 +598,14 @@ export function TurneringPlanWorkspace({
                       {teamCountStatus === "high" ? (
                         <span className="text-amber-700 dark:text-amber-300">
                           {" "}
-                          (anbefalet max {poolHint.recommendedTeamCount} for {planMatchesPerTeam} kampe/hold)
+                          (over mål {poolHint.recommendedTeamCount} hold/pulje)
+                        </span>
+                      ) : null}
+                      {teamCountStatus === "full" ? (
+                        <span className="text-red-700 dark:text-red-300">
+                          {" "}
+                          (maks{" "}
+                          {poolHint.maxTeamsPerPool ?? effectivePoolMaxTeams(poolHint)} hold/pulje)
                         </span>
                       ) : null}{" "}
                       · estimeret {estimated} kampe · genereret {poolMatches.length}

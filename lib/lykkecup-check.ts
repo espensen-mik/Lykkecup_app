@@ -1,6 +1,11 @@
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
 import { isOrphanKampprogramMatch } from "@/lib/kampprogram";
-import { poolPlanningHint, POOL_MAX_TEAMS, roundRobinMatchesPerTeam } from "@/lib/puljer";
+import {
+  effectivePoolMaxTeams,
+  poolPlanningHint,
+  roundRobinMatchesPerTeam,
+  type LevelSchedulePlanningRow,
+} from "@/lib/puljer";
 import { resolvePlanMatchesPerTeam } from "@/lib/lykkecup-regnemaskine";
 import { analyzePoolMatchSync, plannedPoolMatchCount } from "@/lib/turnering";
 
@@ -43,7 +48,7 @@ export type LykkecupCheckInput = {
     start_time: string | null;
   }[];
   planMatchesByLevel: Record<string, number>;
-  scheduleRows: { level: string; plan_matches_per_team: number | null }[];
+  scheduleRows: LevelSchedulePlanningRow[];
 };
 
 const MAX_ISSUES_SHOWN = 10;
@@ -357,11 +362,14 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     const count = teamsByPool.get(pool.id)?.length ?? 0;
     const levelKey = canonicalBanerLevelLabel(pool.level);
     const hint = poolPlanningHint(levelKey, input.scheduleRows);
+    const cap = effectivePoolMaxTeams(hint);
     if (count < 2) poolSizeIssues.push(`${pool.name}: kun ${count} hold (min. 2)`);
-    else if (count > POOL_MAX_TEAMS) poolSizeIssues.push(`${pool.name}: ${count} hold (max ${POOL_MAX_TEAMS})`);
-    else if (count > hint.recommendedTeamCount)
+    else if (count > cap) {
+      const capLabel = hint.maxTeamsPerPool != null ? `maks ${hint.maxTeamsPerPool}` : `over ${cap}`;
+      poolSizeIssues.push(`${pool.name}: ${count} hold (${capLabel})`);
+    } else if (count > hint.recommendedTeamCount)
       poolSizeIssues.push(
-        `${pool.name}: ${count} hold (anbefalet max ${hint.recommendedTeamCount} for ${hint.matchesPerTeam} kampe/hold)`,
+        `${pool.name}: ${count} hold (over mål ${hint.recommendedTeamCount} for ${hint.matchesPerTeam} kampe/hold)`,
       );
     else poolsOkSize += 1;
   }
@@ -370,7 +378,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     {
       id: "pool-size",
       title: "Puljestørrelse",
-      description: `Puljer bør have 2–${POOL_MAX_TEAMS} hold og passe til kampe pr. hold.`,
+      description: "Puljer bør have mindst 2 hold og passe til puljeplan fra Opsætning → Kampe.",
       metrics: [
         { label: "Puljer i alt", value: input.pools.length },
         { label: "OK størrelse", value: poolsOkSize },

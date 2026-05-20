@@ -1,10 +1,20 @@
 import { canonicalBanerLevelLabel, formatLevelShortLabel } from "@/lib/holddannelse";
 import { DEFAULT_PLAN_MATCHES_PER_TEAM } from "@/lib/lykkecup-regnemaskine";
 
-/** Maks. hold pr. pulje (kapacitet i AutoPulje). */
-export const POOL_MAX_TEAMS = 6;
+/** Absolut loft for hold pr. pulje (sikkerhed mod utilsigtede mega-puljer). */
+export const ABSOLUTE_POOL_HARD_CAP = 64;
+
+/** @deprecated Brug `ABSOLUTE_POOL_HARD_CAP` eller `effectivePoolMaxTeams(hint)`. */
+export const POOL_MAX_TEAMS = ABSOLUTE_POOL_HARD_CAP;
 
 const POOL_NAME_NUMBER_RE = /^Pulje\s+(\d+)\s*$/i;
+
+export type LevelSchedulePlanningRow = {
+  level: string;
+  plan_matches_per_team: number | null;
+  plan_target_teams_per_pool?: number | null;
+  plan_max_teams_per_pool?: number | null;
+};
 
 /** Næste ledige puljenavn (undgår dublet når fx Pulje 1 er slettet men Pulje 2 findes). */
 export function suggestNextPoolName(existingNames: readonly string[]): string {
@@ -18,9 +28,15 @@ export function suggestNextPoolName(existingNames: readonly string[]): string {
 
 export type PoolPlanningHint = {
   matchesPerTeam: number;
-  /** Hold i pulje så hvert hold ca. får `matchesPerTeam` kampe ved alle-mod-alle (n−1 = K → n = K+1). */
+  /** Mål hold pr. pulje (AutoPulje og «anbefalet» i UI). */
   recommendedTeamCount: number;
+  /** Valgfri hård grænse fra Opsætning; null = kun `ABSOLUTE_POOL_HARD_CAP`. */
+  maxTeamsPerPool: number | null;
 };
+
+export function effectivePoolMaxTeams(hint: PoolPlanningHint): number {
+  return hint.maxTeamsPerPool ?? ABSOLUTE_POOL_HARD_CAP;
+}
 
 function planMatchesPerTeamFromRow(
   row: { plan_matches_per_team: number | null } | undefined,
@@ -35,10 +51,22 @@ function planMatchesPerTeamFromRow(
   return null;
 }
 
-function pickMoreSpecificScheduleRow<T extends { level: string; plan_matches_per_team: number | null }>(
-  a: T,
-  b: T,
-): T {
+function planTargetTeamsFromRow(
+  row: LevelSchedulePlanningRow | undefined,
+  matchesPerTeam: number,
+): number {
+  const t = row?.plan_target_teams_per_pool;
+  if (t != null && Number.isFinite(t) && t >= 2) return Math.floor(t);
+  return Math.max(2, matchesPerTeam + 1);
+}
+
+function planMaxTeamsFromRow(row: LevelSchedulePlanningRow | undefined): number | null {
+  const m = row?.plan_max_teams_per_pool;
+  if (m != null && Number.isFinite(m) && m >= 2) return Math.floor(m);
+  return null;
+}
+
+function pickMoreSpecificScheduleRow<T extends LevelSchedulePlanningRow>(a: T, b: T): T {
   const aVal = planMatchesPerTeamFromRow(a);
   const bVal = planMatchesPerTeamFromRow(b);
   if (aVal != null && bVal != null) {
@@ -53,7 +81,7 @@ function pickMoreSpecificScheduleRow<T extends { level: string; plan_matches_per
  * Slår «TurboStars» og «TurboStars (4-17 år)» sammen til én række.
  * Ved flere gemte værdier vinder det mest specifikke niveau-navn (længste).
  */
-export function normalizeScheduleRowsForPlanning<T extends { level: string; plan_matches_per_team: number | null }>(
+export function normalizeScheduleRowsForPlanning<T extends LevelSchedulePlanningRow>(
   rows: readonly T[],
 ): T[] {
   const byShort = new Map<string, T>();
@@ -67,13 +95,19 @@ export function normalizeScheduleRowsForPlanning<T extends { level: string; plan
 }
 
 /** Find Opsætning → Kampe row even when pool/team level strings differ slightly (fx «TurboStars» vs «TurboStars (4-17 år)»). */
-export function findLevelScheduleRow<T extends { level: string; plan_matches_per_team: number | null }>(
+export function findLevelScheduleRow<T extends LevelSchedulePlanningRow>(
   levelKey: string,
   levelScheduleRows: readonly T[],
 ): T | undefined {
   const canon = canonicalBanerLevelLabel(levelKey);
   const exact = levelScheduleRows.find((r) => canonicalBanerLevelLabel(r.level) === canon);
-  if (planMatchesPerTeamFromRow(exact) != null) return exact;
+  if (
+    planMatchesPerTeamFromRow(exact) != null ||
+    exact?.plan_target_teams_per_pool != null ||
+    exact?.plan_max_teams_per_pool != null
+  ) {
+    return exact;
+  }
 
   const short = formatLevelShortLabel(levelKey).toLowerCase();
   if (!short || short === "ukendt niveau") return exact;
@@ -87,15 +121,13 @@ export function findLevelScheduleRow<T extends { level: string; plan_matches_per
 
 export function poolPlanningHint(
   levelKey: string,
-  levelScheduleRows: readonly { level: string; plan_matches_per_team: number | null }[],
+  levelScheduleRows: readonly LevelSchedulePlanningRow[],
 ): PoolPlanningHint {
   const row = findLevelScheduleRow(levelKey, levelScheduleRows);
   const matchesPerTeam = planMatchesPerTeamFromRow(row) ?? DEFAULT_PLAN_MATCHES_PER_TEAM;
-  const recommendedTeamCount = Math.min(
-    POOL_MAX_TEAMS,
-    Math.max(2, matchesPerTeam + 1),
-  );
-  return { matchesPerTeam, recommendedTeamCount };
+  const recommendedTeamCount = planTargetTeamsFromRow(row, matchesPerTeam);
+  const maxTeamsPerPool = planMaxTeamsFromRow(row);
+  return { matchesPerTeam, recommendedTeamCount, maxTeamsPerPool };
 }
 
 /** Kampe pr. hold i en pulje med n hold (alle-mod-alle). */
@@ -108,9 +140,10 @@ export function poolTeamCountStatus(
   teamCount: number,
   hint: PoolPlanningHint,
 ): "empty" | "too_few" | "good" | "high" | "full" {
+  const cap = effectivePoolMaxTeams(hint);
   if (teamCount === 0) return "empty";
   if (teamCount < 2) return "too_few";
-  if (teamCount >= POOL_MAX_TEAMS) return "full";
+  if (teamCount >= cap) return "full";
   if (teamCount > hint.recommendedTeamCount) return "high";
   if (teamCount >= hint.recommendedTeamCount - 1 && teamCount <= hint.recommendedTeamCount) return "good";
   return teamCount < hint.recommendedTeamCount ? "too_few" : "good";
