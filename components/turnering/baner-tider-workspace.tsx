@@ -1,5 +1,6 @@
 "use client";
 
+import { Calculator } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
@@ -41,11 +42,10 @@ import type { PeriodsBundle } from "@/lib/tournament-periods";
 
 type TabId = "haller" | "niveau" | "kampe" | "prognose" | "perioder";
 
-const tabs: { id: TabId; label: string }[] = [
+const mainTabs: { id: Exclude<TabId, "prognose">; label: string }[] = [
   { id: "haller", label: "Haller & baner" },
   { id: "niveau", label: "Niveau indstillinger" },
   { id: "kampe", label: "Kampe" },
-  { id: "prognose", label: "Prognose" },
   { id: "perioder", label: "Perioder" },
 ];
 
@@ -600,22 +600,37 @@ export function BanerTiderWorkspace({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 rounded-xl border border-lc-border bg-white p-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            disabled={busy}
-            onClick={() => setTab(t.id)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-              tab === t.id
-                ? "bg-[#14b8a6] text-white shadow-sm"
-                : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-lc-border bg-white p-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
+        <div className="flex flex-wrap gap-2">
+          {mainTabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              disabled={busy}
+              onClick={() => setTab(t.id)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                tab === t.id
+                  ? "bg-[#14b8a6] text-white shadow-sm"
+                  : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setTab("prognose")}
+          className={`ml-auto inline-flex items-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-semibold transition ${
+            tab === "prognose"
+              ? "border-violet-500 bg-violet-600 text-white shadow-sm dark:border-violet-400 dark:bg-violet-600"
+              : "border-violet-300 bg-violet-50 text-violet-900 hover:border-violet-400 hover:bg-violet-100 dark:border-violet-600 dark:bg-violet-950/50 dark:text-violet-100 dark:hover:bg-violet-950/80"
+          }`}
+        >
+          <Calculator className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
+          Prognose
+        </button>
       </div>
 
       {tab === "haller" ? (
@@ -855,7 +870,7 @@ export function BanerTiderWorkspace({
         />
       ) : null}
 
-      {tab === "prognose" ? <LykkecupPrognose baner={initial} /> : null}
+      {tab === "prognose" ? <LykkecupPrognose baner={initial} levels={levels} /> : null}
 
       <Modal
         open={venueModal != null}

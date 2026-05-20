@@ -15,6 +15,7 @@ import {
   DEFAULT_PLAN_MATCHES_PER_TEAM,
   type RegnemaskineLevelPlan,
 } from "@/lib/lykkecup-regnemaskine";
+import type { RegnemaskineLevelInput } from "@/components/turnering/lykkecup-regnemaskine";
 
 type PrognoseLevelDraft = {
   id: string;
@@ -57,15 +58,29 @@ function levelKeysFromSettings(baner: BanerTiderBundle): string[] {
   return sortLevelKeysForNav([...keys]);
 }
 
-function initialDrafts(baner: BanerTiderBundle): PrognoseLevelDraft[] {
-  const keys = levelKeysFromSettings(baner);
+function levelKeysForPrognose(baner: BanerTiderBundle, levels: readonly RegnemaskineLevelInput[]): string[] {
+  const keys = new Set<string>(levelKeysFromSettings(baner));
+  for (const l of levels) {
+    if (l.levelKey.trim()) keys.add(canonicalBanerLevelLabel(l.levelKey));
+  }
+  return sortLevelKeysForNav([...keys]);
+}
+
+function teamCountFromHolddannelse(levelKey: string, levels: readonly RegnemaskineLevelInput[]): number {
+  const canon = canonicalBanerLevelLabel(levelKey);
+  const row = levels.find((l) => canonicalBanerLevelLabel(l.levelKey) === canon);
+  return row?.teamCount ?? 0;
+}
+
+function initialDrafts(baner: BanerTiderBundle, levels: readonly RegnemaskineLevelInput[]): PrognoseLevelDraft[] {
+  const keys = levelKeysForPrognose(baner, levels);
   if (keys.length === 0) {
     return [{ id: newDraftId(), levelKey: "", teamCount: "0", matchesPerTeam: String(DEFAULT_PLAN_MATCHES_PER_TEAM) }];
   }
   return keys.map((levelKey) => ({
     id: newDraftId(),
     levelKey,
-    teamCount: "0",
+    teamCount: String(teamCountFromHolddannelse(levelKey, levels)),
     matchesPerTeam: String(matchesPerTeamFromSettings(levelKey, baner)),
   }));
 }
@@ -102,12 +117,18 @@ function newDraftId(): string {
   return `prognose-${draftIdCounter}`;
 }
 
-export function LykkecupPrognose({ baner }: { baner: BanerTiderBundle }) {
-  const [drafts, setDrafts] = useState<PrognoseLevelDraft[]>(() => initialDrafts(baner));
+export function LykkecupPrognose({
+  baner,
+  levels,
+}: {
+  baner: BanerTiderBundle;
+  levels: readonly RegnemaskineLevelInput[];
+}) {
+  const [drafts, setDrafts] = useState<PrognoseLevelDraft[]>(() => initialDrafts(baner, levels));
 
   const resetFromSettings = useCallback(() => {
-    setDrafts(initialDrafts(baner));
-  }, [baner]);
+    setDrafts(initialDrafts(baner, levels));
+  }, [baner, levels]);
 
   const roundTiming = useMemo(
     () => conservativeRoundTimingFromSchedule(baner.levelSettings),
@@ -180,8 +201,9 @@ export function LykkecupPrognose({ baner }: { baner: BanerTiderBundle }) {
         <div>
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">Prognose</h2>
           <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-            Leg med antal hold pr. niveau og se om der er nok runder på banerne. Baner, åbningstider, kampvarighed,
-            pauser og runder pr. kamp hentes fra Opsætning — intet gemmes her.
+            Leg med antal hold pr. niveau og se om der er nok runder på banerne. Holdantal hentes fra Holddannelse ved
+            indlæsning og ved nulstil — du kan stadig rette tallene her. Baner, åbningstider, kampvarighed, pauser og
+            runder pr. kamp hentes fra Opsætning. Intet gemmes.
           </p>
           {baner.error ? (
             <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
@@ -306,10 +328,10 @@ export function LykkecupPrognose({ baner }: { baner: BanerTiderBundle }) {
           </tbody>
         </table>
         <datalist id="prognose-level-options">
-          {levelKeysFromSettings(baner).map((k) => (
+          {levelKeysForPrognose(baner, levels).map((k) => (
             <option key={k} value={formatLevelShortLabel(k)} />
           ))}
-          {levelKeysFromSettings(baner).map((k) => (
+          {levelKeysForPrognose(baner, levels).map((k) => (
             <option key={`${k}-full`} value={k} />
           ))}
         </datalist>

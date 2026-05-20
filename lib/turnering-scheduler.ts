@@ -100,6 +100,53 @@ export function seedTeamRoundTrackerFromScheduledMatches(
   }
 }
 
+/**
+ * Finder hold, der ikke har mindst `teamRestMinutes` væg-ur-minutter mellem forrige kamps `end_time`
+ * og denne kamps `start_time` — samme regel som planlæggeren (`teamsCanPlayAt`).
+ * Kampe sorteres kronologisk på tværs af puljer på niveauet.
+ */
+export function teamRestViolatingTeamIdsByMatchId(
+  matches: readonly {
+    id: string;
+    team_a_id: string;
+    team_b_id: string;
+    start_time: string | null;
+    end_time: string | null;
+  }[],
+  teamRestMinutes: number,
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  if (teamRestMinutes <= 0) return out;
+
+  const rows = matches
+    .map((m) => {
+      const startMinutes = timeToMinutes(m.start_time);
+      const endMinutes = timeToMinutes(m.end_time);
+      if (startMinutes == null || endMinutes == null || endMinutes <= startMinutes) return null;
+      return {
+        id: m.id,
+        teamAId: m.team_a_id,
+        teamBId: m.team_b_id,
+        startMinutes,
+        endMinutes,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null)
+    .sort((a, b) => a.startMinutes - b.startMinutes || a.id.localeCompare(b.id));
+
+  const tracker = createTeamRoundTracker();
+  for (const m of rows) {
+    const violating: string[] = [];
+    for (const teamId of [m.teamAId, m.teamBId]) {
+      const lastEnd = tracker.get(teamId);
+      if (lastEnd !== undefined && m.startMinutes < lastEnd + teamRestMinutes) violating.push(teamId);
+    }
+    if (violating.length > 0) out.set(m.id, violating);
+    recordTeamsAfterMatch(tracker, m.teamAId, m.teamBId, m.endMinutes);
+  }
+  return out;
+}
+
 /** Sidste runde-slot en kamp optager (ved 2 halvlege: start + 1). */
 export function lastRoundSlotForMatch(startSlot: number, roundsPerMatch: number): number {
   const rpm = Math.max(1, Math.floor(roundsPerMatch));

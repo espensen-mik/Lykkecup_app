@@ -64,6 +64,8 @@ export const MATCH_UNSCHEDULED_NOTICE = "Mangler bane og tid";
 export type TurneringPlanLevelBundle = {
   /** Fra Opsætning → Kampe (`plan_matches_per_team`). */
   planMatchesPerTeam: number;
+  /** Minutter mellem kampe for samme hold (typisk = én rundes længde). */
+  teamRestMinutes: number;
   pools: {
     id: string;
     event_id: string;

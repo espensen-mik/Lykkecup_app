@@ -6,7 +6,9 @@ import {
   normalizeLevelKey,
   sortLevelKeysForNav,
 } from "@/lib/holddannelse";
+import { roundLengthMinutes, type RoundTiming } from "@/lib/lykkecup-regnemaskine";
 import { poolPlanningHint } from "@/lib/puljer";
+import { teamRestMinutesBetweenMatches } from "@/lib/turnering-scheduler";
 import {
   TURNERING_EVENT_ID,
   type MatchRow,
@@ -229,15 +231,27 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
       client.from("venues").select("id").eq("event_id", eventId),
       client
         .from("level_schedule_settings")
-        .select("level, plan_matches_per_team")
+        .select("level, plan_matches_per_team, match_duration_minutes, break_between_matches_minutes")
         .eq("event_id", eventId),
     ]);
 
-  const scheduleRows = (scheduleRes.data ?? []) as { level: string; plan_matches_per_team: number | null }[];
-  const planMatchesPerTeam = poolPlanningHint(canonLevel, scheduleRows).matchesPerTeam;
+  const scheduleRowsFull = (scheduleRes.data ?? []) as Array<{
+    level: string;
+    plan_matches_per_team: number | null;
+    match_duration_minutes: number | null;
+    break_between_matches_minutes: number | null;
+  }>;
+  const planMatchesPerTeam = poolPlanningHint(canonLevel, scheduleRowsFull).matchesPerTeam;
+  const levelScheduleRow = scheduleRowsFull.find((r) => canonicalBanerLevelLabel(r.level) === canonLevel);
+  const levelTiming: RoundTiming = {
+    matchDurationMinutes: levelScheduleRow?.match_duration_minutes ?? 9,
+    breakBetweenMatchesMinutes: levelScheduleRow?.break_between_matches_minutes ?? 1,
+  };
+  const teamRestMinutes = teamRestMinutesBetweenMatches(roundLengthMinutes(levelTiming));
 
   const emptyPlan = {
     planMatchesPerTeam,
+    teamRestMinutes,
     pools: [] as TurneringPlanLevelBundle["pools"],
     teams: [] as TeamRow[],
     members: [] as TeamMemberRow[],
@@ -297,6 +311,7 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
   if (poolIds.length === 0) {
     return {
       planMatchesPerTeam,
+      teamRestMinutes,
       pools,
       teams,
       members,
@@ -324,6 +339,7 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
   }
   return {
     planMatchesPerTeam,
+    teamRestMinutes,
     pools,
     teams,
     members,

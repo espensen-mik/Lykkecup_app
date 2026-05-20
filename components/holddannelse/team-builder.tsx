@@ -464,6 +464,91 @@ export function TeamBuilder({
     setActiveTeamId(t.id);
   }, [teams, canonical, sortTeamsForDisplay]);
 
+  const deleteTeam = useCallback(
+    async (team: TeamRow) => {
+      const tMemberRows = members.filter((m) => m.team_id === team.id);
+      const tCoachRows = teamCoachLinks.filter((tc) => tc.team_id === team.id);
+      const poolNote = team.pool_id
+        ? "\n\nHoldet er placeret i en pulje under Turnering — det fjernes derfra."
+        : "";
+      const ok = window.confirm(
+        `Slet «${team.name}»?${poolNote}\n\n` +
+          `${tMemberRows.length} ${tMemberRows.length === 1 ? "spiller" : "spillere"} og ` +
+          `${tCoachRows.length} ${tCoachRows.length === 1 ? "træner" : "trænere"} fjernes fra holdet ` +
+          `(kan tildeles andre hold bagefter). Genererede kampe med holdet slettes. ` +
+          `Dette kan ikke fortrydes.`,
+      );
+      if (!ok) return;
+
+      setActionError(null);
+      setBusy(true);
+
+      const { error: matchErr } = await supabase
+        .from("matches")
+        .delete()
+        .eq("event_id", HOLD_EVENT_ID)
+        .or(`team_a_id.eq.${team.id},team_b_id.eq.${team.id}`);
+      if (matchErr) {
+        setBusy(false);
+        setActionError(matchErr.message);
+        return;
+      }
+
+      const { error: membersErr } = await supabase.from("team_members").delete().eq("team_id", team.id);
+      if (membersErr) {
+        setBusy(false);
+        setActionError(membersErr.message);
+        return;
+      }
+
+      const { error: coachesErr } = await supabase.from("team_coaches").delete().eq("team_id", team.id);
+      if (coachesErr) {
+        setBusy(false);
+        setActionError(coachesErr.message);
+        return;
+      }
+
+      const { error: teamErr } = await supabase.from("teams").delete().eq("id", team.id);
+      setBusy(false);
+      if (teamErr) {
+        setActionError(teamErr.message);
+        return;
+      }
+
+      const freedPlayerIds = tMemberRows.map((m) => m.player_id);
+      setTeams((prev) => {
+        const next = sortTeamsForDisplay(prev.filter((x) => x.id !== team.id));
+        if (activeTeamId === team.id) {
+          setActiveTeamId(next[0]?.id ?? null);
+        }
+        return next;
+      });
+      setMembers((prev) => prev.filter((m) => m.team_id !== team.id));
+      setTeamCoachLinks((prev) => prev.filter((tc) => tc.team_id !== team.id));
+      setAssignedGlobally((prev) => {
+        const next = new Set(prev);
+        for (const pid of freedPlayerIds) next.delete(pid);
+        return next;
+      });
+      setCollapsedTeamIds((prev) => {
+        const s = new Set(prev);
+        s.delete(team.id);
+        return s;
+      });
+      setClosedTeamDetailOpen((prev) => {
+        const copy = { ...prev };
+        delete copy[team.id];
+        return copy;
+      });
+      setNicknameDrafts((prev) => {
+        const copy = { ...prev };
+        delete copy[team.id];
+        return copy;
+      });
+    },
+    [members, teamCoachLinks, activeTeamId, sortTeamsForDisplay],
+  );
+
   type TeamListItem = { kind: "team"; team: TeamRow } | { kind: "header" };
 
   const teamListItems = useMemo((): TeamListItem[] => {
@@ -1090,6 +1175,14 @@ export function TeamBuilder({
                                   Vælg
                                 </button>
                               )}
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void deleteTeam(t)}
+                                className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-800 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900/50 dark:text-red-200 dark:hover:bg-red-950/40"
+                              >
+                                Slet
+                              </button>
                             </div>
                           </div>
 

@@ -26,6 +26,7 @@ import {
   plannedPoolMatchCount,
   type MatchRow,
 } from "@/lib/turnering";
+import { teamRestViolatingTeamIdsByMatchId } from "@/lib/turnering-scheduler";
 import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 
 type PoolRow = {
@@ -43,6 +44,8 @@ type PeriodOption = { id: string; name: string };
 type Props = {
   levelKey: string;
   planMatchesPerTeam: number;
+  /** Minutter mellem kampe for samme hold (fra Opsætning → Niveau indstillinger). */
+  teamRestMinutes: number;
   initialPools: PoolRow[];
   initialTeams: TeamRow[];
   initialMembers: TeamMemberRow[];
@@ -62,6 +65,7 @@ function fmtTime(ts: string | null): string {
 export function TurneringPlanWorkspace({
   levelKey,
   planMatchesPerTeam,
+  teamRestMinutes,
   initialPools,
   initialTeams,
   initialMembers,
@@ -170,6 +174,11 @@ export function TurneringPlanWorkspace({
     }
     return byPool;
   }, [pools, matches]);
+
+  const teamRestViolatingTeamIdsByMatch = useMemo(
+    () => teamRestViolatingTeamIdsByMatchId(matches, teamRestMinutes),
+    [matches, teamRestMinutes],
+  );
 
   const poolsWithEnoughTeams = useMemo(
     () => pools.filter((p) => (teamsByPool.get(p.id)?.length ?? 0) >= 2).length,
@@ -655,7 +664,19 @@ export function TurneringPlanWorkspace({
                       </tr>
                     </thead>
                     <tbody>
-                      {poolMatches.map((match) => (
+                      {poolMatches.map((match) => {
+                        const violatingTeamIds =
+                          match.start_time && match.end_time
+                            ? teamRestViolatingTeamIdsByMatch.get(match.id)
+                            : undefined;
+                        const violatesTeamRestFromTimes =
+                          Boolean(violatingTeamIds && violatingTeamIds.length > 0);
+                        const showTeamRestWarning =
+                          violatesTeamRestFromTimes ||
+                          Boolean(
+                            match.schedule_relaxed_team_rest && (!match.start_time || !match.end_time),
+                          );
+                        return (
                         <tr key={match.id} className="border-b border-gray-100 last:border-0 dark:border-gray-800">
                           <td className="px-2 py-2 text-gray-900 dark:text-white">
                             <TeamNameWithHover
@@ -680,13 +701,26 @@ export function TurneringPlanWorkspace({
                               <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
                                 {failureReasonByMatchId.get(match.id)}
                               </span>
-                            ) : match.schedule_relaxed_team_rest ? (
-                              <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                                {MATCH_RELAXED_TEAM_REST_NOTICE}
-                              </span>
                             ) : !match.court_id || !match.start_time ? (
                               <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
                                 {MATCH_UNSCHEDULED_NOTICE}
+                              </span>
+                            ) : showTeamRestWarning ? (
+                              <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                                {violatesTeamRestFromTimes && violatingTeamIds?.length ? (
+                                  <>
+                                    {MATCH_RELAXED_TEAM_REST_NOTICE}
+                                    {" — "}
+                                    <span className="font-semibold">
+                                      {violatingTeamIds
+                                        .map((tid) => teamDetailOrFallback(tid).teamName)
+                                        .join(", ")}
+                                    </span>
+                                    {` (${teamRestMinutes} min mellem kampe for samme hold).`}
+                                  </>
+                                ) : (
+                                  MATCH_RELAXED_TEAM_REST_NOTICE
+                                )}
                               </span>
                             ) : (
                               <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
@@ -720,7 +754,8 @@ export function TurneringPlanWorkspace({
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
