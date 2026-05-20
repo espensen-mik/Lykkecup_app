@@ -39,6 +39,7 @@ function isRecommendedSlot(slot: ManualScheduleSlotOption): boolean {
     slot.isPreferredCourtType &&
     !slot.isOutsidePoolPeriod &&
     !slot.isDedicatedOtherPoolPeriod &&
+    slot.teamsFree &&
     slot.respectsTeamRest
   );
 }
@@ -65,7 +66,12 @@ function SlotBadges({ slot }: { slot: ManualScheduleSlotOption }) {
           Anden puljes periode
         </span>
       ) : null}
-      {!slot.respectsTeamRest ? (
+      {!slot.teamsFree ? (
+        <span className="rounded bg-red-100 px-1.5 py-0.5 font-medium text-red-800 dark:bg-red-900/40 dark:text-red-300">
+          Hold optaget
+        </span>
+      ) : null}
+      {slot.teamsFree && !slot.respectsTeamRest ? (
         <span className="rounded bg-red-100 px-1.5 py-0.5 font-medium text-red-800 dark:bg-red-900/40 dark:text-red-300">
           Uden hold-pause
         </span>
@@ -132,6 +138,7 @@ export function ManualScheduleDialog({
         slot.startMinutes,
         slot.endMinutes,
         slot.respectsTeamRest,
+        slot.teamsFree,
       );
       if (!result.ok) throw new Error(result.message);
       router.refresh();
@@ -165,8 +172,8 @@ export function ManualScheduleDialog({
             {teamALabel} vs {teamBLabel}
           </p>
           <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-            Alle ledige kombinationer af bane, tid og periode — også andre banestørrelser og tider uden for puljens
-            periode. Hold-pause: min. {teamRestMinutes} min mellem kampe (kan fraviges med mærkning).
+            Alle ledige baner og tider på tværs af perioder og banestørrelser. Tider uden hold-pause eller hvor et
+            hold allerede spiller er markeret — du kan stadig vælge dem.
           </p>
         </div>
 
@@ -197,7 +204,7 @@ export function ManualScheduleDialog({
           {!loading && !error && visibleSlots.length === 0 ? (
             <p className="text-sm text-amber-800 dark:text-amber-300">
               {slots.length === 0
-                ? "Ingen ledige baner/tider fundet — tjek at banerne har åbningstider under Opsætning, og at holdene ikke allerede spiller på samme tidspunkt."
+                ? "Ingen ledige baner/tider fundet — tjek banernes åbningstider og pauser under Opsætning → Haller & baner."
                 : "Ingen tider matcher filteret «kun anbefalede»."}
             </p>
           ) : null}

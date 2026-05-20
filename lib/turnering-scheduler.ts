@@ -13,6 +13,7 @@ import {
   type RegnemaskineBreak,
   type RoundTiming,
 } from "@/lib/lykkecup-regnemaskine";
+import { buildLevelTimingByLevel, resolveKampprogramLevelTiming } from "@/lib/kampprogram";
 import { courtTypeForLevel } from "@/lib/level-court-settings";
 import { minutesToTimeInput, timeInputToTimestamptz, timeToMinutes } from "@/lib/baner-tider";
 import {
@@ -26,7 +27,7 @@ import {
   periodWindowMinutes,
   type TournamentPeriodRow,
 } from "@/lib/tournament-periods";
-import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
+import { canonicalBanerLevelLabel, formatLevelShortLabel } from "@/lib/holddannelse";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
 /**
@@ -67,6 +68,76 @@ export function teamsCanPlayAt(
     if (startMinutes < lastEnd + restMinutes) return false;
   }
   return true;
+}
+
+type TeamScheduledInterval = {
+  id: string;
+  teamAId: string;
+  teamBId: string;
+  startMinutes: number;
+  endMinutes: number;
+};
+
+function teamsOverlapScheduledInterval(
+  teamAId: string,
+  teamBId: string,
+  startMinutes: number,
+  endMinutes: number,
+  intervals: readonly TeamScheduledInterval[],
+  excludeMatchId: string,
+): boolean {
+  for (const m of intervals) {
+    if (m.id === excludeMatchId) continue;
+    const touches =
+      m.teamAId === teamAId ||
+      m.teamBId === teamAId ||
+      m.teamAId === teamBId ||
+      m.teamBId === teamBId;
+    if (!touches) continue;
+    if (overlaps(startMinutes, endMinutes, m.startMinutes, m.endMinutes)) return true;
+  }
+  return false;
+}
+
+function resolveSchedulerTimingForLevel(
+  levelKey: string,
+  levelRows: readonly {
+    level: string;
+    match_duration_minutes: number | null;
+    break_between_matches_minutes: number | null;
+    rounds_per_match?: number | null;
+  }[],
+): { timing: RoundTiming; roundsPerMatch: number } {
+  const levelTimingByLevel = buildLevelTimingByLevel(
+    levelRows.map((r) => ({
+      level: r.level,
+      match_duration_minutes: r.match_duration_minutes,
+      break_between_matches_minutes: r.break_between_matches_minutes,
+      rounds_per_match: r.rounds_per_match ?? null,
+    })),
+  );
+  const resolved = resolveKampprogramLevelTiming(levelKey, levelTimingByLevel);
+  const short = formatLevelShortLabel(levelKey).toLowerCase();
+  const matches = levelRows.filter(
+    (r) => formatLevelShortLabel(r.level).toLowerCase() === short,
+  );
+  const best =
+    matches.length > 0
+      ? [...matches].sort(
+          (a, b) =>
+            canonicalBanerLevelLabel(b.level).length - canonicalBanerLevelLabel(a.level).length,
+        )[0]
+      : undefined;
+  const timing: RoundTiming = {
+    matchDurationMinutes: best?.match_duration_minutes ?? 9,
+    breakBetweenMatchesMinutes: best?.break_between_matches_minutes ?? 1,
+  };
+  const rpmRaw = best?.rounds_per_match;
+  const roundsPerMatch =
+    rpmRaw != null && Number.isFinite(rpmRaw) && rpmRaw >= 1
+      ? Math.min(4, Math.floor(rpmRaw))
+      : resolved.roundsPerMatch;
+  return { timing, roundsPerMatch };
 }
 
 export function recordTeamsAfterMatch(
@@ -472,9 +543,14 @@ function findAllSlotsForMatch(
   return sortSlotCandidates(slots);
 }
 
+type ManualSlotCandidate = SlotCandidate & {
+  respectsTeamRest: boolean;
+  teamsFree: boolean;
+};
+
 /**
  * Manuel planlægning: alle aktive baner (alle størrelser) og alle turneringsperioder.
- * Ingen filtrering til kun pulje-periode eller kun «rigtig» banetype.
+ * Viser ethvert ledigt bane/tid-slot; hold-pause og hold-overlap markeres — ikke skjult.
  */
 function findAllSlotsForMatchManual(
   periods: readonly TournamentPeriodRow[],
@@ -484,7 +560,9 @@ function findAllSlotsForMatchManual(
   occupancy: readonly OccupiedSlot[],
   teamRounds: TeamRoundTracker,
   teamRestMinutes: number,
-): SlotCandidate[] {
+  teamIntervals: readonly TeamScheduledInterval[],
+  scheduledRoundStartMinutes: readonly number[],
+): ManualSlotCandidate[] {
   const roundLen = roundLengthMinutes(base.timing);
   if (roundLen <= 0 || allCourtIds.length === 0) return [];
 
@@ -494,7 +572,7 @@ function findAllSlotsForMatchManual(
       a.sort_order - b.sort_order ||
       (periodWindowMinutes(a)?.startMinutes ?? 0) - (periodWindowMinutes(b)?.startMinutes ?? 0),
   );
-  const slots: SlotCandidate[] = [];
+  const slots: ManualSlotCandidate[] = [];
 
   for (const period of tryPeriods) {
     const periodWin = periodWindowForScheduling(period, base.baseAvailability, base.courtIds);
@@ -506,25 +584,29 @@ function findAllSlotsForMatchManual(
       periodWin,
       period,
     );
-    const ctx: SchedulePeriodContext = {
-      period,
-      roundSlotEpochStartMinutes: base.roundSlotEpochStartMinutes,
-      courtIds: base.courtIds,
-      courtTypes: base.courtTypes,
-      levelKey: base.levelKey,
-      levelCourtRows: base.levelCourtRows,
-      availability,
-      breaks: base.breaks,
-      timing: base.timing,
-      roundsPerMatch: base.roundsPerMatch,
-      existingOccupancy: occupancy,
-      teamRestMinutes,
-    };
 
+    const candidateStarts = new Set<number>();
     for (let t = periodWin.startMinutes; t + blockMinutes <= periodWin.endMinutes; t += roundLen) {
-      if (!teamsCanPlayAt(teamRounds, match.teamAId, match.teamBId, t, teamRestMinutes)) continue;
+      candidateStarts.add(t);
+    }
+    for (const t of scheduledRoundStartMinutes) {
+      if (t >= periodWin.startMinutes && t + blockMinutes <= periodWin.endMinutes) {
+        candidateStarts.add(t);
+      }
+    }
 
+    for (const t of [...candidateStarts].sort((a, b) => a - b)) {
       const endMinutes = t + blockMinutes;
+      const teamsFree = !teamsOverlapScheduledInterval(
+        match.teamAId,
+        match.teamBId,
+        t,
+        endMinutes,
+        teamIntervals,
+        match.id,
+      );
+      const respectsTeamRest =
+        teamsFree && teamsCanPlayAt(teamRounds, match.teamAId, match.teamBId, t, teamRestMinutes);
       const roundSlot = roundSlotFromStartMinutes(base.roundSlotEpochStartMinutes, roundLen, t);
 
       for (const courtId of allCourtIds) {
@@ -536,20 +618,21 @@ function findAllSlotsForMatchManual(
               .map((w) => intersectWindow(w, periodWin))
               .filter((w): w is { startMinutes: number; endMinutes: number } => w != null);
         if (playableWindows.length === 0) continue;
-        if (isIntervalFree(courtId, t, endMinutes, occupancy, courtBreaks, playableWindows)) {
-          slots.push({
-            courtId,
-            startMinutes: t,
-            endMinutes,
-            roundSlot,
-            periodId: period.id,
-          });
-        }
+        if (!isIntervalFree(courtId, t, endMinutes, occupancy, courtBreaks, playableWindows)) continue;
+        slots.push({
+          courtId,
+          startMinutes: t,
+          endMinutes,
+          roundSlot,
+          periodId: period.id,
+          respectsTeamRest,
+          teamsFree,
+        });
       }
     }
   }
 
-  return sortSlotCandidates(slots);
+  return slots;
 }
 
 /** Kun puljens tildelte periode — til fælles planlægning af flere puljer på samme niveau. */
@@ -3426,6 +3509,8 @@ export type ManualScheduleSlotOption = {
   endMinutes: number;
   timeLabel: string;
   respectsTeamRest: boolean;
+  /** Begge hold har ingen anden kamp der overlapper dette tidsrum. */
+  teamsFree: boolean;
   periodName: string;
   isOutsidePoolPeriod: boolean;
   /** Periode er tildelt en anden pulje under Opsætning → Perioder. */
@@ -3501,13 +3586,10 @@ export async function listManualScheduleSlotsForMatch(
   ]);
 
   if (poolRes.error) return { ...empty, error: poolRes.error.message };
-  if (!poolRes.data?.period_id) {
-    return { ...empty, error: "Puljen mangler tildelt periode under Opsætning → Perioder." };
-  }
   if (allPeriodsRes.error) return { ...empty, error: allPeriodsRes.error.message };
   if (eventPoolsRes.error) return { ...empty, error: eventPoolsRes.error.message };
 
-  const pool = poolRes.data as { id: string; level: string | null; period_id: string };
+  const pool = poolRes.data as { id: string; level: string | null; period_id: string | null };
   const levelKey = canonicalBanerLevelLabel(pool.level);
   const teamById = new Map(
     ((teamsRes.data ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]),
@@ -3517,7 +3599,7 @@ export async function listManualScheduleSlotsForMatch(
 
   const allPeriods = (allPeriodsRes.data ?? []) as TournamentPeriodRow[];
   const periodsById = new Map(allPeriods.map((p) => [p.id, p]));
-  const primaryPeriodId = pool.period_id;
+  const primaryPeriodId = pool.period_id ?? "";
   const dedicatedOtherPoolPeriodIds = dedicatedPeriodIdsForOtherPools(
     (eventPoolsRes.data ?? []) as Array<{ id: string; period_id: string | null }>,
     pool.id,
@@ -3547,7 +3629,7 @@ export async function listManualScheduleSlotsForMatch(
       supabase.from("level_court_settings").select("level, court_type").eq("event_id", eventId),
       supabase
         .from("matches")
-        .select("id, court_id, start_time, end_time")
+        .select("id, team_a_id, team_b_id, court_id, start_time, end_time")
         .eq("event_id", eventId)
         .not("court_id", "is", null)
         .not("start_time", "is", null)
@@ -3611,33 +3693,44 @@ export async function listManualScheduleSlotsForMatch(
 
   const levelRows = (levelRes.data ?? []) as Array<{
     level: string;
-    match_duration_minutes: number;
-    break_between_matches_minutes: number;
-    rounds_per_match: number;
+    match_duration_minutes: number | null;
+    break_between_matches_minutes: number | null;
+    rounds_per_match: number | null;
+    plan_matches_per_team?: number | null;
   }>;
-  const levelRow = levelRows.find((r) => canonicalBanerLevelLabel(r.level) === levelKey);
-  const timing: RoundTiming = {
-    matchDurationMinutes: levelRow?.match_duration_minutes ?? 9,
-    breakBetweenMatchesMinutes: levelRow?.break_between_matches_minutes ?? 1,
-  };
-  const roundsPerMatch = levelRow?.rounds_per_match ?? 1;
+  const { timing, roundsPerMatch } = resolveSchedulerTimingForLevel(levelKey, levelRows);
   const roundLen = roundLengthMinutes(timing);
   const teamRestMinutes = teamRestMinutesBetweenMatches(roundLen);
   const roundSlotEpochStart = schedulingEpochStartMinutes(allPeriods);
 
-  const matchTeamIds = new Set([matchRow.team_a_id, matchRow.team_b_id]);
   const existingOccupancy: OccupiedSlot[] = [];
+  const teamIntervals: TeamScheduledInterval[] = [];
+  const scheduledRoundStartMinutes = new Set<number>();
+
+  const matchTeamIds = new Set([matchRow.team_a_id, matchRow.team_b_id]);
+
   for (const m of (allMatchesRes.data ?? []) as Array<{
     id: string;
+    team_a_id: string;
+    team_b_id: string;
     court_id: string;
     start_time: string;
     end_time: string;
   }>) {
-    if (m.id === matchId) continue;
     const s = timeToMinutes(m.start_time);
     const e = timeToMinutes(m.end_time);
     if (s == null || e == null || e <= s) continue;
-    existingOccupancy.push({ courtId: m.court_id, startMinutes: s, endMinutes: e });
+    teamIntervals.push({
+      id: m.id,
+      teamAId: m.team_a_id,
+      teamBId: m.team_b_id,
+      startMinutes: s,
+      endMinutes: e,
+    });
+    if (m.id !== matchId) {
+      existingOccupancy.push({ courtId: m.court_id, startMinutes: s, endMinutes: e });
+    }
+    scheduledRoundStartMinutes.add(s);
   }
 
   const teamRounds = createTeamRoundTracker();
@@ -3696,7 +3789,7 @@ export async function listManualScheduleSlotsForMatch(
     teamBId: matchRow.team_b_id,
   };
 
-  const slotsWithRest = findAllSlotsForMatchManual(
+  const merged = findAllSlotsForMatchManual(
     allPeriods,
     matchInput,
     activeCourtIds,
@@ -3704,19 +3797,9 @@ export async function listManualScheduleSlotsForMatch(
     existingOccupancy,
     teamRounds,
     teamRestMinutes,
+    teamIntervals,
+    [...scheduledRoundStartMinutes],
   );
-  const slotsRelaxed = findAllSlotsForMatchManual(
-    allPeriods,
-    matchInput,
-    activeCourtIds,
-    poolBase,
-    existingOccupancy,
-    teamRounds,
-    0,
-  );
-
-  const restKeys = new Set(slotsWithRest.map((s) => `${s.courtId}:${s.startMinutes}`));
-  const merged = [...slotsWithRest, ...slotsRelaxed.filter((s) => !restKeys.has(`${s.courtId}:${s.startMinutes}`))];
 
   const slots: ManualScheduleSlotOption[] = merged.map((slot) => {
     const period = periodsById.get(slot.periodId);
@@ -3724,7 +3807,7 @@ export async function listManualScheduleSlotsForMatch(
     const startLabel = minutesToTimeInput(slot.startMinutes);
     const endLabel = minutesToTimeInput(slot.endMinutes);
     const courtType = courtTypeById.get(slot.courtId) ?? requiredType;
-    const isOutsidePoolPeriod = slot.periodId !== primaryPeriodId;
+    const isOutsidePoolPeriod = Boolean(primaryPeriodId && slot.periodId !== primaryPeriodId);
     const isDedicatedOtherPoolPeriod =
       isOutsidePoolPeriod && dedicatedOtherPoolPeriodIds.has(slot.periodId);
     return {
@@ -3735,7 +3818,8 @@ export async function listManualScheduleSlotsForMatch(
       startMinutes: slot.startMinutes,
       endMinutes: slot.endMinutes,
       timeLabel: `${startLabel}–${endLabel}`,
-      respectsTeamRest: restKeys.has(`${slot.courtId}:${slot.startMinutes}`),
+      respectsTeamRest: slot.respectsTeamRest,
+      teamsFree: slot.teamsFree,
       periodName,
       isOutsidePoolPeriod,
       isDedicatedOtherPoolPeriod,
@@ -3749,6 +3833,7 @@ export async function listManualScheduleSlotsForMatch(
     if (a.isDedicatedOtherPoolPeriod !== b.isDedicatedOtherPoolPeriod) {
       return a.isDedicatedOtherPoolPeriod ? 1 : -1;
     }
+    if (a.teamsFree !== b.teamsFree) return a.teamsFree ? -1 : 1;
     if (a.respectsTeamRest !== b.respectsTeamRest) return a.respectsTeamRest ? -1 : 1;
     return a.startMinutes - b.startMinutes || a.courtName.localeCompare(b.courtName, "da");
   });

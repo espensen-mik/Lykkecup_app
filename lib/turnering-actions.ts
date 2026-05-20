@@ -577,6 +577,7 @@ export async function applyManualScheduleSlotAction(
   startMinutes: number,
   endMinutes: number,
   respectsTeamRest: boolean,
+  teamsFree = true,
 ): Promise<TurneringActionResult> {
   const startTimeIso = minutesToTimestamptz(startMinutes);
   const endTimeIso = minutesToTimestamptz(endMinutes);
@@ -585,7 +586,7 @@ export async function applyManualScheduleSlotAction(
   }
 
   return updateMatchScheduleAction(matchId, levelKey, courtId, startTimeIso, endTimeIso, {
-    scheduleRelaxedTeamRest: !respectsTeamRest,
+    scheduleRelaxedTeamRest: !teamsFree || !respectsTeamRest,
   });
 }
 
