@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/auth-server";
-import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
+import { canonicalBanerLevelLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { effectivePoolMaxTeams, poolPlanningHint, suggestNextPoolName } from "@/lib/puljer";
 import { generateRoundRobinMatches, TURNERING_EVENT_ID } from "@/lib/turnering";
 import {
@@ -947,6 +947,125 @@ export async function generateAllPoolMatchesForLevelAction(
     matchCount: totalMatchCount,
     scheduled,
     schedulingFailures,
+  };
+}
+
+/**
+ * Generer (eller regenerer) kampe for alle puljer på alle niveauer i én kørsel.
+ * Matcher oprettes først på tværs af turneringen; planlægning kører niveau for niveau så
+ * hold-pause og banebelastning fra tidligere niveauer medtages.
+ */
+export async function generateAllPoolMatchesForTournamentAction(
+  regenerate: boolean,
+): Promise<
+  TurneringActionResult & {
+    scheduled?: number;
+    matchCount?: number;
+    levelCount?: number;
+    schedulingFailures?: SchedulingFailureRow[];
+  }
+> {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Du skal være logget ind for at generere kampe." };
+  }
+
+  const poolsRes = await supabase
+    .from("pools")
+    .select("id, level")
+    .eq("event_id", TURNERING_EVENT_ID);
+
+  if (poolsRes.error) return { ok: false, message: poolsRes.error.message };
+
+  const levelKeys = sortLevelKeysForNav(
+    [
+      ...new Set(
+        ((poolsRes.data ?? []) as Array<{ id: string; level: string | null }>).map((p) =>
+          canonicalBanerLevelLabel(p.level),
+        ),
+      ),
+    ].filter(Boolean),
+  );
+
+  if (levelKeys.length === 0) {
+    return { ok: false, message: "Ingen puljer — opret puljer under Puljer først." };
+  }
+
+  if (regenerate) {
+    const delRes = await supabase.from("matches").delete().eq("event_id", TURNERING_EVENT_ID);
+    if (delRes.error) return { ok: false, message: delRes.error.message };
+  }
+
+  let totalMatchCount = 0;
+  let scheduled = 0;
+  let unscheduled = 0;
+  const errors: string[] = [];
+  const skippedLevels: string[] = [];
+  const schedulingFailures: SchedulingFailureRow[] = [];
+  let levelsProcessed = 0;
+
+  for (const levelKey of levelKeys) {
+    const result = await generateAllPoolMatchesForLevelAction(levelKey, false);
+    const levelMatches = result.matchCount ?? 0;
+    const levelScheduled = result.scheduled ?? 0;
+    if (levelMatches > 0 || levelScheduled > 0) {
+      levelsProcessed += 1;
+    }
+    totalMatchCount += levelMatches;
+    scheduled += levelScheduled;
+    unscheduled += Math.max(0, levelMatches - levelScheduled);
+    if (!result.ok && result.message) {
+      if (result.message.includes("alle puljer har allerede kampe")) {
+        skippedLevels.push(levelKey);
+      } else {
+        errors.push(`${levelKey}: ${result.message}`);
+      }
+    }
+    if (result.schedulingFailures?.length) {
+      schedulingFailures.push(...result.schedulingFailures);
+    }
+  }
+
+  revalidatePath("/turnering/plan");
+  revalidatePath("/kampprogram");
+  for (const levelKey of levelKeys) {
+    revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
+  }
+
+  if (totalMatchCount === 0 && errors.length === 0 && skippedLevels.length === levelKeys.length) {
+    return {
+      ok: false,
+      message:
+        "Alle niveauer har allerede kampe. Brug knappen igen for at regenerere hele turneringen.",
+      levelCount: 0,
+    };
+  }
+
+  if (totalMatchCount === 0 && errors.length > 0) {
+    return { ok: false, message: errors.join(" "), levelCount: levelsProcessed, schedulingFailures };
+  }
+
+  const partial = unscheduled > 0 ? ` ${unscheduled} kampe mangler bane/tid.` : "";
+  const skipNote =
+    skippedLevels.length > 0 ? ` Sprang over (havde kampe): ${skippedLevels.join(", ")}.` : "";
+  const errNote = errors.length > 0 ? ` Fejl: ${errors.join(" ")}` : "";
+  const ok = errors.length === 0 && unscheduled === 0 && scheduled > 0;
+
+  return {
+    ok,
+    message: `Hele turneringen: ${totalMatchCount} kampe på ${levelsProcessed} niveau(er) — ${scheduled} med bane og tid.${partial}${skipNote}${errNote}${
+      unscheduled > 0 ? " Se detaljer på det enkelte niveau." : ""
+    }`,
+    matchCount: totalMatchCount,
+    scheduled,
+    levelCount: levelsProcessed,
+    schedulingFailures: schedulingFailures.length > 0 ? schedulingFailures : undefined,
   };
 }
 

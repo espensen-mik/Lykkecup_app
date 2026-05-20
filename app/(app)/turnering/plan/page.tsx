@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { levelPathSegment } from "@/lib/holddannelse";
+import { PlanOverviewActions } from "@/components/turnering/plan-overview-actions";
+import { PlanOverviewStatus } from "@/components/turnering/plan-overview-status";
+import { fetchTurneringsplanMatchStatus } from "@/lib/turneringsplan-status-server";
 import { fetchTurneringsplanOverview } from "@/lib/turnering-server";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +15,11 @@ export const metadata: Metadata = {
 };
 
 export default async function TurneringPlanPage() {
-  const { levels, error } = await fetchTurneringsplanOverview();
+  const [overview, matchStatus] = await Promise.all([
+    fetchTurneringsplanOverview(),
+    fetchTurneringsplanMatchStatus(),
+  ]);
+  const { levels, totalMatchCount, error } = overview;
 
   if (error) {
     return (
@@ -25,6 +32,8 @@ export default async function TurneringPlanPage() {
     );
   }
 
+  const matchCount = totalMatchCount;
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10 lg:space-y-11">
       <header className="max-w-2xl">
@@ -35,9 +44,16 @@ export default async function TurneringPlanPage() {
           Turneringsplan
         </h1>
         <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
-          Placeholder for kampplanlægning. Vælg et niveau for at se puljer og hold.
+          Vælg et niveau for pulje- og kampdetaljer, eller generér kampe for hele turneringen på én gang.
         </p>
       </header>
+
+      {levels.length > 0 ? (
+        <>
+          <PlanOverviewStatus status={matchStatus} loadError={matchStatus.error} />
+          <PlanOverviewActions levelCount={levels.length} totalMatchCount={matchCount} />
+        </>
+      ) : null}
 
       {levels.length === 0 ? (
         <p className="rounded-xl border border-dashed border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900/35 dark:text-gray-400">

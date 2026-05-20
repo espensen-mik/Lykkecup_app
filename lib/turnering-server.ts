@@ -115,17 +115,29 @@ export async function fetchPuljerOverview(): Promise<{
 
 export async function fetchTurneringsplanOverview(): Promise<{
   levels: TurneringsplanOverviewLevel[];
+  totalMatchCount: number;
   error: string | null;
 }> {
+  const eventId = TURNERING_EVENT_ID;
   const { levels, error } = await fetchPuljerOverview();
-  if (error) return { levels: [], error };
+  if (error) return { levels: [], totalMatchCount: 0, error };
+
+  const client = await createServerSupabase();
+  const matchCountRes = await client
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", eventId);
+
+  const totalMatchCount = matchCountRes.error ? 0 : (matchCountRes.count ?? 0);
+
   return {
     levels: levels.map((l) => ({
       levelKey: l.levelKey,
       teamCount: l.totalTeams,
       poolCount: l.poolCount,
     })),
-    error: null,
+    totalMatchCount,
+    error: matchCountRes.error?.message ?? null,
   };
 }
 
