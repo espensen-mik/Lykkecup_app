@@ -95,6 +95,11 @@ export function TurneringPlanWorkspace({
   const [editEnd, setEditEnd] = useState("");
   const [savingMatch, setSavingMatch] = useState(false);
   const [manualScheduleMatch, setManualScheduleMatch] = useState<MatchRow | null>(null);
+  const [activePlanMatchesPerTeam, setActivePlanMatchesPerTeam] = useState(planMatchesPerTeam);
+
+  useEffect(() => {
+    setActivePlanMatchesPerTeam(planMatchesPerTeam);
+  }, [planMatchesPerTeam]);
 
   useEffect(() => {
     setPools(initialPools);
@@ -192,19 +197,19 @@ export function TurneringPlanWorkspace({
     let synced = 0;
     for (const pool of pools) {
       const teams = teamsByPool.get(pool.id) ?? [];
-      const analysis = analyzePoolMatchSync(teams, matchesByPool.get(pool.id) ?? [], planMatchesPerTeam);
+      const analysis = analyzePoolMatchSync(teams, matchesByPool.get(pool.id) ?? [], activePlanMatchesPerTeam);
       if (analysis.isSynced) synced += 1;
     }
     return synced;
-  }, [pools, teamsByPool, matchesByPool, planMatchesPerTeam]);
+  }, [pools, teamsByPool, matchesByPool, activePlanMatchesPerTeam]);
 
   const estimatedTotalMatches = useMemo(
     () =>
       pools.reduce(
-        (sum, p) => sum + plannedPoolMatchCount(teamsByPool.get(p.id)?.length ?? 0, planMatchesPerTeam),
+        (sum, p) => sum + plannedPoolMatchCount(teamsByPool.get(p.id)?.length ?? 0, activePlanMatchesPerTeam),
         0,
       ),
-    [pools, teamsByPool, planMatchesPerTeam],
+    [pools, teamsByPool, activePlanMatchesPerTeam],
   );
 
   const hasDuplicatePoolNames = useMemo(() => {
@@ -390,7 +395,7 @@ export function TurneringPlanWorkspace({
         </div>
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           Puljer klar til kampe: <span className="font-semibold">{poolsWithEnoughTeams}</span> · Kampe/hold (Opsætning →
-          Kampe): <span className="font-semibold">{planMatchesPerTeam}</span> · Estimeret antal kampe:{" "}
+          Kampe): <span className="font-semibold">{activePlanMatchesPerTeam}</span> · Estimeret antal kampe:{" "}
           <span className="font-semibold">{estimatedTotalMatches}</span>
         </p>
 
@@ -567,10 +572,10 @@ export function TurneringPlanWorkspace({
         ) : (
           pools.map((pool) => {
             const teams = teamsByPool.get(pool.id) ?? [];
-            const estimated = plannedPoolMatchCount(teams.length, planMatchesPerTeam);
+            const estimated = plannedPoolMatchCount(teams.length, activePlanMatchesPerTeam);
             const poolMatches = matchesByPool.get(pool.id) ?? [];
             const unscheduledCount = poolMatches.filter((m) => !m.court_id || !m.start_time).length;
-            const sync = analyzePoolMatchSync(teams, poolMatches, planMatchesPerTeam);
+            const sync = analyzePoolMatchSync(teams, poolMatches, activePlanMatchesPerTeam);
             const teamCountStatus = poolTeamCountStatus(teams.length, poolHint);
             const hasEnoughTeams = teams.length >= 2;
             const isSynced = sync.isSynced;

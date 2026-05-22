@@ -128,7 +128,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
   let teamsMatchOk = 0;
 
   for (const team of input.teams) {
-    const expected = resolvePlanMatchesPerTeam(team.level, input.planMatchesByLevel);
+    const expected = resolvePlanMatchesPerTeam(team.level, input.planMatchesByLevel, input.scheduleRows);
     const actual = teamMatchCount.get(team.id) ?? 0;
     if (expected == null) {
       teamsNoPlanSetting.push(team.name);
@@ -168,7 +168,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     if (teamLinks.length !== 1) continue;
     const team = teamById.get(teamLinks[0]!);
     if (!team) continue;
-    const expected = resolvePlanMatchesPerTeam(team.level, input.planMatchesByLevel);
+    const expected = resolvePlanMatchesPerTeam(team.level, input.planMatchesByLevel, input.scheduleRows);
     if (expected == null) continue;
     playersChecked += 1;
     const actual = teamMatchCount.get(team.id) ?? 0;
@@ -244,7 +244,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     if (teams.length < 2) continue;
     poolsChecked += 1;
     const levelKey = canonicalBanerLevelLabel(pool.level ?? teams[0]?.level);
-    const planPerTeam = resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel) ?? poolPlanningHint(
+    const planPerTeam = resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel, input.scheduleRows) ?? poolPlanningHint(
       levelKey,
       input.scheduleRows,
     ).matchesPerTeam;
@@ -314,7 +314,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
   const levelsMissingPlan: string[] = [];
   for (const levelKey of levelsWithTeams) {
     if (levelKey === "Ukendt niveau") continue;
-    if (resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel) == null) {
+    if (resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel, input.scheduleRows) == null) {
       levelsMissingPlan.push(levelKey);
     }
   }
@@ -395,7 +395,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     const teams = teamsByPool.get(pool.id) ?? [];
     const levelKey = canonicalBanerLevelLabel(pool.level ?? teams[0]?.level);
     const planPerTeam =
-      resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel) ??
+      resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel, input.scheduleRows) ??
       poolPlanningHint(levelKey, input.scheduleRows).matchesPerTeam;
     expectedMatchesTotal += plannedPoolMatchCount(teams.length, planPerTeam);
     generatedInPools += (matchesByPool.get(pool.id) ?? []).filter(

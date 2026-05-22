@@ -8,6 +8,11 @@ comment on column public.level_schedule_settings.plan_target_teams_per_pool is
 comment on column public.level_schedule_settings.plan_max_teams_per_pool is
   'Valgfri hård grænse hold pr. pulje. Null = kun systemloft (64).';
 
+-- Idempotent: safe to re-run if constraints were created on a previous attempt.
+alter table public.level_schedule_settings
+  drop constraint if exists level_schedule_settings_plan_target_teams_per_pool_check,
+  drop constraint if exists level_schedule_settings_plan_max_teams_per_pool_check;
+
 alter table public.level_schedule_settings
   add constraint level_schedule_settings_plan_target_teams_per_pool_check
     check (plan_target_teams_per_pool is null or (plan_target_teams_per_pool >= 2 and plan_target_teams_per_pool <= 99)),

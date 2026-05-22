@@ -1,8 +1,8 @@
 import type { CourtAvailabilityRow, CourtBreakRow, CourtRow, LevelCourtSettingLike } from "@/lib/baner-tider";
 import { compareCourtTypes, timeToMinutes } from "@/lib/baner-tider";
-import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
+import { canonicalBanerLevelLabel, formatLevelShortLabel } from "@/lib/holddannelse";
+import { findLevelScheduleRow, normalizeScheduleRowsForPlanning } from "@/lib/puljer";
 import { courtTypeForLevel, defaultRoundsPerMatchForLevel } from "@/lib/level-court-settings";
-import { findLevelScheduleRow } from "@/lib/puljer";
 import { plannedPoolMatchCount } from "@/lib/turnering";
 
 /** Planlagte runder pr. bane (kampe × runder pr. kamp for puljens niveau). */
@@ -45,21 +45,15 @@ export type LevelPlanPersisted = {
   rounds_per_match?: number | null;
 };
 
-/** Gemte kampe/hold pr. niveau (kun rækker med værdi i DB — ingen standard-5). */
+/** Gemte kampe/hold pr. niveau — slår niveau-varianter sammen som i Puljer/Turneringsplan. */
 export function planMatchesByLevelFromScheduleRows(
   rows: readonly { level: string; plan_matches_per_team: number | null }[],
 ): Record<string, number> {
-  const merged = new Map<string, number | null>();
-  for (const row of rows) {
-    const key = canonicalBanerLevelLabel(row.level);
-    const prev = merged.get(key);
-    const next = row.plan_matches_per_team;
-    merged.set(key, prev ?? next ?? null);
-  }
   const out: Record<string, number> = {};
-  for (const [key, value] of merged) {
-    if (value != null && Number.isFinite(value) && value >= 0) {
-      out[key] = Math.floor(value);
+  for (const row of normalizeScheduleRowsForPlanning(rows)) {
+    const m = row.plan_matches_per_team;
+    if (m != null && Number.isFinite(m) && m >= 0) {
+      out[canonicalBanerLevelLabel(row.level)] = Math.floor(m);
     }
   }
   return out;
@@ -69,9 +63,30 @@ export function planMatchesByLevelFromScheduleRows(
 export function resolvePlanMatchesPerTeam(
   level: string | null | undefined,
   planMatchesByLevel: Record<string, number>,
+  scheduleRows?: readonly { level: string; plan_matches_per_team: number | null }[],
 ): number | null {
   if (level == null || String(level).trim() === "") return null;
-  return planMatchesByLevel[canonicalBanerLevelLabel(String(level))] ?? null;
+  const canon = canonicalBanerLevelLabel(String(level));
+  const direct = planMatchesByLevel[canon];
+  if (direct != null) return direct;
+
+  if (scheduleRows?.length) {
+    const row = findLevelScheduleRow(level, scheduleRows);
+    if (
+      row?.plan_matches_per_team != null &&
+      Number.isFinite(row.plan_matches_per_team) &&
+      row.plan_matches_per_team >= 0
+    ) {
+      return Math.floor(row.plan_matches_per_team);
+    }
+  }
+
+  const short = formatLevelShortLabel(level).toLowerCase();
+  if (!short || short === "ukendt niveau") return null;
+  for (const [key, value] of Object.entries(planMatchesByLevel)) {
+    if (formatLevelShortLabel(key).toLowerCase() === short) return value;
+  }
+  return null;
 }
 
 /**

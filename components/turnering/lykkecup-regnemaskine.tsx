@@ -18,6 +18,7 @@ import {
 } from "@/lib/lykkecup-regnemaskine";
 import { BaneStatusPanel } from "@/components/turnering/bane-status-panel";
 import { insertLevelSchedulePlanning, writeLevelSchedulePlanning } from "@/lib/level-schedule-settings";
+import { revalidateAfterKampeSettingsAction } from "@/lib/turnering-actions";
 import { findLevelScheduleRow, poolPlanningHint } from "@/lib/puljer";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
@@ -252,6 +253,7 @@ export function LykkecupRegnemaskine({
             setLocalError(
               "Kampe/hold gemt. Puljestørrelse kræver migration — kør supabase/migrations/20260520130000_level_schedule_pool_settings.sql i Supabase.",
             );
+            await revalidateAfterKampeSettingsAction(levelKey);
             router.refresh();
             return;
           }
@@ -271,10 +273,12 @@ export function LykkecupRegnemaskine({
             setLocalError(
               "Kampe/hold gemt. Puljestørrelse kræver migration — kør supabase/migrations/20260520130000_level_schedule_pool_settings.sql i Supabase.",
             );
+            await revalidateAfterKampeSettingsAction(levelKey);
             router.refresh();
             return;
           }
         }
+        await revalidateAfterKampeSettingsAction(levelKey);
         router.refresh();
       } finally {
         setSavingLevel(null);

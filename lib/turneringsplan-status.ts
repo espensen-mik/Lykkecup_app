@@ -7,7 +7,7 @@ import {
 } from "@/lib/holddannelse";
 import { isOrphanKampprogramMatch } from "@/lib/kampprogram";
 import type { CheckStatus, LykkecupCheckResult } from "@/lib/lykkecup-check";
-import { findLevelScheduleRow } from "@/lib/puljer";
+import { findLevelScheduleRow, poolPlanningHint } from "@/lib/puljer";
 import { resolvePlanMatchesPerTeam, roundLengthMinutes, type RoundTiming } from "@/lib/lykkecup-regnemaskine";
 import { plannedPoolMatchCount } from "@/lib/turnering";
 import { teamRestMinutesBetweenMatches, teamRestViolatingTeamIdsByMatchId } from "@/lib/turnering-scheduler";
@@ -203,9 +203,8 @@ function computeLevelBreakdown(input: TurneringsplanStatusInput): Turneringsplan
     const row = ensure(pool.level);
     const teams = teamsByPool.get(pool.id) ?? [];
     const planPerTeam =
-      resolvePlanMatchesPerTeam(row.levelKey, input.planMatchesByLevel) ??
-      findLevelScheduleRow(row.levelKey, input.scheduleRows)?.plan_matches_per_team ??
-      0;
+      resolvePlanMatchesPerTeam(row.levelKey, input.planMatchesByLevel, input.scheduleRows) ??
+      poolPlanningHint(row.levelKey, input.scheduleRows).matchesPerTeam;
     row.expected += plannedPoolMatchCount(teams.length, planPerTeam);
 
     for (const m of matchesByPool.get(pool.id) ?? []) {

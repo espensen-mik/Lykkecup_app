@@ -814,7 +814,13 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <AnalyticsTracker />
-      <header className="sticky top-0 z-50 flex h-14 items-center gap-3 border-b border-teal-500/40 bg-[#14b8a6] px-4 text-white shadow-[0_4px_18px_rgba(15,118,110,0.24)] print:hidden dark:border-teal-400/30 dark:bg-teal-600 dark:shadow-[0_4px_18px_rgba(15,118,110,0.2)]">
+      <header
+        className={`sticky top-0 z-50 flex h-14 items-center gap-3 border-b px-4 text-white print:hidden ${
+          planningLockdown
+            ? "border-red-400/50 bg-red-600 shadow-[0_4px_18px_rgba(185,28,28,0.35)] dark:border-red-500/40 dark:bg-red-700 dark:shadow-[0_4px_18px_rgba(127,29,29,0.4)]"
+            : "border-teal-500/40 bg-[#14b8a6] shadow-[0_4px_18px_rgba(15,118,110,0.24)] dark:border-teal-400/30 dark:bg-teal-600 dark:shadow-[0_4px_18px_rgba(15,118,110,0.2)]"
+        }`}
+      >
         <button
           type="button"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white/90 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
@@ -835,8 +841,14 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           <Link
             href="/lister"
             onClick={() => setMobileOpen(false)}
-            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
-              isActive("/lister") ? "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
+            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
+              planningLockdown ? "text-red-700" : "text-[#0f766e]"
+            } ${
+              isActive("/lister")
+                ? planningLockdown
+                  ? "ring-2 ring-white/90 ring-offset-2 ring-offset-red-600 dark:ring-offset-red-700"
+                  : "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600"
+                : ""
             }`}
             aria-current={isActive("/lister") ? "page" : undefined}
             title="Lister til udskrift — hold og spillere"
@@ -847,8 +859,14 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           <Link
             href="/analyse"
             onClick={() => setMobileOpen(false)}
-            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
-              isActive("/analyse") ? "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
+            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
+              planningLockdown ? "text-red-700" : "text-[#0f766e]"
+            } ${
+              isActive("/analyse")
+                ? planningLockdown
+                  ? "ring-2 ring-white/90 ring-offset-2 ring-offset-red-600 dark:ring-offset-red-700"
+                  : "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600"
+                : ""
             }`}
             aria-current={isActive("/analyse") ? "page" : undefined}
             title="Brugsstatistik for app og KontrolCenter"
@@ -859,8 +877,14 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           <Link
             href="/billetsalg"
             onClick={() => setMobileOpen(false)}
-            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
-              isActive("/billetsalg") ? "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600" : ""
+            className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
+              planningLockdown ? "text-red-700" : "text-[#0f766e]"
+            } ${
+              isActive("/billetsalg")
+                ? planningLockdown
+                  ? "ring-2 ring-white/90 ring-offset-2 ring-offset-red-600 dark:ring-offset-red-700"
+                  : "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600"
+                : ""
             }`}
             aria-current={isActive("/billetsalg") ? "page" : undefined}
             title="Live billetsalg fra WordPress"
@@ -870,18 +894,12 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           </Link>
           <KontrolcenterLockdownToggle />
           <KontrolcenterHelp />
-          {planningLockdown ? (
-            <span
-              className="hidden rounded-full border border-amber-200/90 bg-amber-100/95 px-2.5 py-1 text-[0.6875rem] font-bold uppercase tracking-wide text-amber-950 lg:inline-flex dark:border-amber-700 dark:bg-amber-950/70 dark:text-amber-100"
-              title="Holddannelse og Turnering er låst"
-            >
-              Låst
-            </span>
-          ) : null}
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm"
+            className={`inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${
+              planningLockdown ? "text-red-700" : "text-[#0f766e]"
+            }`}
             aria-label="Log ud"
             title="Log ud af KontrolCenter"
           >
@@ -896,7 +914,11 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                 className="h-8 w-8 shrink-0 rounded-full object-cover"
               />
             ) : (
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-[0.7rem] font-semibold text-[#0f766e]">
+              <span
+                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-[0.7rem] font-semibold ${
+                  planningLockdown ? "text-red-700" : "text-[#0f766e]"
+                }`}
+              >
                 {initialsFromName(currentUser?.fullName ?? "Ukendt bruger")}
               </span>
             )}

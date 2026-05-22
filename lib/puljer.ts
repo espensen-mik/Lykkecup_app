@@ -118,13 +118,14 @@ export function findLevelScheduleRow<T extends LevelSchedulePlanningRow>(
   return matches.reduce((acc, row) => pickMoreSpecificScheduleRow(acc, row));
 }
 
-/** Kort visning af puljestørrelse fra Opsætning → Kampe. */
+/** Kort visning af plan fra Opsætning → Kampe (kampe/hold + puljestørrelse). */
 export function formatPoolSizePlanLabel(hint: PoolPlanningHint): string {
   const target = hint.recommendedTeamCount;
+  const matches = `${hint.matchesPerTeam} kampe/hold`;
   if (hint.maxTeamsPerPool != null) {
-    return `mål ${target} · maks ${hint.maxTeamsPerPool} hold/pulje`;
+    return `${matches} · mål ${target} · maks ${hint.maxTeamsPerPool} hold/pulje`;
   }
-  return `mål ${target} hold/pulje (ingen maks sat)`;
+  return `${matches} · mål ${target} hold/pulje (ingen maks sat)`;
 }
 
 export function poolPlanningHint(

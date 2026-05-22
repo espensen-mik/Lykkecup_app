@@ -11,7 +11,6 @@ import {
   effectivePoolMaxTeams,
   formatPoolSizePlanLabel,
   poolTeamCountStatus,
-  roundRobinMatchesPerTeam,
   type PoolPlanningHint,
 } from "@/lib/puljer";
 import {
@@ -107,8 +106,8 @@ function teamStats(
 function PoolCapacityHint({ teamCount, hint }: { teamCount: number; hint: PoolPlanningHint }) {
   const status = poolTeamCountStatus(teamCount, hint);
   const cap = effectivePoolMaxTeams(hint);
-  const rr = roundRobinMatchesPerTeam(teamCount);
   const planLabel = formatPoolSizePlanLabel(hint);
+  const matchesPerTeam = hint.matchesPerTeam;
   const labels: Record<typeof status, string> = {
     empty: "Tom pulje",
     too_few: "Tilføj flere hold",
@@ -136,7 +135,9 @@ function PoolCapacityHint({ teamCount, hint }: { teamCount: number; hint: PoolPl
       </p>
       {teamCount >= 2 ? (
         <p>
-          Alle-mod-alle: hvert hold spiller <strong className="font-semibold">{rr}</strong> kampe i puljen.
+          Fra Opsætning → Kampe: hvert hold spiller{" "}
+          <strong className="font-semibold tabular-nums">{matchesPerTeam}</strong> kampe i puljen (uafhængigt af
+          puljens størrelse).
         </p>
       ) : null}
     </div>
@@ -510,8 +511,9 @@ export function PoolAssignmentWorkspace({
             Opsætning → Kampe
           </Link>
           : <strong className="tabular-nums">{hint.matchesPerTeam}</strong> kampe/hold ·{" "}
-          <strong>{formatPoolSizePlanLabel(hint)}</strong> · mindst <strong>2</strong> hold pr. pulje (alle-mod-alle).
-          Tilføjelse til pulje blokeres ved maks; AutoPulje fylder op til mål.
+          <strong>{formatPoolSizePlanLabel(hint)}</strong> · mindst <strong>2</strong> hold pr. pulje. Kampe genereres
+          efter <strong className="tabular-nums">{hint.matchesPerTeam}</strong> kampe/hold — ikke automatisk n−1 i
+          puljen. Tilføjelse blokeres ved maks; AutoPulje fylder op til mål.
         </p>
       </div>
 

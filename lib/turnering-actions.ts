@@ -27,6 +27,18 @@ export type TurneringActionResult = {
   message: string;
 };
 
+/** Efter gem i Opsætning → Kampe: opfrisk Turneringsplan, Puljer og Kampprogram. */
+export async function revalidateAfterKampeSettingsAction(levelKey: string): Promise<TurneringActionResult> {
+  const canon = canonicalBanerLevelLabel(levelKey);
+  revalidatePath("/turnering/baner");
+  revalidatePath("/turnering/plan");
+  revalidatePath(`/turnering/plan/${encodeURIComponent(canon)}`);
+  revalidatePath("/turnering/puljer");
+  revalidatePath(`/turnering/puljer/${encodeURIComponent(canon)}`);
+  revalidatePath("/kampprogram");
+  return { ok: true, message: "Turneringsplan opdateret." };
+}
+
 export type SchedulingFailureRow = {
   matchId: string;
   label: string;
