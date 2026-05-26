@@ -15,18 +15,37 @@ export function LykkeLagkageProgram({
 }) {
   const schedule = content?.schedule?.length ? content.schedule : [];
 
+  const heroSrc = heroImageUrl || "/Lykkeoglagkage.jpg";
+  const heroIsLocal = heroSrc.startsWith("/");
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex w-full flex-col">
       <figure className="w-full shrink-0">
-        <div className="relative h-48 w-full overflow-hidden sm:h-56">
-          <Image
-            src={heroImageUrl || "/Lykkeoglagkage.jpg"}
-            alt=""
-            fill
-            className="object-cover object-center"
-            priority
-            sizes="100vw"
-          />
+        {/* Inline aspect-ratio so layout is correct before Tailwind/CSS hydrates (QR cold open). */}
+        <div
+          className="relative w-full overflow-hidden bg-stone-100"
+          style={{ aspectRatio: "3 / 1", width: "100%", maxHeight: "14rem" }}
+        >
+          {heroIsLocal ? (
+            <Image
+              src={heroSrc}
+              alt=""
+              width={1050}
+              height={350}
+              priority
+              sizes="100vw"
+              className="h-full w-full object-cover object-center"
+            />
+          ) : (
+            <Image
+              src={heroSrc}
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover object-center"
+            />
+          )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-lc26-navy/35 via-transparent to-transparent" />
         </div>
       </figure>

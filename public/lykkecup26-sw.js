@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_VERSION = "lykkecup26-v1";
+const CACHE_VERSION = "lykkecup26-v2";
 const CACHE_NAME = `lc26-cache-${CACHE_VERSION}`;
 const APP_SHELL = ["/lykkecup26", "/lykkecup26.webmanifest", "/favicon.png"];
 
@@ -35,6 +35,25 @@ self.addEventListener("fetch", (event) => {
   const isLc26Path = url.pathname === "/lykkecup26" || url.pathname.startsWith("/lykkecup26/");
   const isManifest = url.pathname === "/lykkecup26.webmanifest";
   if (!isLc26Path && !isManifest) return;
+
+  const isDocument =
+    request.mode === "navigate" ||
+    request.destination === "document" ||
+    (request.headers.get("accept")?.includes("text/html") ?? false);
+
+  // HTML: network-first so cold opens (fx QR) altid får frisk layout + CSS.
+  if (isDocument) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseToCache));
+          return networkResponse;
+        })
+        .catch(() => caches.match(request).then((cached) => cached ?? caches.match("/lykkecup26"))),
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(request).then((cached) => {
