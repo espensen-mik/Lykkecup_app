@@ -93,3 +93,12 @@ body {
     color: #000 !important;
   }
 }
+
+@keyframes generation-progress-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}

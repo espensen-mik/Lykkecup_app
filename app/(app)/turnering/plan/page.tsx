@@ -51,7 +51,10 @@ export default async function TurneringPlanPage() {
       {levels.length > 0 ? (
         <>
           <PlanOverviewStatus status={matchStatus} loadError={matchStatus.error} />
-          <PlanOverviewActions levelCount={levels.length} totalMatchCount={matchCount} />
+          <PlanOverviewActions
+            levelKeys={levels.map((level) => level.levelKey)}
+            totalMatchCount={matchCount}
+          />
         </>
       ) : null}
 

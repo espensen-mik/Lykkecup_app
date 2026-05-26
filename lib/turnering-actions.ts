@@ -5,7 +5,12 @@ import { createServerSupabase } from "@/lib/auth-server";
 import { canonicalBanerLevelLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { fetchLevelSchedulePlanningRows } from "@/lib/level-schedule-settings";
 import { effectivePoolMaxTeams, poolPlanningHint, suggestNextPoolName } from "@/lib/puljer";
-import { generateRoundRobinMatches, TURNERING_EVENT_ID } from "@/lib/turnering";
+import {
+  computeLevelBalanceAdditions,
+  generateLevelCappedMatches,
+  generateRoundRobinMatches,
+  TURNERING_EVENT_ID,
+} from "@/lib/turnering";
 import {
   assignMatchScheduleForLevelAllDay,
   assignMatchScheduleForLevelPeriodPools,
@@ -708,6 +713,85 @@ export async function applyManualScheduleSlotAction(
   });
 }
 
+async function appendLevelBalanceMatchesForLevel(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  normalizedLevel: string,
+  matchesPerTeam: number,
+): Promise<{ added: number; error: string | null }> {
+  const poolsRes = await supabase
+    .from("pools")
+    .select("id")
+    .eq("event_id", TURNERING_EVENT_ID);
+  if (poolsRes.error) return { added: 0, error: poolsRes.error.message };
+
+  const levelPoolIds = ((poolsRes.data ?? []) as { id: string }[])
+    .map((p) => p.id)
+    .filter(Boolean);
+  if (levelPoolIds.length === 0) return { added: 0, error: null };
+
+  const poolsWithLevel = await supabase
+    .from("pools")
+    .select("id, level")
+    .eq("event_id", TURNERING_EVENT_ID)
+    .in("id", levelPoolIds);
+  if (poolsWithLevel.error) return { added: 0, error: poolsWithLevel.error.message };
+
+  const poolIds = ((poolsWithLevel.data ?? []) as { id: string; level: string | null }[])
+    .filter((p) => canonicalBanerLevelLabel(p.level) === normalizedLevel)
+    .map((p) => p.id);
+  if (poolIds.length === 0) return { added: 0, error: null };
+
+  const teamsRes = await supabase
+    .from("teams")
+    .select("id, name, sort_order, pool_id")
+    .eq("event_id", TURNERING_EVENT_ID)
+    .in("pool_id", poolIds);
+  if (teamsRes.error) return { added: 0, error: teamsRes.error.message };
+
+  const levelTeams = (teamsRes.data ?? []) as {
+    id: string;
+    name: string;
+    sort_order: number;
+    pool_id: string;
+  }[];
+  if (levelTeams.length < 2) return { added: 0, error: null };
+
+  const teamIds = levelTeams.map((t) => t.id);
+  const matchesRes = await supabase
+    .from("matches")
+    .select("team_a_id, team_b_id")
+    .eq("event_id", TURNERING_EVENT_ID)
+    .or(`team_a_id.in.(${teamIds.join(",")}),team_b_id.in.(${teamIds.join(",")})`);
+  if (matchesRes.error) return { added: 0, error: matchesRes.error.message };
+
+  const additions = computeLevelBalanceAdditions(
+    levelTeams.map((t) => ({
+      id: t.id,
+      name: t.name,
+      sort_order: t.sort_order,
+      poolId: t.pool_id,
+    })),
+    (matchesRes.data ?? []) as { team_a_id: string; team_b_id: string }[],
+    matchesPerTeam,
+  );
+  if (additions.length === 0) return { added: 0, error: null };
+
+  const payload = additions.map((match) => ({
+    event_id: TURNERING_EVENT_ID,
+    pool_id: match.poolId,
+    team_a_id: match.teamAId,
+    team_b_id: match.teamBId,
+    court_id: null,
+    start_time: null,
+    end_time: null,
+    status: "scheduled",
+  }));
+
+  const insRes = await supabase.from("matches").insert(payload);
+  if (insRes.error) return { added: 0, error: insRes.error.message };
+  return { added: additions.length, error: null };
+}
+
 export async function generatePoolMatchesAction(
   poolId: string,
   levelKey: string,
@@ -791,11 +875,19 @@ export async function generatePoolMatchesAction(
     };
   }
 
+  const balance = await appendLevelBalanceMatchesForLevel(supabase, planningLevel, matchesPerTeam);
+  if (balance.error) {
+    return { ok: false, message: balance.error };
+  }
+  const totalCreated = payload.length + balance.added;
+
   if (options?.skipSchedule) {
     return {
       ok: true,
-      message: `${pool.name}: ${payload.length} kampe oprettet (${matchesPerTeam} kampe/hold).`,
-      matchCount: payload.length,
+      message: `${pool.name}: ${totalCreated} kampe oprettet (${matchesPerTeam} kampe/hold${
+        balance.added > 0 ? `, ${balance.added} på tværs af puljer` : ""
+      }).`,
+      matchCount: totalCreated,
       scheduled: 0,
     };
   }
@@ -811,8 +903,8 @@ export async function generatePoolMatchesAction(
       ok: false,
       message:
         schedule.error ??
-        `${pool.name}: ${payload.length} kampe oprettet, men ingen fik bane/tid. Tildel periode under Opsætning → Perioder.`,
-      matchCount: payload.length,
+        `${pool.name}: ${totalCreated} kampe oprettet, men ingen fik bane/tid. Tildel periode under Opsætning → Perioder.`,
+      matchCount: totalCreated,
       scheduled: 0,
     };
   }
@@ -832,10 +924,12 @@ export async function generatePoolMatchesAction(
 
   return {
     ok: schedule.unscheduled === 0,
-    message: `${pool.name}: ${payload.length} kampe genereret (${matchesPerTeam} kampe/hold) — ${schedule.scheduled} med bane og tid.${partial}${overflow}${
+    message: `${pool.name}: ${totalCreated} kampe genereret (${matchesPerTeam} kampe/hold${
+      balance.added > 0 ? `, ${balance.added} på tværs af puljer` : ""
+    }) — ${schedule.scheduled} med bane og tid.${partial}${overflow}${
       schedule.error ? ` ${schedule.error}` : ""
     }`,
-    matchCount: payload.length,
+    matchCount: totalCreated,
     scheduled: schedule.scheduled,
     schedulingFailures,
   };
@@ -898,52 +992,88 @@ export async function generateAllPoolMatchesForLevelAction(
 
   const poolIds = levelPools.map((p) => p.id);
 
-  if (regenerate && poolIds.length > 0) {
-    const delRes = await supabase.from("matches").delete().eq("event_id", TURNERING_EVENT_ID).in("pool_id", poolIds);
-    if (delRes.error) return { ok: false, message: delRes.error.message };
+  const scheduleFetch = await fetchLevelSchedulePlanningRows(supabase, TURNERING_EVENT_ID);
+  if (scheduleFetch.error) return { ok: false, message: scheduleFetch.error };
+  const matchesPerTeam = poolPlanningHint(normalizedLevel, scheduleFetch.rows).matchesPerTeam;
+
+  const { data: levelTeamsRaw, error: teamsErr } = await supabase
+    .from("teams")
+    .select("id, name, sort_order, pool_id")
+    .eq("event_id", TURNERING_EVENT_ID)
+    .in("pool_id", poolIds)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (teamsErr) return { ok: false, message: teamsErr.message };
+
+  const levelTeams = (levelTeamsRaw ?? []) as {
+    id: string;
+    name: string;
+    sort_order: number;
+    pool_id: string;
+  }[];
+  if (levelTeams.length < 2) {
+    return { ok: false, message: `${normalizedLevel}: mindst 2 hold i puljerne kræves.` };
   }
+
+  const levelTeamIds = levelTeams.map((t) => t.id);
 
   const { data: existingMatches } = await supabase
     .from("matches")
-    .select("pool_id")
+    .select("id")
     .eq("event_id", TURNERING_EVENT_ID)
-    .in("pool_id", poolIds);
+    .or(`team_a_id.in.(${levelTeamIds.join(",")}),team_b_id.in.(${levelTeamIds.join(",")})`);
 
-  const poolsWithMatches = new Set(((existingMatches ?? []) as { pool_id: string }[]).map((m) => m.pool_id));
+  const hasLevelMatches = (existingMatches ?? []).length > 0;
 
-  let totalMatchCount = 0;
-  const generatedPoolIds: string[] = [];
-  const skipped: string[] = [];
-  const errors: string[] = [];
-
-  for (const pool of levelPools) {
-    if (!regenerate && poolsWithMatches.has(pool.id)) {
-      skipped.push(pool.name);
-      continue;
-    }
-
-    const result = await generatePoolMatchesAction(pool.id, levelKey, regenerate, { skipSchedule: true });
-    if (!result.ok) {
-      errors.push(`${pool.name}: ${result.message}`);
-      continue;
-    }
-    totalMatchCount += result.matchCount ?? 0;
-    generatedPoolIds.push(pool.id);
-  }
-
-  if (generatedPoolIds.length === 0 && errors.length === 0) {
+  if (!regenerate && hasLevelMatches) {
     return {
       ok: false,
-      message:
-        skipped.length > 0
-          ? `${normalizedLevel}: alle puljer har allerede kampe. Brug «Generer alle» igen for at regenerere.`
-          : `${normalizedLevel}: ingen kampe blev genereret.`,
+      message: `${normalizedLevel}: der findes allerede kampe for niveauet. Brug «Generer alle» igen for at regenerere.`,
     };
   }
 
-  if (generatedPoolIds.length === 0) {
-    return { ok: false, message: errors.join(" ") };
+  if (regenerate && hasLevelMatches) {
+    const delRes = await supabase
+      .from("matches")
+      .delete()
+      .eq("event_id", TURNERING_EVENT_ID)
+      .or(`team_a_id.in.(${levelTeamIds.join(",")}),team_b_id.in.(${levelTeamIds.join(",")})`);
+    if (delRes.error) return { ok: false, message: delRes.error.message };
   }
+
+  const pairings = generateLevelCappedMatches(
+    levelTeams.map((t) => ({
+      id: t.id,
+      name: t.name,
+      sort_order: t.sort_order,
+      poolId: t.pool_id,
+    })),
+    matchesPerTeam,
+  );
+  if (pairings.length === 0) {
+    return { ok: false, message: `${normalizedLevel}: ingen kampe blev genereret.` };
+  }
+
+  const payload = pairings.map((match) => ({
+    event_id: TURNERING_EVENT_ID,
+    pool_id: match.poolId,
+    team_a_id: match.teamAId,
+    team_b_id: match.teamBId,
+    court_id: null,
+    start_time: null,
+    end_time: null,
+    status: "scheduled",
+  }));
+
+  const insRes = await supabase.from("matches").insert(payload);
+  if (insRes.error) {
+    return { ok: false, message: `Kunne ikke oprette kampe: ${insRes.error.message}` };
+  }
+
+  const totalMatchCount = pairings.length;
+  const generatedPoolIds = poolIds;
+  const errors: string[] = [];
+  const skipped: string[] = [];
 
   const allPeriods = (periodsRes.data ?? []) as TournamentPeriodRow[];
   const allDayPeriodIds = new Set(allPeriods.filter((p) => isAllDayPeriod(p)).map((p) => p.id));
@@ -1063,6 +1193,28 @@ export async function generateAllPoolMatchesForLevelAction(
     schedulingFailures,
     postScheduleChecks,
   };
+}
+
+/** Slet alle turneringskampe (til regenerering niveau for niveau fra klient). */
+export async function clearAllTournamentMatchesAction(): Promise<TurneringActionResult> {
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Du skal være logget ind for at fjerne kampe." };
+  }
+
+  const delRes = await supabase.from("matches").delete().eq("event_id", TURNERING_EVENT_ID);
+  if (delRes.error) return { ok: false, message: delRes.error.message };
+
+  revalidatePath("/turnering/plan");
+  revalidatePath("/kampprogram");
+
+  return { ok: true, message: "Alle kampe er slettet." };
 }
 
 /**

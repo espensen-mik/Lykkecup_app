@@ -2,6 +2,10 @@
 
 import { Lock } from "lucide-react";
 import { useKontrolcenterLockdown } from "@/components/kontrolcenter-lockdown-context";
+import {
+  LOCKDOWN_TOGGLE_KNOB_CLASS,
+  LOCKDOWN_TOGGLE_LABEL_CLASS,
+} from "@/lib/kontrolcenter-lockdown-shared";
 
 export function KontrolcenterLockdownToggle() {
   const { planningLockdown, isAdmin, toggleBusy, setPlanningLockdown } = useKontrolcenterLockdown();
@@ -12,7 +16,7 @@ export function KontrolcenterLockdownToggle() {
     <label
       className={`inline-flex shrink-0 cursor-pointer select-none items-center gap-2 rounded-full border-2 py-1 pl-2 pr-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-[2px] transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-white/90 ${
         planningLockdown
-          ? "border-white/70 bg-white/20 ring-2 ring-white ring-offset-2 ring-offset-red-600 hover:border-white hover:bg-white/25 dark:ring-offset-red-700"
+          ? LOCKDOWN_TOGGLE_LABEL_CLASS
           : "border-white/40 bg-black/15 hover:border-white/60 hover:bg-black/20 dark:border-white/30 dark:bg-black/25"
       } ${toggleBusy ? "pointer-events-none opacity-60" : ""}`}
       title={
@@ -52,7 +56,7 @@ export function KontrolcenterLockdownToggle() {
           aria-hidden
           className={`pointer-events-none absolute left-[3px] top-1/2 h-[1.125rem] w-[1.125rem] -translate-y-1/2 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.22)] ring-1 transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
             planningLockdown
-              ? "translate-x-[1.2rem] bg-red-600 ring-red-900/20 shadow-[0_2px_8px_rgba(127,29,29,0.4)]"
+              ? LOCKDOWN_TOGGLE_KNOB_CLASS
               : "translate-x-0 bg-white ring-black/8"
           }`}
         />

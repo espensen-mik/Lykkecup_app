@@ -33,6 +33,11 @@ import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { KontrolcenterHelp } from "@/components/kontrolcenter-help";
 import { KontrolcenterLockdownToggle } from "@/components/kontrolcenter-lockdown-toggle";
 import { useKontrolcenterLockdown } from "@/components/kontrolcenter-lockdown-context";
+import {
+  LOCKDOWN_ACCENT_TEXT_CLASS,
+  LOCKDOWN_HEADER_CLASS,
+  LOCKDOWN_RING_OFFSET_CLASS,
+} from "@/lib/kontrolcenter-lockdown-shared";
 import { fetchUnhandledClubFeedbackCount } from "@/lib/club-feedback";
 import {
   mergeTurneringLevelDisplayLabel,
@@ -822,7 +827,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       <header
         className={`sticky top-0 z-50 flex h-14 items-center gap-3 border-b px-4 text-white print:hidden ${
           planningLockdown
-            ? "border-red-400/50 bg-red-600 shadow-[0_4px_18px_rgba(185,28,28,0.35)] dark:border-red-500/40 dark:bg-red-700 dark:shadow-[0_4px_18px_rgba(127,29,29,0.4)]"
+            ? LOCKDOWN_HEADER_CLASS
             : "border-teal-500/40 bg-[#14b8a6] shadow-[0_4px_18px_rgba(15,118,110,0.24)] dark:border-teal-400/30 dark:bg-teal-600 dark:shadow-[0_4px_18px_rgba(15,118,110,0.2)]"
         }`}
       >
@@ -847,11 +852,11 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             href="/lister"
             onClick={() => setMobileOpen(false)}
             className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
-              planningLockdown ? "text-red-700" : "text-[#0f766e]"
+              planningLockdown ? LOCKDOWN_ACCENT_TEXT_CLASS : "text-[#0f766e]"
             } ${
               isActive("/lister")
                 ? planningLockdown
-                  ? "ring-2 ring-white/90 ring-offset-2 ring-offset-red-600 dark:ring-offset-red-700"
+                  ? `ring-2 ring-white/90 ring-offset-2 ${LOCKDOWN_RING_OFFSET_CLASS}`
                   : "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600"
                 : ""
             }`}
@@ -865,11 +870,11 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             href="/analyse"
             onClick={() => setMobileOpen(false)}
             className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
-              planningLockdown ? "text-red-700" : "text-[#0f766e]"
+              planningLockdown ? LOCKDOWN_ACCENT_TEXT_CLASS : "text-[#0f766e]"
             } ${
               isActive("/analyse")
                 ? planningLockdown
-                  ? "ring-2 ring-white/90 ring-offset-2 ring-offset-red-600 dark:ring-offset-red-700"
+                  ? `ring-2 ring-white/90 ring-offset-2 ${LOCKDOWN_RING_OFFSET_CLASS}`
                   : "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600"
                 : ""
             }`}
@@ -883,11 +888,11 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             href="/billetsalg"
             onClick={() => setMobileOpen(false)}
             className={`hidden shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] lg:inline-flex lg:px-4 lg:py-2 lg:text-sm ${
-              planningLockdown ? "text-red-700" : "text-[#0f766e]"
+              planningLockdown ? LOCKDOWN_ACCENT_TEXT_CLASS : "text-[#0f766e]"
             } ${
               isActive("/billetsalg")
                 ? planningLockdown
-                  ? "ring-2 ring-white/90 ring-offset-2 ring-offset-red-600 dark:ring-offset-red-700"
+                  ? `ring-2 ring-white/90 ring-offset-2 ${LOCKDOWN_RING_OFFSET_CLASS}`
                   : "ring-2 ring-white/90 ring-offset-2 ring-offset-[#14b8a6] dark:ring-offset-teal-600"
                 : ""
             }`}
@@ -903,7 +908,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             type="button"
             onClick={() => void handleLogout()}
             className={`inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold shadow-sm outline-none transition hover:bg-white/95 hover:shadow focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${
-              planningLockdown ? "text-red-700" : "text-[#0f766e]"
+              planningLockdown ? LOCKDOWN_ACCENT_TEXT_CLASS : "text-[#0f766e]"
             }`}
             aria-label="Log ud"
             title="Log ud af KontrolCenter"
@@ -921,7 +926,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             ) : (
               <span
                 className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-[0.7rem] font-semibold ${
-                  planningLockdown ? "text-red-700" : "text-[#0f766e]"
+                  planningLockdown ? LOCKDOWN_ACCENT_TEXT_CLASS : "text-[#0f766e]"
                 }`}
               >
                 {initialsFromName(currentUser?.fullName ?? "Ukendt bruger")}

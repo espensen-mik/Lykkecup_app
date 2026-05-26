@@ -1,16 +1,15 @@
-import { timeToMinutes } from "@/lib/baner-tider";
+import { formatTimeForInput, timeToMinutes } from "@/lib/baner-tider";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
 import { isOrphanKampprogramMatch } from "@/lib/kampprogram";
 import {
-  effectivePoolMaxTeams,
   poolPlanningHint,
   roundRobinMatchesPerTeam,
   type LevelSchedulePlanningRow,
 } from "@/lib/puljer";
 import { resolvePlanMatchesPerTeam } from "@/lib/lykkecup-regnemaskine";
 import { isAllDayPeriod, periodWindowMinutes } from "@/lib/tournament-periods";
-import { analyzePoolMatchSync, plannedPoolMatchCount } from "@/lib/turnering";
-import { findCourtOverlapIssues, findTeamRestIssues } from "@/lib/turneringsplan-status";
+import { analyzePoolMatchSync, canAllTeamsReachMatchCap, plannedLevelMatchCount } from "@/lib/turnering";
+import { findCourtOverlapIssues } from "@/lib/turneringsplan-status";
 
 export type CheckStatus = "ok" | "warn" | "error";
 
@@ -56,6 +55,17 @@ export type LykkecupCheckInput = {
   scheduleRows: LevelSchedulePlanningRow[];
   periods?: { id: string; name: string; start_time: string; end_time: string; is_all_day?: boolean }[];
   courtNamesById?: Record<string, string>;
+  courtUsage?: LykkecupCheckCourtUsageRow[];
+  coaches?: { id: string; name: string }[];
+  teamCoaches?: { coach_id: string; team_id: string }[];
+};
+
+export type LykkecupCheckCourtUsageRow = {
+  courtId: string;
+  courtName: string;
+  capacityRounds: number;
+  usedRounds: number;
+  freeRounds: number;
 };
 
 const MAX_ISSUES_SHOWN = 10;
@@ -129,6 +139,14 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     teamMatchCount.set(m.team_b_id, (teamMatchCount.get(m.team_b_id) ?? 0) + 1);
   }
 
+  const teamsByPool = new Map<string, typeof input.teams>();
+  for (const team of input.teams) {
+    if (!team.pool_id || !poolIds.has(team.pool_id)) continue;
+    const list = teamsByPool.get(team.pool_id) ?? [];
+    list.push(team);
+    teamsByPool.set(team.pool_id, list);
+  }
+
   const teamsWrongMatchCount: string[] = [];
   const teamsNoPlanSetting: string[] = [];
   let teamsWithExpected = 0;
@@ -151,7 +169,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
       id: "team-match-count",
       title: "Kampe pr. hold",
       description:
-        "Hvert hold skal have det aftalte antal kampe fra Opsætning → Kampe (plan_matches_per_team pr. niveau).",
+        "Hvert hold skal have præcis det aftalte antal kampe fra Opsætning → Kampe.",
       metrics: [
         { label: "Hold med mål", value: teamsWithExpected },
         { label: "Korrekt antal", value: teamsMatchOk },
@@ -180,13 +198,14 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     playersChecked += 1;
     const actual = teamMatchCount.get(team.id) ?? 0;
     if (actual === expected) playersMatchOk += 1;
-    else playersWrongMatches.push(`${p.name}: ${actual} kampe (forventet ${expected})`);
+    else playersWrongMatches.push(`${p.name} (${team.name}): ${actual} kampe (forventet ${expected})`);
   }
 
   const checkPlayerMatchCount = finalizeItem({
     id: "player-match-count",
     title: "Kampe pr. spiller",
-    description: "Spillere arver antal kampe fra deres hold — skal matche niveauets mål.",
+    description:
+      "Spillere arver antal kampe fra deres hold — skal matche Opsætning → Kampe præcis.",
     metrics: [
       { label: "Spillere tjekket", value: playersChecked },
       { label: "Korrekt antal", value: playersMatchOk },
@@ -227,19 +246,14 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     ],
   });
 
-  const teamsByPool = new Map<string, typeof input.teams>();
-  for (const team of input.teams) {
-    if (!team.pool_id || !poolIds.has(team.pool_id)) continue;
-    const list = teamsByPool.get(team.pool_id) ?? [];
-    list.push(team);
-    teamsByPool.set(team.pool_id, list);
-  }
-
   const matchesByPool = new Map<string, typeof input.matches>();
-  for (const m of input.matches) {
-    const list = matchesByPool.get(m.pool_id) ?? [];
-    list.push(m);
-    matchesByPool.set(m.pool_id, list);
+  for (const pool of input.pools) {
+    const teamIdSet = new Set((teamsByPool.get(pool.id) ?? []).map((t) => t.id));
+    if (teamIdSet.size === 0) continue;
+    const list = input.matches.filter(
+      (m) => teamIdSet.has(m.team_a_id) || teamIdSet.has(m.team_b_id),
+    );
+    matchesByPool.set(pool.id, list);
   }
 
   const poolSyncIssues: string[] = [];
@@ -387,51 +401,83 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     "warn",
   );
 
-  const { relaxedCount } = findTeamRestIssues({
-    teams: input.teams,
-    pools: input.pools,
-    matches: schedulingMatches,
-    planMatchesByLevel: input.planMatchesByLevel,
-    scheduleRows: input.scheduleRows,
-    courtNamesById: input.courtNamesById ?? {},
-    teamNamesById,
-  });
+  const manglerPauseMatches: string[] = [];
+  const teamsManglerPause = new Set<string>();
+  for (const m of input.matches) {
+    if (
+      isOrphanKampprogramMatch(
+        { teamAId: m.team_a_id, teamBId: m.team_b_id, poolId: m.pool_id },
+        teamIds,
+        poolIds,
+      )
+    ) {
+      continue;
+    }
+    if (!m.schedule_relaxed_team_rest) continue;
+    teamsManglerPause.add(m.team_a_id);
+    teamsManglerPause.add(m.team_b_id);
+    const a = teamNamesById[m.team_a_id] ?? "Hold";
+    const b = teamNamesById[m.team_b_id] ?? "Hold";
+    const court = m.court_id ? (input.courtNamesById?.[m.court_id] ?? "Bane") : "Ikke planlagt";
+    const time =
+      m.start_time != null ? formatTimeForInput(m.start_time) : "—";
+    manglerPauseMatches.push(`${a} vs ${b} — ${time} (${court})`);
+  }
 
-  const hardTeamRestIssues = findTeamRestIssues({
-    teams: input.teams,
-    pools: input.pools,
-    matches: schedulingMatches.filter((m) => !m.schedule_relaxed_team_rest),
-    planMatchesByLevel: input.planMatchesByLevel,
-    scheduleRows: input.scheduleRows,
-    courtNamesById: input.courtNamesById ?? {},
-    teamNamesById,
-  }).issues;
-
-  const checkTeamRest = finalizeItem(
+  const checkManglerPause = finalizeItem(
     {
-      id: "team-rest",
-      title: "Hold-pause overholdt",
-      description: "Hold skal have minimum pause mellem kampe (fra niveauets runde-længde).",
+      id: "mangler-pause",
+      title: "Mangler pause",
+      description:
+        "Kampe planlagt uden fuld hold-pause mellem kampe. Holdene kan spille, men bør flyttes hvis muligt.",
       metrics: [
-        { label: "Brud", value: hardTeamRestIssues.length },
-        { label: "Mangler pause (planlagt)", value: relaxedCount },
+        { label: "Hold berørt", value: teamsManglerPause.size },
+        { label: "Kampe", value: manglerPauseMatches.length },
       ],
-      issues: hardTeamRestIssues,
+      issues: manglerPauseMatches,
     },
     "warn",
   );
 
-  const checkRelaxedTeamRest = finalizeItem(
+  const courtUsageRows = input.courtUsage ?? [];
+  const courtsOverCapacity = courtUsageRows.filter((r) => r.freeRounds <= 0);
+  const courtUsageLines = courtUsageRows.map(
+    (r) =>
+      `${r.courtName}: ${r.freeRounds} ledige runder (kapacitet ${r.capacityRounds}, brugt ${r.usedRounds})`,
+  );
+
+  const checkCourtUsage: LykkecupCheckItem = {
+    id: "court-usage",
+    title: "Baneforbrug",
+    description:
+      "Aktive baner skal have ledig kapacitet. Rød markering når en bane har 0 eller færre ledige runder.",
+    metrics: [
+      { label: "Baner", value: courtUsageRows.length },
+      { label: "Over kapacitet", value: courtsOverCapacity.length },
+      {
+        label: "Ledige runder i alt",
+        value: courtUsageRows.reduce((s, r) => s + Math.max(0, r.freeRounds), 0),
+      },
+    ],
+    issues: truncateIssues(courtUsageLines),
+    issueCount: courtsOverCapacity.length,
+    status: courtsOverCapacity.length > 0 ? "error" : "ok",
+    ok: courtsOverCapacity.length === 0,
+  };
+
+  const assignedCoachIds = new Set((input.teamCoaches ?? []).map((tc) => tc.coach_id));
+  const coachesWithoutTeam = (input.coaches ?? []).filter((c) => !assignedCoachIds.has(c.id));
+
+  const checkCoaches = finalizeItem(
     {
-      id: "relaxed-team-rest",
-      title: "Kampe med lempet pause",
-      description:
-        "Kampe planlagt uden fuld hold-pause — markeret «Mangler pause» i Kampprogram. Overvej at flytte dem.",
-      metrics: [{ label: "Kampe", value: relaxedCount }],
-      issues:
-        relaxedCount > 0
-          ? [`${relaxedCount} kamp(e) er planlagt med lempet hold-pause (Mangler pause)`]
-          : [],
+      id: "coaches-assigned",
+      title: "Træner-tjek",
+      description: "Trænere bør være knyttet til mindst ét hold. Manglende tilknytning er kun en advarsel.",
+      metrics: [
+        { label: "Trænere i alt", value: input.coaches?.length ?? 0 },
+        { label: "Uden hold", value: coachesWithoutTeam.length },
+      ],
+      issues: coachesWithoutTeam.map((c) => c.name),
     },
     "warn",
   );
@@ -482,51 +528,63 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     "warn",
   );
 
-  const poolSizeIssues: string[] = [];
-  let poolsOkSize = 0;
-  for (const pool of input.pools) {
-    const count = teamsByPool.get(pool.id)?.length ?? 0;
-    const levelKey = canonicalBanerLevelLabel(pool.level);
-    const hint = poolPlanningHint(levelKey, input.scheduleRows);
-    const cap = effectivePoolMaxTeams(hint);
-    if (count < 2) poolSizeIssues.push(`${pool.name}: kun ${count} hold (min. 2)`);
-    else if (count > cap) {
-      const capLabel = hint.maxTeamsPerPool != null ? `maks ${hint.maxTeamsPerPool}` : `over ${cap}`;
-      poolSizeIssues.push(`${pool.name}: ${count} hold (${capLabel})`);
-    } else if (count > hint.recommendedTeamCount)
-      poolSizeIssues.push(
-        `${pool.name}: ${count} hold (over mål ${hint.recommendedTeamCount} for ${hint.matchesPerTeam} kampe/hold)`,
+  const levelParityIssues: string[] = [];
+  const teamsByLevel = new Map<string, typeof input.teams>();
+  for (const team of input.teams) {
+    if (!team.pool_id || !poolIds.has(team.pool_id)) continue;
+    const levelKey = canonicalBanerLevelLabel(team.level);
+    const list = teamsByLevel.get(levelKey) ?? [];
+    list.push(team);
+    teamsByLevel.set(levelKey, list);
+  }
+  for (const [levelKey, levelTeams] of teamsByLevel) {
+    if (levelTeams.length < 2) continue;
+    const planPerTeam = resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel, input.scheduleRows);
+    if (planPerTeam == null) continue;
+    if (!canAllTeamsReachMatchCap(levelTeams.length, planPerTeam)) {
+      levelParityIssues.push(
+        `${levelKey}: ${levelTeams.length} hold × ${planPerTeam} kampe/hold giver ulige total — alle kan ikke få ${planPerTeam} kampe. Tilføj/fjern et hold på niveauet eller ændre kampe/hold under Opsætning.`,
       );
-    else poolsOkSize += 1;
+    }
   }
 
-  const checkPoolSize = finalizeItem(
+  const checkLevelMatchParity = finalizeItem(
     {
-      id: "pool-size",
-      title: "Puljestørrelse",
-      description: "Puljer bør have mindst 2 hold og passe til puljeplan fra Opsætning → Kampe.",
+      id: "level-match-parity",
+      title: "Kampe/hold kan fordeles",
+      description:
+        "Antal hold × kampe/hold skal være lige på hvert niveau, ellers kan ikke alle hold få det aftalte antal kampe.",
       metrics: [
-        { label: "Puljer i alt", value: input.pools.length },
-        { label: "OK størrelse", value: poolsOkSize },
-        { label: "Bemærkninger", value: poolSizeIssues.length },
+        { label: "Niveauer tjekket", value: teamsByLevel.size },
+        { label: "Kan ikke fordeles", value: levelParityIssues.length },
       ],
-      issues: poolSizeIssues,
+      issues: levelParityIssues,
     },
-    "warn",
+    "error",
   );
 
   let expectedMatchesTotal = 0;
   let generatedInPools = 0;
-  for (const pool of input.pools) {
-    const teams = teamsByPool.get(pool.id) ?? [];
-    const levelKey = canonicalBanerLevelLabel(pool.level ?? teams[0]?.level);
+  const countedMatchIds = new Set<string>();
+  for (const [levelKey, levelTeams] of teamsByLevel) {
     const planPerTeam =
       resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel, input.scheduleRows) ??
       poolPlanningHint(levelKey, input.scheduleRows).matchesPerTeam;
-    expectedMatchesTotal += plannedPoolMatchCount(teams.length, planPerTeam);
-    generatedInPools += (matchesByPool.get(pool.id) ?? []).filter(
-      (m) => !isOrphanKampprogramMatch({ teamAId: m.team_a_id, teamBId: m.team_b_id, poolId: m.pool_id }, teamIds, poolIds),
-    ).length;
+    expectedMatchesTotal += plannedLevelMatchCount(levelTeams.length, planPerTeam);
+  }
+  for (const m of input.matches) {
+    if (
+      isOrphanKampprogramMatch(
+        { teamAId: m.team_a_id, teamBId: m.team_b_id, poolId: m.pool_id },
+        teamIds,
+        poolIds,
+      )
+    ) {
+      continue;
+    }
+    if (countedMatchIds.has(m.id)) continue;
+    countedMatchIds.add(m.id);
+    generatedInPools += 1;
   }
 
   const checkMatchTotals = finalizeItem(
@@ -554,7 +612,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     checkTeamsInPools,
     checkEmptyTeams,
     checkPlanSettings,
-    checkPoolSize,
+    checkLevelMatchParity,
     checkPoolSync,
     checkTeamMatchCount,
     checkPlayerMatchCount,
@@ -563,8 +621,9 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     checkScheduled,
     checkCourtConflicts,
     checkOutsidePoolPeriod,
-    checkTeamRest,
-    checkRelaxedTeamRest,
+    checkCourtUsage,
+    checkManglerPause,
+    checkCoaches,
   ];
 
   const items = rawItems.map((i) => ({

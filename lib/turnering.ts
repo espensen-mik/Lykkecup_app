@@ -126,26 +126,33 @@ export function analyzePoolMatchSync<T extends TeamForPairing>(
 ): PoolMatchSyncAnalysis {
   const teamIds = new Set(teams.map((t) => t.id));
   const nameById = new Map(teams.map((t) => [t.id, t.name ?? t.id]));
-
-  const expected = new Set(
-    generateRoundRobinMatches([...teams], maxMatchesPerTeam).map((m) =>
-      matchPairKey(m.teamAId, m.teamBId),
-    ),
-  );
+  const cap = resolveMatchesPerTeamCap(teams.length, maxMatchesPerTeam);
 
   const actualPairCounts = new Map<string, number>();
+  const matchCountByTeam = new Map<string, number>();
   let invalidCount = 0;
   const teamsInMatches = new Set<string>();
 
   for (const match of matches) {
-    if (!teamIds.has(match.team_a_id) || !teamIds.has(match.team_b_id) || match.team_a_id === match.team_b_id) {
+    const inA = teamIds.has(match.team_a_id);
+    const inB = teamIds.has(match.team_b_id);
+    if (!inA && !inB) continue;
+    if (match.team_a_id === match.team_b_id) {
       invalidCount += 1;
       continue;
     }
-    teamsInMatches.add(match.team_a_id);
-    teamsInMatches.add(match.team_b_id);
-    const key = matchPairKey(match.team_a_id, match.team_b_id);
-    actualPairCounts.set(key, (actualPairCounts.get(key) ?? 0) + 1);
+    if (inA) {
+      teamsInMatches.add(match.team_a_id);
+      matchCountByTeam.set(match.team_a_id, (matchCountByTeam.get(match.team_a_id) ?? 0) + 1);
+    }
+    if (inB) {
+      teamsInMatches.add(match.team_b_id);
+      matchCountByTeam.set(match.team_b_id, (matchCountByTeam.get(match.team_b_id) ?? 0) + 1);
+    }
+    if (inA && inB) {
+      const key = matchPairKey(match.team_a_id, match.team_b_id);
+      actualPairCounts.set(key, (actualPairCounts.get(key) ?? 0) + 1);
+    }
   }
 
   let duplicateCount = 0;
@@ -153,18 +160,20 @@ export function analyzePoolMatchSync<T extends TeamForPairing>(
     if (count > 1) duplicateCount += count - 1;
   }
 
-  const missingCount = [...expected].filter((key) => !actualPairCounts.has(key)).length;
-  const unexpectedCount = [...actualPairCounts.keys()].filter((key) => !expected.has(key)).length;
+  const teamsWrongCount = cap != null
+    ? teams.filter((t) => (matchCountByTeam.get(t.id) ?? 0) !== cap).map((t) => t.id)
+    : [];
   const teamsWithoutMatch = teams.filter((t) => !teamsInMatches.has(t.id)).map((t) => t.id);
 
   const noTeamsToSchedule = teams.length < 2;
-  const hasMatches = matches.length > 0;
+  const hasMatches = matches.some(
+    (m) => teamIds.has(m.team_a_id) || teamIds.has(m.team_b_id),
+  );
   const isSynced = noTeamsToSchedule
     ? !hasMatches
-    : missingCount === 0 &&
-      unexpectedCount === 0 &&
-      duplicateCount === 0 &&
-      invalidCount === 0;
+    : cap != null
+      ? teamsWrongCount.length === 0 && duplicateCount === 0 && invalidCount === 0
+      : duplicateCount === 0 && invalidCount === 0;
 
   let message: string | null = null;
   if (!isSynced && teams.length >= 2) {
@@ -174,12 +183,14 @@ export function analyzePoolMatchSync<T extends TeamForPairing>(
         teamsWithoutMatch.length === 1
           ? `${names} er ikke med i de genererede kampe — typisk fordi hold er tilføjet efter sidste generering. Generér kampe igen.`
           : `Disse hold mangler i kampprogrammet: ${names}. Generér kampe igen efter ændring af puljen.`;
-    } else if (unexpectedCount > 0 && missingCount > 0) {
-      message = `Kampene passer ikke til puljens ${teams.length} hold (${missingCount} mangler, ${unexpectedCount} overflødige). Generér kampe igen.`;
-    } else if (unexpectedCount > 0) {
-      message = `${unexpectedCount} kamp(e) hører ikke til puljens nuværende hold. Generér kampe igen.`;
-    } else if (missingCount > 0) {
-      message = `${missingCount} forventet kamp mangler. Generér kampe igen.`;
+    } else if (teamsWrongCount.length > 0 && cap != null) {
+      const names = teamsWrongCount
+        .map((id) => {
+          const actual = matchCountByTeam.get(id) ?? 0;
+          return `${nameById.get(id) ?? id} (${actual}/${cap})`;
+        })
+        .join(", ");
+      message = `Hold med forkert antal kampe: ${names}. Generér kampe igen for niveauet.`;
     } else if (duplicateCount > 0) {
       message = `${duplicateCount} dublet-kamp(e). Generér kampe igen.`;
     } else if (invalidCount > 0) {
@@ -191,8 +202,8 @@ export function analyzePoolMatchSync<T extends TeamForPairing>(
 
   return {
     isSynced,
-    missingCount,
-    unexpectedCount,
+    missingCount: teamsWrongCount.length,
+    unexpectedCount: 0,
     duplicateCount,
     invalidCount,
     teamsWithoutMatch,
@@ -215,6 +226,24 @@ export function resolveMatchesPerTeamCap(
   if (maxMatchesPerTeam == null || !Number.isFinite(maxMatchesPerTeam)) return null;
   return Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), teamCount - 1));
 }
+
+/** True når alle hold kan få præcis `cap` kampe (n×cap skal være lige). */
+export function canAllTeamsReachMatchCap(teamCount: number, cap: number): boolean {
+  if (teamCount < 2 || cap < 1) return false;
+  return (teamCount * cap) % 2 === 0;
+}
+
+export function resolveMatchPoolId(poolA: string, poolB: string): string {
+  return poolA <= poolB ? poolA : poolB;
+}
+
+export type LevelMatchTeam = TeamForPairing & { poolId: string };
+
+export type LevelMatchPairing = {
+  teamAId: string;
+  teamBId: string;
+  poolId: string;
+};
 
 function tryAddCappedPairing(
   teamAId: string,
@@ -311,9 +340,8 @@ function generateCappedRoundRobinPairings(
 }
 
 /**
- * Round-robin op til `maxMatchesPerTeam` kampe pr. hold.
- * Ulige puljer: ingen hold får flere end cap; total matcher `plannedPoolMatchCount`.
- * Når cap×hold er ulige kan ét hold få cap−1 — resten cap (grafteori, ikke fejl).
+ * Round-robin op til `maxMatchesPerTeam` kampe pr. hold (én pulje).
+ * Brug `generateLevelCappedMatches` når der kan være flere puljer på niveauet.
  */
 export function generateRoundRobinMatches<T extends TeamForPairing>(
   teams: readonly T[],
@@ -331,6 +359,188 @@ export function generateRoundRobinMatches<T extends TeamForPairing>(
   return generateCappedRoundRobinPairings(teamIds, cap);
 }
 
+function addLevelPairing(
+  teamAId: string,
+  teamBId: string,
+  poolId: string,
+  cap: number,
+  poolByTeamId: ReadonlyMap<string, string>,
+  matchCount: Map<string, number>,
+  usedPairs: Set<string>,
+  pairings: LevelMatchPairing[],
+): boolean {
+  if (teamAId === teamBId) return false;
+  const key = matchPairKey(teamAId, teamBId);
+  if (usedPairs.has(key)) return false;
+  const countA = matchCount.get(teamAId) ?? 0;
+  const countB = matchCount.get(teamBId) ?? 0;
+  if (countA >= cap || countB >= cap) return false;
+  pairings.push({
+    teamAId,
+    teamBId,
+    poolId: poolId || resolveMatchPoolId(poolByTeamId.get(teamAId)!, poolByTeamId.get(teamBId)!),
+  });
+  usedPairs.add(key);
+  matchCount.set(teamAId, countA + 1);
+  matchCount.set(teamBId, countB + 1);
+  return true;
+}
+
+function balanceLevelPairings(
+  teams: readonly LevelMatchTeam[],
+  cap: number,
+  poolByTeamId: ReadonlyMap<string, string>,
+  matchCount: Map<string, number>,
+  usedPairs: Set<string>,
+  pairings: LevelMatchPairing[],
+  preferCrossPool: boolean,
+): void {
+  let progress = true;
+  while (progress) {
+    progress = false;
+    const underCap = teams
+      .map((t) => t.id)
+      .filter((id) => (matchCount.get(id) ?? 0) < cap)
+      .sort(
+        (a, b) =>
+          (matchCount.get(a) ?? 0) - (matchCount.get(b) ?? 0) || a.localeCompare(b),
+      );
+
+    if (underCap.length < 2) break;
+
+    let best: { a: string; b: string; crossPool: boolean } | null = null;
+    for (let i = 0; i < underCap.length; i += 1) {
+      for (let j = i + 1; j < underCap.length; j += 1) {
+        const a = underCap[i]!;
+        const b = underCap[j]!;
+        const key = matchPairKey(a, b);
+        if (usedPairs.has(key)) continue;
+        if ((matchCount.get(a) ?? 0) >= cap || (matchCount.get(b) ?? 0) >= cap) continue;
+        const crossPool = poolByTeamId.get(a) !== poolByTeamId.get(b);
+        if (!best) {
+          best = { a, b, crossPool };
+          continue;
+        }
+        if (preferCrossPool && crossPool && !best.crossPool) {
+          best = { a, b, crossPool };
+          continue;
+        }
+        if (best.crossPool === crossPool) {
+          const score = (matchCount.get(a) ?? 0) + (matchCount.get(b) ?? 0);
+          const bestScore = (matchCount.get(best.a) ?? 0) + (matchCount.get(best.b) ?? 0);
+          if (score < bestScore) best = { a, b, crossPool };
+        }
+      }
+    }
+
+    if (!best) break;
+    if (
+      addLevelPairing(
+        best.a,
+        best.b,
+        resolveMatchPoolId(poolByTeamId.get(best.a)!, poolByTeamId.get(best.b)!),
+        cap,
+        poolByTeamId,
+        matchCount,
+        usedPairs,
+        pairings,
+      )
+    ) {
+      progress = true;
+    }
+  }
+}
+
+/**
+ * Generér kampe for hele et niveau: først inden for puljer, derefter på tværs af puljer
+ * så alle hold kan nå præcis `maxMatchesPerTeam` når n×cap er lige.
+ */
+export function generateLevelCappedMatches(
+  teams: readonly LevelMatchTeam[],
+  maxMatchesPerTeam?: number,
+): LevelMatchPairing[] {
+  if (teams.length < 2) return [];
+
+  const sortedTeams = sortTeamsForPairing(teams);
+  const cap = resolveMatchesPerTeamCap(sortedTeams.length, maxMatchesPerTeam);
+  if (cap == null) {
+    const poolByTeamId = new Map(sortedTeams.map((t) => [t.id, t.poolId]));
+    return generateFullRoundRobinPairings(sortedTeams.map((t) => t.id)).map((p) => ({
+      ...p,
+      poolId: resolveMatchPoolId(poolByTeamId.get(p.teamAId)!, poolByTeamId.get(p.teamBId)!),
+    }));
+  }
+
+  const poolByTeamId = new Map(sortedTeams.map((t) => [t.id, t.poolId]));
+  const matchCount = new Map(sortedTeams.map((t) => [t.id, 0]));
+  const usedPairs = new Set<string>();
+  const pairings: LevelMatchPairing[] = [];
+
+  const teamsByPool = new Map<string, LevelMatchTeam[]>();
+  for (const team of sortedTeams) {
+    const list = teamsByPool.get(team.poolId) ?? [];
+    list.push(team);
+    teamsByPool.set(team.poolId, list);
+  }
+
+  for (const poolTeams of teamsByPool.values()) {
+    if (poolTeams.length < 2) continue;
+    for (const pairing of generateCappedRoundRobinPairings(
+      sortTeamsForPairing(poolTeams).map((t) => t.id),
+      cap,
+    )) {
+      addLevelPairing(
+        pairing.teamAId,
+        pairing.teamBId,
+        poolByTeamId.get(pairing.teamAId)!,
+        cap,
+        poolByTeamId,
+        matchCount,
+        usedPairs,
+        pairings,
+      );
+    }
+  }
+
+  balanceLevelPairings(sortedTeams, cap, poolByTeamId, matchCount, usedPairs, pairings, true);
+
+  return pairings;
+}
+
+/** Ekstra kampe på tværs af puljer for at løfte hold op til cap (uden at slette eksisterende). */
+export function computeLevelBalanceAdditions(
+  teams: readonly LevelMatchTeam[],
+  existingMatches: readonly { team_a_id: string; team_b_id: string }[],
+  maxMatchesPerTeam?: number,
+): LevelMatchPairing[] {
+  if (teams.length < 2) return [];
+  const sortedTeams = sortTeamsForPairing(teams);
+  const cap = resolveMatchesPerTeamCap(sortedTeams.length, maxMatchesPerTeam);
+  if (cap == null) return [];
+
+  const teamIds = new Set(sortedTeams.map((t) => t.id));
+  const poolByTeamId = new Map(sortedTeams.map((t) => [t.id, t.poolId]));
+  const matchCount = new Map(sortedTeams.map((t) => [t.id, 0]));
+  const usedPairs = new Set<string>();
+  const additions: LevelMatchPairing[] = [];
+
+  for (const match of existingMatches) {
+    if (!teamIds.has(match.team_a_id) && !teamIds.has(match.team_b_id)) continue;
+    if (match.team_a_id === match.team_b_id) continue;
+    const key = matchPairKey(match.team_a_id, match.team_b_id);
+    usedPairs.add(key);
+    if (teamIds.has(match.team_a_id)) {
+      matchCount.set(match.team_a_id, (matchCount.get(match.team_a_id) ?? 0) + 1);
+    }
+    if (teamIds.has(match.team_b_id)) {
+      matchCount.set(match.team_b_id, (matchCount.get(match.team_b_id) ?? 0) + 1);
+    }
+  }
+
+  balanceLevelPairings(sortedTeams, cap, poolByTeamId, matchCount, usedPairs, additions, true);
+  return additions;
+}
+
 /** Antal kampe ved begrænset round-robin (til KPI / sync). */
 export function plannedPoolMatchCount(teamCount: number, maxMatchesPerTeam?: number): number {
   if (teamCount < 2) return 0;
@@ -339,6 +549,11 @@ export function plannedPoolMatchCount(teamCount: number, maxMatchesPerTeam?: num
     return (teamCount * (teamCount - 1)) / 2;
   }
   return Math.floor((teamCount * cap) / 2);
+}
+
+/** Forventet kampe når alle hold på niveauet skal have præcis cap kampe. */
+export function plannedLevelMatchCount(teamCount: number, maxMatchesPerTeam?: number): number {
+  return plannedPoolMatchCount(teamCount, maxMatchesPerTeam);
 }
 
 export type TurneringDashboardLevelStats = {

@@ -444,7 +444,7 @@ export function PlayersAdmin({
                       <span
                         className={`tabular-nums ${
                           isAssigned && expectedMatches != null
-                            ? "font-semibold text-amber-800 dark:text-amber-300"
+                            ? "font-semibold text-red-700 dark:text-red-300"
                             : "text-gray-600 dark:text-gray-300"
                         }`}
                         title={matchTitle}

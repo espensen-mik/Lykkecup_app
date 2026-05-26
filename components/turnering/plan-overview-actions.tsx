@@ -3,20 +3,32 @@
 import { Loader2, Sparkles, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { GenerationProgress } from "@/components/ui/generation-progress";
 import { KampprogramScheduleFollowUp } from "@/components/scheduling/scheduling-summary-banner";
-import { generateAllPoolMatchesForTournamentAction } from "@/lib/turnering-actions";
+import {
+  clearAllTournamentMatchesAction,
+  generateAllPoolMatchesForLevelAction,
+} from "@/lib/turnering-actions";
 
 type Props = {
-  levelCount: number;
+  levelKeys: readonly string[];
   totalMatchCount: number;
 };
 
-export function PlanOverviewActions({ levelCount, totalMatchCount }: Props) {
+type ProgressState = {
+  step: number;
+  total: number;
+  label: string;
+  detail?: string;
+};
+
+export function PlanOverviewActions({ levelKeys, totalMatchCount }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [lastUnscheduled, setLastUnscheduled] = useState(0);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
   const [postScheduleChecks, setPostScheduleChecks] = useState<{
     courtConflicts: number;
     teamRestWarnings: number;
@@ -25,18 +37,102 @@ export function PlanOverviewActions({ levelCount, totalMatchCount }: Props) {
 
   const runGenerate = useCallback(
     async (regenerate: boolean) => {
+      if (levelKeys.length === 0) return;
+
       setBusy(true);
       setConfirmRegenerate(false);
       setActionMsg(null);
       setPostScheduleChecks(null);
+
+      let totalMatches = 0;
+      let scheduled = 0;
+      let unscheduled = 0;
+      const errors: string[] = [];
+      const skippedLevels: string[] = [];
+      let levelsProcessed = 0;
+      let postScheduleChecksResult: typeof postScheduleChecks = null;
+
       try {
-        const result = await generateAllPoolMatchesForTournamentAction(regenerate);
-        setActionMsg(result.message);
-        const scheduled = result.scheduled ?? 0;
-        const matchCount = result.matchCount ?? 0;
-        setLastUnscheduled(Math.max(0, matchCount - scheduled));
-        setPostScheduleChecks(result.postScheduleChecks ?? null);
-        if (result.ok || scheduled > 0 || matchCount > 0) {
+        if (regenerate) {
+          setProgress({
+            step: 0,
+            total: levelKeys.length,
+            label: "Sletter eksisterende kampe…",
+            detail: "Forbereder regenerering af hele turneringen",
+          });
+          const clearResult = await clearAllTournamentMatchesAction();
+          if (!clearResult.ok) {
+            setActionMsg(clearResult.message);
+            return;
+          }
+        }
+
+        for (let i = 0; i < levelKeys.length; i += 1) {
+          const levelKey = levelKeys[i]!;
+          const step = i + 1;
+          setProgress({
+            step,
+            total: levelKeys.length,
+            label: `Genererer ${levelKey}…`,
+            detail: `Niveau ${step} af ${levelKeys.length}`,
+          });
+
+          const result = await generateAllPoolMatchesForLevelAction(levelKey, false);
+          const levelMatches = result.matchCount ?? 0;
+          const levelScheduled = result.scheduled ?? 0;
+
+          if (levelMatches > 0 || levelScheduled > 0) {
+            levelsProcessed += 1;
+          }
+          totalMatches += levelMatches;
+          scheduled += levelScheduled;
+          unscheduled += Math.max(0, levelMatches - levelScheduled);
+
+          if (!result.ok && result.message) {
+            if (result.message.includes("alle puljer har allerede kampe")) {
+              skippedLevels.push(levelKey);
+            } else {
+              errors.push(`${levelKey}: ${result.message}`);
+            }
+          }
+          if (result.postScheduleChecks && step === levelKeys.length) {
+            postScheduleChecksResult = result.postScheduleChecks;
+          }
+        }
+
+        setProgress({
+          step: levelKeys.length,
+          total: levelKeys.length,
+          label: "Færdig",
+          detail: `${levelsProcessed} niveau(er) behandlet`,
+        });
+
+        if (totalMatches === 0 && errors.length === 0 && skippedLevels.length === levelKeys.length) {
+          setActionMsg(
+            "Alle niveauer har allerede kampe. Brug knappen igen for at regenerere hele turneringen.",
+          );
+          return;
+        }
+
+        if (totalMatches === 0 && errors.length > 0) {
+          setActionMsg(errors.join(" "));
+          return;
+        }
+
+        const partial = unscheduled > 0 ? ` ${unscheduled} kampe mangler bane/tid.` : "";
+        const skipNote =
+          skippedLevels.length > 0 ? ` Sprang over (havde kampe): ${skippedLevels.join(", ")}.` : "";
+        const errNote = errors.length > 0 ? ` Fejl: ${errors.join(" ")}` : "";
+
+        setActionMsg(
+          `Hele turneringen: ${totalMatches} kampe på ${levelsProcessed} niveau(er) — ${scheduled} med bane og tid.${partial}${skipNote}${errNote}${
+            unscheduled > 0 ? " Se detaljer på det enkelte niveau." : ""
+          }`,
+        );
+        setLastUnscheduled(unscheduled);
+        setPostScheduleChecks(postScheduleChecksResult);
+
+        if (totalMatches > 0 || scheduled > 0) {
           router.refresh();
         }
       } catch (error) {
@@ -44,9 +140,10 @@ export function PlanOverviewActions({ levelCount, totalMatchCount }: Props) {
         setActionMsg(`Kunne ikke generere kampe for hele turneringen: ${message}`);
       } finally {
         setBusy(false);
+        setProgress(null);
       }
     },
-    [router],
+    [levelKeys, router],
   );
 
   const onClickGenerate = useCallback(() => {
@@ -57,7 +154,10 @@ export function PlanOverviewActions({ levelCount, totalMatchCount }: Props) {
     void runGenerate(false);
   }, [runGenerate, totalMatchCount]);
 
-  if (levelCount === 0) return null;
+  if (levelKeys.length === 0) return null;
+
+  const progressPercent =
+    progress && progress.total > 0 ? (progress.step / progress.total) * 100 : 0;
 
   return (
     <section className="rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
@@ -69,6 +169,15 @@ export function PlanOverviewActions({ levelCount, totalMatchCount }: Props) {
           springes over.
         </p>
       </div>
+
+      {busy && progress ? (
+        <GenerationProgress
+          className="mt-4"
+          value={progressPercent}
+          label={progress.label}
+          detail={progress.detail}
+        />
+      ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {confirmRegenerate ? (

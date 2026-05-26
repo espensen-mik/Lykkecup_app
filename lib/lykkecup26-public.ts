@@ -328,15 +328,25 @@ export async function fetchLykkecup26PlayerPage(playerId: string): Promise<Lc26P
     const venueMap = new Map<string, string>();
 
     if (courtIds.length > 0) {
-      const { data: courts } = await supabase.from("courts").select("id, name, venue_id").in("id", courtIds);
-      const vids = [...new Set((courts ?? []).map((c: { venue_id: string }) => c.venue_id))];
-      for (const c of (courts ?? []) as { id: string; name: string; venue_id: string }[]) {
-        courtMap.set(c.id, { name: c.name, venue_id: c.venue_id });
-      }
-      if (vids.length > 0) {
-        const { data: venues } = await supabase.from("venues").select("id, name").eq("event_id", eventId).in("id", vids);
-        for (const v of (venues ?? []) as { id: string; name: string }[]) {
-          venueMap.set(v.id, v.name);
+      const { data: courts, error: courtsErr } = await supabase
+        .from("courts")
+        .select("id, name, venue_id, event_id")
+        .in("id", courtIds);
+      if (!courtsErr && courts) {
+        const vids = [...new Set(courts.map((c: { venue_id: string }) => c.venue_id))];
+        for (const c of courts as { id: string; name: string; venue_id: string; event_id?: string | null }[]) {
+          if (c.event_id && c.event_id !== eventId) continue;
+          courtMap.set(c.id, { name: c.name, venue_id: c.venue_id });
+        }
+        if (vids.length > 0) {
+          const { data: venues } = await supabase
+            .from("venues")
+            .select("id, name")
+            .eq("event_id", eventId)
+            .in("id", vids);
+          for (const v of (venues ?? []) as { id: string; name: string }[]) {
+            venueMap.set(v.id, v.name);
+          }
         }
       }
     }

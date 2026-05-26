@@ -1,7 +1,9 @@
 "use client";
 
 import { AlertTriangle, CalendarClock, CheckCircle2, Loader2, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { GenerationProgress } from "@/components/ui/generation-progress";
 import { KampprogramScheduleFollowUp } from "@/components/scheduling/scheduling-summary-banner";
+import { useSimulatedGenerationProgress } from "@/lib/use-generation-progress";
 import { ManualScheduleDialog } from "@/components/turnering/manual-schedule-dialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -232,6 +234,7 @@ export function TurneringPlanWorkspace({
   const [clearingAllPools, setClearingAllPools] = useState(false);
   const [confirmRegenerateAllPools, setConfirmRegenerateAllPools] = useState(false);
   const [confirmClearAllPools, setConfirmClearAllPools] = useState(false);
+  const generationProgress = useSimulatedGenerationProgress(generatingAllPools);
 
   async function fixDuplicatePoolNames() {
     setRenumberingPools(true);
@@ -328,6 +331,7 @@ export function TurneringPlanWorkspace({
 
     try {
       const result = await generateAllPoolMatchesForLevelAction(levelKey, regenerate);
+      generationProgress.complete();
       setActionMsg(result.message);
       setSchedulingFailures(result.schedulingFailures ?? []);
       setPostScheduleChecks(result.postScheduleChecks ?? null);
@@ -337,6 +341,7 @@ export function TurneringPlanWorkspace({
       setActionMsg(`Kunne ikke generere kampe for alle puljer: ${message}`);
     } finally {
       setGeneratingAllPools(false);
+      generationProgress.reset();
     }
   }
 
@@ -408,6 +413,15 @@ export function TurneringPlanWorkspace({
           Kampe): <span className="font-semibold">{activePlanMatchesPerTeam}</span> · Estimeret antal kampe:{" "}
           <span className="font-semibold">{estimatedTotalMatches}</span>
         </p>
+
+        {generatingAllPools ? (
+          <GenerationProgress
+            className="mt-4"
+            value={generationProgress.value}
+            label={generationProgress.label || "Genererer kampe for alle puljer…"}
+            detail={`Niveau ${levelKey}`}
+          />
+        ) : null}
 
         {pools.length > 0 ? (
           <div className="mt-4 flex flex-wrap items-center gap-2">

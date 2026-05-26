@@ -11,19 +11,18 @@ type Props = {
 
 const sectionTitle = "text-lg font-semibold tracking-[-0.02em] text-lc26-navy";
 
-function matchLocationParts(match: Lc26PublicMatch): { primary: string; secondary: string | null } {
+function matchLocationLabel(match: Lc26PublicMatch): string | null {
   const court = match.courtName?.trim();
   const venue = match.venueName?.trim();
-  if (court && venue) return { primary: court, secondary: venue };
-  if (court) return { primary: court, secondary: null };
-  if (venue) return { primary: venue, secondary: null };
-  return { primary: "", secondary: null };
+  if (court && venue) return `${court}, ${venue}`;
+  if (court) return court;
+  if (venue) return venue;
+  return null;
 }
 
 function MatchScheduleCard({ match }: { match: Lc26PublicMatch }) {
   const timeLabel = match.startTime ? formatDaTimeOnly(match.startTime) : null;
-  const { primary: locationPrimary, secondary: locationSecondary } = matchLocationParts(match);
-  const hasLocation = Boolean(locationPrimary);
+  const locationLabel = matchLocationLabel(match);
 
   return (
     <li className="relative overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm ring-1 ring-stone-100/80">
@@ -58,17 +57,10 @@ function MatchScheduleCard({ match }: { match: Lc26PublicMatch }) {
               Hvor
             </dt>
             <dd className="mt-1.5">
-              {hasLocation ? (
-                <>
-                  <span className="block text-balance text-[1.0625rem] font-bold leading-snug tracking-[-0.01em] text-lc26-navy sm:text-lg">
-                    {locationPrimary}
-                  </span>
-                  {locationSecondary ? (
-                    <span className="mt-0.5 block text-sm font-medium leading-snug text-lc26-navy/55">
-                      {locationSecondary}
-                    </span>
-                  ) : null}
-                </>
+              {locationLabel ? (
+                <span className="block text-balance text-[1.0625rem] font-bold leading-snug tracking-[-0.01em] text-lc26-navy sm:text-lg">
+                  {locationLabel}
+                </span>
               ) : (
                 <span className="text-sm font-medium text-lc26-navy/50">Kommer senere</span>
               )}

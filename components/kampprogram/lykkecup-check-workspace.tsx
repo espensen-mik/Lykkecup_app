@@ -50,6 +50,26 @@ function formatRanAt(iso: string) {
   }
 }
 
+function courtUsageLineStatus(line: string): CheckStatus {
+  const m = line.match(/: (-?\d+) ledige runder/);
+  if (!m) return "ok";
+  return Number(m[1]) <= 0 ? "error" : "ok";
+}
+
+function IssueLine({ itemId, issue }: { itemId: string; issue: string }) {
+  if (itemId !== "court-usage") {
+    return <li className="leading-snug">{issue}</li>;
+  }
+  const lineStatus = courtUsageLineStatus(issue);
+  const styles = statusStyles(lineStatus);
+  return (
+    <li className={`leading-snug rounded px-1.5 py-0.5 ${lineStatus === "error" ? "bg-red-50/80 dark:bg-red-950/30" : "text-gray-700 dark:text-gray-300"}`}>
+      <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${lineStatus === "error" ? "bg-red-500" : "bg-emerald-500"}`} aria-hidden />
+      <span className={lineStatus === "error" ? styles.icon : undefined}>{issue}</span>
+    </li>
+  );
+}
+
 function CheckRow({ item }: { item: LykkecupCheckItem }) {
   const styles = statusStyles(item.status);
   const Icon = statusIcon(item.status);
@@ -87,9 +107,7 @@ function CheckRow({ item }: { item: LykkecupCheckItem }) {
           {item.issues.length > 0 ? (
             <ul className="mt-3 space-y-1 rounded-lg border border-black/5 bg-white/60 px-3 py-2.5 text-sm text-gray-700 dark:border-white/10 dark:bg-gray-900/50 dark:text-gray-300">
               {item.issues.map((issue, idx) => (
-                <li key={`${item.id}-${idx}`} className="leading-snug">
-                  {issue}
-                </li>
+                <IssueLine key={`${item.id}-${idx}`} itemId={item.id} issue={issue} />
               ))}
             </ul>
           ) : null}
