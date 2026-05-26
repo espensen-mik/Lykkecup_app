@@ -3,6 +3,7 @@
 import { Loader2, Sparkles, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { KampprogramScheduleFollowUp } from "@/components/scheduling/scheduling-summary-banner";
 import { generateAllPoolMatchesForTournamentAction } from "@/lib/turnering-actions";
 
 type Props = {
@@ -15,16 +16,27 @@ export function PlanOverviewActions({ levelCount, totalMatchCount }: Props) {
   const [busy, setBusy] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [lastUnscheduled, setLastUnscheduled] = useState(0);
+  const [postScheduleChecks, setPostScheduleChecks] = useState<{
+    courtConflicts: number;
+    teamRestWarnings: number;
+    teamsSpanningPeriods: number;
+  } | null>(null);
 
   const runGenerate = useCallback(
     async (regenerate: boolean) => {
       setBusy(true);
       setConfirmRegenerate(false);
       setActionMsg(null);
+      setPostScheduleChecks(null);
       try {
         const result = await generateAllPoolMatchesForTournamentAction(regenerate);
         setActionMsg(result.message);
-        if (result.ok || (result.scheduled ?? 0) > 0 || (result.matchCount ?? 0) > 0) {
+        const scheduled = result.scheduled ?? 0;
+        const matchCount = result.matchCount ?? 0;
+        setLastUnscheduled(Math.max(0, matchCount - scheduled));
+        setPostScheduleChecks(result.postScheduleChecks ?? null);
+        if (result.ok || scheduled > 0 || matchCount > 0) {
           router.refresh();
         }
       } catch (error) {
@@ -111,9 +123,26 @@ export function PlanOverviewActions({ levelCount, totalMatchCount }: Props) {
       </div>
 
       {actionMsg ? (
-        <p className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
-          {actionMsg}
-        </p>
+        <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
+          <p>{actionMsg}</p>
+          <KampprogramScheduleFollowUp unscheduledCount={lastUnscheduled} />
+          {postScheduleChecks && (postScheduleChecks.courtConflicts > 0 || postScheduleChecks.teamRestWarnings > 0 || postScheduleChecks.teamsSpanningPeriods > 0) ? (
+            <div className="mt-2 border-t border-amber-200 pt-2 dark:border-amber-800">
+              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">Efter planlægning:</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-amber-800 dark:text-amber-300">
+                {postScheduleChecks.courtConflicts > 0 ? (
+                  <li>{postScheduleChecks.courtConflicts} bane-konflikt{postScheduleChecks.courtConflicts === 1 ? "" : "er"} — se Kampstatus</li>
+                ) : null}
+                {postScheduleChecks.teamRestWarnings > 0 ? (
+                  <li>{postScheduleChecks.teamRestWarnings} hold-pause-advarsel{postScheduleChecks.teamRestWarnings === 1 ? "" : "er"} — se Kampstatus</li>
+                ) : null}
+                {postScheduleChecks.teamsSpanningPeriods > 0 ? (
+                  <li>{postScheduleChecks.teamsSpanningPeriods} hold spænder over Formiddag og Eftermiddag</li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

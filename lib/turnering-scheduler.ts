@@ -3550,6 +3550,41 @@ export type ManualScheduleSlotOption = {
   isPreferredCourtType: boolean;
 };
 
+export type ManualScheduleMoveSuggestionReason = "team-overlap" | "team-rest" | "court-blocked";
+
+export type ManualScheduleMoveSuggestion = {
+  matchId: string;
+  levelKey: string;
+  teamALabel: string;
+  teamBLabel: string;
+  timeLabel: string;
+  courtName: string;
+  venueName: string | null;
+  reason: ManualScheduleMoveSuggestionReason;
+  reasonLabel: string;
+  /** Antal anbefalede tider for målkampen hvis denne kamp flyttes væk. */
+  slotsFreed: number;
+};
+
+export type ManualScheduleCourtOption = {
+  courtId: string;
+  courtName: string;
+  courtType: CourtType;
+  venueName: string | null;
+  isPreferredCourtType: boolean;
+};
+
+export type ManualScheduleBookedBlock = {
+  matchId: string;
+  courtId: string;
+  startMinutes: number;
+  endMinutes: number;
+  timeLabel: string;
+  teamALabel: string;
+  teamBLabel: string;
+  isCurrentMatch: boolean;
+};
+
 export type ManualScheduleSlotsResult = {
   ok: boolean;
   error: string | null;
@@ -3558,7 +3593,387 @@ export type ManualScheduleSlotsResult = {
   teamBLabel: string | null;
   teamRestMinutes: number;
   slots: ManualScheduleSlotOption[];
+  moveSuggestions: ManualScheduleMoveSuggestion[];
+  courts: ManualScheduleCourtOption[];
+  bookedBlocks: ManualScheduleBookedBlock[];
 };
+
+type ScheduledMatchMeta = {
+  id: string;
+  poolId: string;
+  teamAId: string;
+  teamBId: string;
+  courtId: string;
+  startMinutes: number;
+  endMinutes: number;
+};
+
+function isRecommendedManualSlot(
+  slot: ManualSlotCandidate,
+  primaryPeriodId: string,
+  dedicatedOtherPoolPeriodIds: ReadonlySet<string>,
+  preferredCourtIds: ReadonlySet<string>,
+): boolean {
+  return (
+    preferredCourtIds.has(slot.courtId) &&
+    (!primaryPeriodId || slot.periodId === primaryPeriodId) &&
+    !dedicatedOtherPoolPeriodIds.has(slot.periodId) &&
+    slot.teamsFree &&
+    slot.respectsTeamRest
+  );
+}
+
+function findTeamOverlapBlockerIds(
+  teamAId: string,
+  teamBId: string,
+  startMinutes: number,
+  endMinutes: number,
+  intervals: readonly TeamScheduledInterval[],
+  excludeMatchId: string,
+): string[] {
+  const out: string[] = [];
+  for (const m of intervals) {
+    if (m.id === excludeMatchId) continue;
+    const touches =
+      m.teamAId === teamAId ||
+      m.teamBId === teamAId ||
+      m.teamAId === teamBId ||
+      m.teamBId === teamBId;
+    if (!touches) continue;
+    if (overlaps(startMinutes, endMinutes, m.startMinutes, m.endMinutes)) out.push(m.id);
+  }
+  return out;
+}
+
+function findTeamRestBlockerIds(
+  teamAId: string,
+  teamBId: string,
+  startMinutes: number,
+  endMinutes: number,
+  intervals: readonly TeamScheduledInterval[],
+  excludeMatchId: string,
+  restMinutes: number,
+): string[] {
+  if (restMinutes <= 0) return [];
+  const out: string[] = [];
+  for (const teamId of [teamAId, teamBId]) {
+    for (const m of intervals) {
+      if (m.id === excludeMatchId) continue;
+      if (m.teamAId !== teamId && m.teamBId !== teamId) continue;
+      if (m.endMinutes <= startMinutes && startMinutes < m.endMinutes + restMinutes) out.push(m.id);
+      if (m.startMinutes >= endMinutes && m.startMinutes < endMinutes + restMinutes) out.push(m.id);
+    }
+  }
+  return [...new Set(out)];
+}
+
+function findCourtBlockerId(
+  courtId: string,
+  startMinutes: number,
+  endMinutes: number,
+  scheduled: readonly ScheduledMatchMeta[],
+  excludeMatchId: string,
+): string | null {
+  for (const m of scheduled) {
+    if (m.id === excludeMatchId) continue;
+    if (m.courtId !== courtId) continue;
+    if (overlaps(startMinutes, endMinutes, m.startMinutes, m.endMinutes)) return m.id;
+  }
+  return null;
+}
+
+function countRecommendedManualSlots(
+  match: ScheduleMatchInput,
+  allCourtIds: readonly string[],
+  base: SchedulePoolBase,
+  occupancy: readonly OccupiedSlot[],
+  teamRestMinutes: number,
+  teamIntervals: readonly TeamScheduledInterval[],
+  scheduledRoundStartMinutes: readonly number[],
+  periods: readonly TournamentPeriodRow[],
+  primaryPeriodId: string,
+  dedicatedOtherPoolPeriodIds: ReadonlySet<string>,
+  preferredCourtIds: ReadonlySet<string>,
+): number {
+  const merged = findAllSlotsForMatchManual(
+    periods,
+    match,
+    allCourtIds,
+    base,
+    occupancy,
+    teamRestMinutes,
+    teamIntervals,
+    scheduledRoundStartMinutes,
+  );
+  return merged.filter((slot) =>
+    isRecommendedManualSlot(slot, primaryPeriodId, dedicatedOtherPoolPeriodIds, preferredCourtIds),
+  ).length;
+}
+
+function reasonLabelForMoveSuggestion(reason: ManualScheduleMoveSuggestionReason): string {
+  switch (reason) {
+    case "team-overlap":
+      return "Holdet spiller allerede i dette tidsrum";
+    case "team-rest":
+      return "Blokerer for hold-pause";
+    case "court-blocked":
+      return "Optager bane og tid";
+    default:
+      return "Blokerer planlægning";
+  }
+}
+
+function findManualScheduleMoveSuggestions(input: {
+  match: ScheduleMatchInput;
+  merged: readonly ManualSlotCandidate[];
+  allCourtIds: readonly string[];
+  poolBase: SchedulePoolBase;
+  existingOccupancy: readonly OccupiedSlot[];
+  teamRestMinutes: number;
+  teamIntervals: readonly TeamScheduledInterval[];
+  scheduledRoundStartMinutes: readonly number[];
+  scheduledMatches: readonly ScheduledMatchMeta[];
+  periods: readonly TournamentPeriodRow[];
+  primaryPeriodId: string;
+  dedicatedOtherPoolPeriodIds: ReadonlySet<string>;
+  preferredCourtIds: ReadonlySet<string>;
+  courtNameById: ReadonlyMap<string, string>;
+  venueByCourtId: ReadonlyMap<string, string | null>;
+  teamNameById: ReadonlyMap<string, string>;
+  levelKeyByPoolId: ReadonlyMap<string, string>;
+  poolIdByMatchId: ReadonlyMap<string, string>;
+}): ManualScheduleMoveSuggestion[] {
+  const recommendedCount = input.merged.filter((slot) =>
+    isRecommendedManualSlot(
+      slot,
+      input.primaryPeriodId,
+      input.dedicatedOtherPoolPeriodIds,
+      input.preferredCourtIds,
+    ),
+  ).length;
+  if (recommendedCount > 0) return [];
+
+  const blockerHits = new Map<
+    string,
+    { reason: ManualScheduleMoveSuggestionReason; hitCount: number }
+  >();
+
+  const recordBlocker = (matchId: string, reason: ManualScheduleMoveSuggestionReason) => {
+    const prev = blockerHits.get(matchId);
+    if (!prev) {
+      blockerHits.set(matchId, { reason, hitCount: 1 });
+      return;
+    }
+    prev.hitCount += 1;
+    if (reason === "team-overlap") prev.reason = reason;
+    else if (reason === "team-rest" && prev.reason === "court-blocked") prev.reason = reason;
+  };
+
+  const nearMissSlots = input.merged.filter(
+    (slot) =>
+      input.preferredCourtIds.has(slot.courtId) &&
+      (!input.primaryPeriodId || slot.periodId === input.primaryPeriodId) &&
+      !input.dedicatedOtherPoolPeriodIds.has(slot.periodId),
+  );
+
+  if (nearMissSlots.length > 0) {
+    for (const slot of nearMissSlots) {
+      if (!slot.teamsFree) {
+        for (const id of findTeamOverlapBlockerIds(
+          input.match.teamAId,
+          input.match.teamBId,
+          slot.startMinutes,
+          slot.endMinutes,
+          input.teamIntervals,
+          input.match.id,
+        )) {
+          recordBlocker(id, "team-overlap");
+        }
+      } else if (!slot.respectsTeamRest) {
+        for (const id of findTeamRestBlockerIds(
+          input.match.teamAId,
+          input.match.teamBId,
+          slot.startMinutes,
+          slot.endMinutes,
+          input.teamIntervals,
+          input.match.id,
+          input.teamRestMinutes,
+        )) {
+          recordBlocker(id, "team-rest");
+        }
+      }
+    }
+  } else {
+    const primaryPeriod = input.periods.find((p) => p.id === input.primaryPeriodId) ?? input.periods[0];
+    if (primaryPeriod) {
+      const periodWin = periodWindowForScheduling(
+        primaryPeriod,
+        input.poolBase.baseAvailability,
+        input.poolBase.courtIds,
+      );
+      const roundLen = roundLengthMinutes(input.poolBase.timing);
+      const blockMinutes = Math.max(1, Math.floor(input.poolBase.roundsPerMatch)) * roundLen;
+      if (periodWin && roundLen > 0) {
+        const availability = availabilityForPeriodScheduling(
+          input.allCourtIds,
+          input.poolBase.baseAvailability,
+          periodWin,
+          primaryPeriod,
+        );
+        const preferredCourtIds = [...input.preferredCourtIds];
+        for (let t = periodWin.startMinutes; t + blockMinutes <= periodWin.endMinutes; t += roundLen) {
+          const endMinutes = t + blockMinutes;
+          for (const courtId of preferredCourtIds) {
+            const avail = availabilityWindowsForCourt(courtId, availability);
+            const courtBreaks = breaksForCourt(courtId, input.poolBase.breaks);
+            const playableWindows = isAllDayPeriod(primaryPeriod)
+              ? avail.filter((w) => w.endMinutes > w.startMinutes)
+              : avail
+                  .map((w) => intersectWindow(w, periodWin))
+                  .filter((w): w is { startMinutes: number; endMinutes: number } => w != null);
+            if (playableWindows.length === 0) continue;
+
+            const courtFree = isIntervalFree(
+              courtId,
+              t,
+              endMinutes,
+              input.existingOccupancy,
+              courtBreaks,
+              playableWindows,
+            );
+            if (!courtFree) {
+              const blockerId = findCourtBlockerId(
+                courtId,
+                t,
+                endMinutes,
+                input.scheduledMatches,
+                input.match.id,
+              );
+              if (blockerId) recordBlocker(blockerId, "court-blocked");
+              continue;
+            }
+
+            if (
+              teamsOverlapScheduledInterval(
+                input.match.teamAId,
+                input.match.teamBId,
+                t,
+                endMinutes,
+                input.teamIntervals,
+                input.match.id,
+              )
+            ) {
+              for (const id of findTeamOverlapBlockerIds(
+                input.match.teamAId,
+                input.match.teamBId,
+                t,
+                endMinutes,
+                input.teamIntervals,
+                input.match.id,
+              )) {
+                recordBlocker(id, "team-overlap");
+              }
+              continue;
+            }
+
+            if (
+              !teamsRespectRestAtInterval(
+                input.match.teamAId,
+                input.match.teamBId,
+                t,
+                endMinutes,
+                input.teamIntervals,
+                input.match.id,
+                input.teamRestMinutes,
+              )
+            ) {
+              for (const id of findTeamRestBlockerIds(
+                input.match.teamAId,
+                input.match.teamBId,
+                t,
+                endMinutes,
+                input.teamIntervals,
+                input.match.id,
+                input.teamRestMinutes,
+              )) {
+                recordBlocker(id, "team-rest");
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (blockerHits.size === 0) {
+    for (const m of input.scheduledMatches) {
+      if (m.id === input.match.id) continue;
+      const touches =
+        m.teamAId === input.match.teamAId ||
+        m.teamBId === input.match.teamAId ||
+        m.teamAId === input.match.teamBId ||
+        m.teamBId === input.match.teamBId;
+      if (touches) {
+        recordBlocker(m.id, "team-overlap");
+      }
+    }
+  }
+
+  const suggestions: ManualScheduleMoveSuggestion[] = [];
+  for (const [blockerId, meta] of blockerHits) {
+    const scheduled = input.scheduledMatches.find((m) => m.id === blockerId);
+    if (!scheduled) continue;
+
+    const poolBaseWithout: SchedulePoolBase = {
+      ...input.poolBase,
+      existingOccupancy: input.existingOccupancy.filter((o) => {
+        return !(
+          o.courtId === scheduled.courtId &&
+          o.startMinutes === scheduled.startMinutes &&
+          o.endMinutes === scheduled.endMinutes
+        );
+      }),
+    };
+
+    const slotsFreed = countRecommendedManualSlots(
+      input.match,
+      input.allCourtIds,
+      poolBaseWithout,
+      poolBaseWithout.existingOccupancy,
+      input.teamRestMinutes,
+      input.teamIntervals.filter((m) => m.id !== blockerId),
+      input.scheduledRoundStartMinutes,
+      input.periods,
+      input.primaryPeriodId,
+      input.dedicatedOtherPoolPeriodIds,
+      input.preferredCourtIds,
+    );
+
+    const poolId = input.poolIdByMatchId.get(blockerId) ?? scheduled.poolId;
+    const levelKey = input.levelKeyByPoolId.get(poolId) ?? input.match.levelKey;
+    suggestions.push({
+      matchId: blockerId,
+      levelKey,
+      teamALabel: input.teamNameById.get(scheduled.teamAId) ?? "Hold A",
+      teamBLabel: input.teamNameById.get(scheduled.teamBId) ?? "Hold B",
+      timeLabel: `${minutesToTimeInput(scheduled.startMinutes)}–${minutesToTimeInput(scheduled.endMinutes)}`,
+      courtName: input.courtNameById.get(scheduled.courtId) ?? "Bane",
+      venueName: input.venueByCourtId.get(scheduled.courtId) ?? null,
+      reason: meta.reason,
+      reasonLabel: reasonLabelForMoveSuggestion(meta.reason),
+      slotsFreed,
+    });
+  }
+
+  suggestions.sort(
+    (a, b) =>
+      b.slotsFreed - a.slotsFreed ||
+      a.timeLabel.localeCompare(b.timeLabel, "da") ||
+      a.teamALabel.localeCompare(b.teamALabel, "da", { sensitivity: "base" }),
+  );
+
+  return suggestions.slice(0, 8);
+}
 
 /** Ledige bane/tid til manuel planlægning — inkl. andre banestørrelser og alle perioder. */
 export async function listManualScheduleSlotsForMatch(
@@ -3573,6 +3988,9 @@ export async function listManualScheduleSlotsForMatch(
     teamBLabel: null,
     teamRestMinutes: 0,
     slots: [],
+    moveSuggestions: [],
+    courts: [],
+    bookedBlocks: [],
   };
 
   const eventId = TURNERING_EVENT_ID;
@@ -3606,13 +4024,13 @@ export async function listManualScheduleSlotsForMatch(
     supabase
       .from("teams")
       .select("id, name")
-      .in("id", [matchRow.team_a_id, matchRow.team_b_id]),
+      .eq("event_id", eventId),
     supabase
       .from("tournament_periods")
       .select("id, event_id, name, start_time, end_time, sort_order, is_all_day")
       .eq("event_id", eventId)
       .order("sort_order", { ascending: true }),
-    supabase.from("pools").select("id, period_id").eq("event_id", eventId),
+    supabase.from("pools").select("id, level, period_id").eq("event_id", eventId),
     supabase.from("venues").select("id").eq("event_id", eventId),
   ]);
 
@@ -3659,7 +4077,7 @@ export async function listManualScheduleSlotsForMatch(
     supabase.from("level_court_settings").select("level, court_type").eq("event_id", eventId),
     supabase
       .from("matches")
-      .select("id, team_a_id, team_b_id, court_id, start_time, end_time")
+      .select("id, pool_id, team_a_id, team_b_id, court_id, start_time, end_time")
       .eq("event_id", eventId)
       .not("court_id", "is", null)
       .not("start_time", "is", null)
@@ -3730,9 +4148,12 @@ export async function listManualScheduleSlotsForMatch(
   const existingOccupancy: OccupiedSlot[] = [];
   const teamIntervals: TeamScheduledInterval[] = [];
   const scheduledRoundStartMinutes = new Set<number>();
+  const scheduledMatches: ScheduledMatchMeta[] = [];
+  const poolIdByMatchId = new Map<string, string>();
 
   for (const m of (allMatchesRes.data ?? []) as Array<{
     id: string;
+    pool_id: string;
     team_a_id: string;
     team_b_id: string;
     court_id: string;
@@ -3742,6 +4163,16 @@ export async function listManualScheduleSlotsForMatch(
     const s = timeToMinutes(m.start_time);
     const e = timeToMinutes(m.end_time);
     if (s == null || e == null || e <= s) continue;
+    poolIdByMatchId.set(m.id, m.pool_id);
+    scheduledMatches.push({
+      id: m.id,
+      poolId: m.pool_id,
+      teamAId: m.team_a_id,
+      teamBId: m.team_b_id,
+      courtId: m.court_id,
+      startMinutes: s,
+      endMinutes: e,
+    });
     teamIntervals.push({
       id: m.id,
       teamAId: m.team_a_id,
@@ -3754,6 +4185,13 @@ export async function listManualScheduleSlotsForMatch(
     }
     scheduledRoundStartMinutes.add(s);
   }
+
+  const levelKeyByPoolId = new Map(
+    ((eventPoolsRes.data ?? []) as Array<{ id: string; level: string | null }>).map((p) => [
+      p.id,
+      canonicalBanerLevelLabel(p.level),
+    ]),
+  );
 
   const courtTypes = new Map<string, CourtType>();
   for (const c of courtRows) {
@@ -3829,6 +4267,59 @@ export async function listManualScheduleSlotsForMatch(
     return a.startMinutes - b.startMinutes || a.courtName.localeCompare(b.courtName, "da");
   });
 
+  const moveSuggestions = findManualScheduleMoveSuggestions({
+    match: matchInput,
+    merged,
+    allCourtIds: activeCourtIds,
+    poolBase,
+    existingOccupancy,
+    teamRestMinutes,
+    teamIntervals,
+    scheduledRoundStartMinutes: [...scheduledRoundStartMinutes],
+    scheduledMatches,
+    periods: allPeriods,
+    primaryPeriodId,
+    dedicatedOtherPoolPeriodIds,
+    preferredCourtIds,
+    courtNameById,
+    venueByCourtId,
+    teamNameById: teamById,
+    levelKeyByPoolId,
+    poolIdByMatchId,
+  });
+
+  const courts: ManualScheduleCourtOption[] = activeCourtRows
+    .map((c) => ({
+      courtId: c.id,
+      courtName: c.name,
+      courtType: c.court_type,
+      venueName: venueByCourtId.get(c.id) ?? null,
+      isPreferredCourtType: preferredCourtIds.has(c.id),
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.isPreferredCourtType) - Number(a.isPreferredCourtType) ||
+        a.courtName.localeCompare(b.courtName, "da", { sensitivity: "base" }),
+    );
+
+  const bookedBlocks: ManualScheduleBookedBlock[] = scheduledMatches
+    .map((m) => ({
+      matchId: m.id,
+      courtId: m.courtId,
+      startMinutes: m.startMinutes,
+      endMinutes: m.endMinutes,
+      timeLabel: `${minutesToTimeInput(m.startMinutes)}–${minutesToTimeInput(m.endMinutes)}`,
+      teamALabel: teamById.get(m.teamAId) ?? "Hold",
+      teamBLabel: teamById.get(m.teamBId) ?? "Hold",
+      isCurrentMatch: m.id === matchId,
+    }))
+    .sort(
+      (a, b) =>
+        a.startMinutes - b.startMinutes ||
+        a.courtId.localeCompare(b.courtId) ||
+        a.teamALabel.localeCompare(b.teamALabel, "da", { sensitivity: "base" }),
+    );
+
   return {
     ok: true,
     error: null,
@@ -3837,5 +4328,8 @@ export async function listManualScheduleSlotsForMatch(
     teamBLabel,
     teamRestMinutes,
     slots,
+    moveSuggestions,
+    courts,
+    bookedBlocks,
   };
 }

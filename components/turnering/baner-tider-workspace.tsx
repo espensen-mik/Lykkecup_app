@@ -475,6 +475,49 @@ export function BanerTiderWorkspace({
     refresh();
   }
 
+  async function deleteCourt(c: CourtRow) {
+    const usedSlots = initial.scheduledSlotsByCourtId[c.id] ?? 0;
+    const confirmMsg =
+      usedSlots > 0
+        ? `Bane «${c.name}» har ${usedSlots} planlagte kamprunder. Sletning fjerner banen permanent og gør tilknyttede kampe uplanlagte. Fortsæt?`
+        : `Slette bane «${c.name}» permanent? Dette kan ikke fortrydes.`;
+    if (!confirm(confirmMsg)) return;
+
+    const err = await run(async () => {
+      const { error: unschedErr } = await supabase
+        .from("matches")
+        .update({ court_id: null, start_time: null, end_time: null })
+        .eq("event_id", eventId)
+        .eq("court_id", c.id);
+      if (unschedErr) return unschedErr.message;
+
+      const { error: avErr } = await supabase
+        .from("court_availability")
+        .delete()
+        .eq("event_id", eventId)
+        .eq("court_id", c.id);
+      if (avErr) return avErr.message;
+
+      const { error: breaksErr } = await supabase
+        .from("court_breaks")
+        .delete()
+        .eq("event_id", eventId)
+        .eq("court_id", c.id);
+      if (breaksErr) return breaksErr.message;
+
+      const { error: delErr } = await supabase.from("courts").delete().eq("id", c.id);
+      if (delErr) return delErr.message;
+      return null;
+    });
+    if (err) {
+      setError(err);
+      return;
+    }
+    if (editCourt?.id === c.id) setEditCourt(null);
+    setToast(usedSlots > 0 ? "Bane slettet — kampe er nu uplanlagte." : "Bane slettet.");
+    refresh();
+  }
+
   const [levelDrafts, setLevelDrafts] = useState<Record<string, { match: string; pause: string; rounds: string }>>({});
   const [courtDrafts, setCourtDrafts] = useState<Partial<Record<string, CourtType>>>({});
 
@@ -742,6 +785,14 @@ export function BanerTiderWorkspace({
                               className="rounded-md text-sm font-medium text-[#0f766e] underline-offset-2 hover:underline dark:text-teal-300"
                             >
                               Rediger
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void deleteCourt(c)}
+                              className="rounded-md text-sm font-medium text-red-700 underline-offset-2 hover:underline dark:text-red-300"
+                            >
+                              Slet
                             </button>
                           </div>
                         </li>
@@ -1088,6 +1139,23 @@ export function BanerTiderWorkspace({
           >
             Gem bane
           </button>
+
+          {editCourt ? (
+            <div className="border-t border-red-100 pt-5 dark:border-red-900/40">
+              <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">Slet bane</h3>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Fjerner banen, åbningstider, pauser og gør planlagte kampe på banen uplanlagte.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void deleteCourt(editCourt)}
+                className="mt-3 w-full rounded-lg border border-red-200 bg-red-50 py-2 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-100 dark:hover:bg-red-950/50"
+              >
+                Slet bane permanent
+              </button>
+            </div>
+          ) : null}
         </form>
       </Modal>
 

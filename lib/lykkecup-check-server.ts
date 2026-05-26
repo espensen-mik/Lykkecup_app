@@ -9,18 +9,20 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
   const eventId = TURNERING_EVENT_ID;
   const client = await createServerSupabase();
 
-  const [playersRes, teamsRes, poolsRes, membersRes, matchesRes] = await Promise.all([
+  const [playersRes, teamsRes, poolsRes, membersRes, matchesRes, courtsRes, periodsRes] = await Promise.all([
     client.from("players").select("id, name, level").eq("event_id", eventId),
     client
       .from("teams")
       .select("id, name, level, pool_id, sort_order")
       .eq("event_id", eventId),
-    client.from("pools").select("id, name, level").eq("event_id", eventId),
+    client.from("pools").select("id, name, level, period_id").eq("event_id", eventId),
     client.from("team_members").select("player_id, team_id").eq("event_id", eventId),
     client
       .from("matches")
-      .select("id, pool_id, team_a_id, team_b_id, court_id, start_time")
+      .select("id, pool_id, team_a_id, team_b_id, court_id, start_time, end_time, schedule_relaxed_team_rest")
       .eq("event_id", eventId),
+    client.from("courts").select("id, name").eq("event_id", eventId),
+    client.from("tournament_periods").select("id, name, start_time, end_time, is_all_day").eq("event_id", eventId),
   ]);
 
   const scheduleFetch = await fetchLevelSchedulePlanningRows(client, eventId);
@@ -31,6 +33,8 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
     poolsRes.error?.message ??
     membersRes.error?.message ??
     matchesRes.error?.message ??
+    courtsRes.error?.message ??
+    periodsRes.error?.message ??
     scheduleFetch.error ??
     null;
 
@@ -46,6 +50,8 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
 
   const scheduleRows = scheduleFetch.rows;
 
+  const courtNamesById = Object.fromEntries((courtsRes.data ?? []).map((c) => [c.id, c.name]));
+
   const input: LykkecupCheckInput = {
     players: (playersRes.data ?? []) as LykkecupCheckInput["players"],
     teams: (teamsRes.data ?? []) as LykkecupCheckInput["teams"],
@@ -54,6 +60,8 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
     matches: (matchesRes.data ?? []) as LykkecupCheckInput["matches"],
     planMatchesByLevel: planMatchesByLevelFromScheduleRows(scheduleRows),
     scheduleRows,
+    periods: (periodsRes.data ?? []) as LykkecupCheckInput["periods"],
+    courtNamesById,
   };
 
   const result = runLykkecupCheck(input);

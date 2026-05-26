@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, CalendarClock, CheckCircle2, Loader2, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { KampprogramScheduleFollowUp } from "@/components/scheduling/scheduling-summary-banner";
 import { ManualScheduleDialog } from "@/components/turnering/manual-schedule-dialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -88,6 +89,11 @@ export function TurneringPlanWorkspace({
   const [schedulingFailures, setSchedulingFailures] = useState<
     Array<{ matchId: string; label: string; reason: string }>
   >([]);
+  const [postScheduleChecks, setPostScheduleChecks] = useState<{
+    courtConflicts: number;
+    teamRestWarnings: number;
+    teamsSpanningPeriods: number;
+  } | null>(null);
   const [previewTeamId, setPreviewTeamId] = useState<string | null>(null);
   const [editingMatch, setEditingMatch] = useState<MatchRow | null>(null);
   const [editCourtId, setEditCourtId] = useState("");
@@ -280,10 +286,12 @@ export function TurneringPlanWorkspace({
     });
     setActionMsg(null);
     setSchedulingFailures([]);
+    setPostScheduleChecks(null);
     try {
       const result = await schedulePoolMatchesAction(pool.id, levelKey);
       setActionMsg(result.message);
       setSchedulingFailures(result.schedulingFailures ?? []);
+      setPostScheduleChecks(result.postScheduleChecks ?? null);
       if (result.ok || (result.scheduled ?? 0) > 0) router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ukendt fejl";
@@ -316,11 +324,13 @@ export function TurneringPlanWorkspace({
     setConfirmRegenerateAllPools(false);
     setActionMsg(null);
     setSchedulingFailures([]);
+    setPostScheduleChecks(null);
 
     try {
       const result = await generateAllPoolMatchesForLevelAction(levelKey, regenerate);
       setActionMsg(result.message);
       setSchedulingFailures(result.schedulingFailures ?? []);
+      setPostScheduleChecks(result.postScheduleChecks ?? null);
       if (result.ok || (result.scheduled ?? 0) > 0) router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ukendt fejl";
@@ -516,6 +526,23 @@ export function TurneringPlanWorkspace({
                     <li className="text-gray-500 dark:text-gray-400">
                       … og {schedulingFailures.length - 20} kampe mere
                     </li>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
+            <KampprogramScheduleFollowUp unscheduledCount={unscheduledMatchCount} />
+            {postScheduleChecks && (postScheduleChecks.courtConflicts > 0 || postScheduleChecks.teamRestWarnings > 0 || postScheduleChecks.teamsSpanningPeriods > 0) ? (
+              <div className="mt-2 border-t border-amber-200 pt-2 dark:border-amber-800">
+                <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">Efter planlægning:</p>
+                <ul className="mt-1 space-y-0.5 text-xs text-amber-800 dark:text-amber-300">
+                  {postScheduleChecks.courtConflicts > 0 ? (
+                    <li>{postScheduleChecks.courtConflicts} bane-konflikt{postScheduleChecks.courtConflicts === 1 ? "" : "er"} — se Kampstatus</li>
+                  ) : null}
+                  {postScheduleChecks.teamRestWarnings > 0 ? (
+                    <li>{postScheduleChecks.teamRestWarnings} hold-pause-advarsel{postScheduleChecks.teamRestWarnings === 1 ? "" : "er"} — se Kampstatus</li>
+                  ) : null}
+                  {postScheduleChecks.teamsSpanningPeriods > 0 ? (
+                    <li>{postScheduleChecks.teamsSpanningPeriods} hold spænder over Formiddag og Eftermiddag</li>
                   ) : null}
                 </ul>
               </div>

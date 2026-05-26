@@ -206,27 +206,114 @@ function rotateRoundRobinOrder(order: string[]): void {
   order.splice(1, 0, last);
 }
 
-/** Runder at spille når puljen har ulige antal hold (bye-runde tæller ikke som kamp). */
-function cappedRoundRobinRoundsToPlay(
-  realTeamCount: number,
-  maxMatchesPerTeam: number | undefined,
-  phantomSlotCount: number,
-): number {
-  const maxRounds = phantomSlotCount - 1;
-  if (maxMatchesPerTeam == null || !Number.isFinite(maxMatchesPerTeam)) {
-    return maxRounds;
+/** Maks kampe pr. hold i en pulje (begrænset af antal modstandere). */
+export function resolveMatchesPerTeamCap(
+  teamCount: number,
+  maxMatchesPerTeam?: number,
+): number | null {
+  if (teamCount < 2) return null;
+  if (maxMatchesPerTeam == null || !Number.isFinite(maxMatchesPerTeam)) return null;
+  return Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), teamCount - 1));
+}
+
+function tryAddCappedPairing(
+  teamAId: string,
+  teamBId: string,
+  cap: number,
+  matchCount: Map<string, number>,
+  usedPairs: Set<string>,
+  pairings: Array<{ teamAId: string; teamBId: string }>,
+): boolean {
+  if (teamAId === teamBId) return false;
+  const key = matchPairKey(teamAId, teamBId);
+  if (usedPairs.has(key)) return false;
+  const countA = matchCount.get(teamAId) ?? 0;
+  const countB = matchCount.get(teamBId) ?? 0;
+  if (countA >= cap || countB >= cap) return false;
+  pairings.push({ teamAId, teamBId });
+  usedPairs.add(key);
+  matchCount.set(teamAId, countA + 1);
+  matchCount.set(teamBId, countB + 1);
+  return true;
+}
+
+function generateFullRoundRobinPairings(teamIds: readonly string[]): Array<{ teamAId: string; teamBId: string }> {
+  let order = [...teamIds];
+  if (order.length % 2 === 1) order = [...order, ROUND_ROBIN_BYE];
+
+  const n = order.length;
+  const pairings: Array<{ teamAId: string; teamBId: string }> = [];
+  const slotOrder = [...order];
+
+  for (let round = 0; round < n - 1; round += 1) {
+    for (let i = 0; i < n / 2; i += 1) {
+      const teamAId = slotOrder[i]!;
+      const teamBId = slotOrder[n - 1 - i]!;
+      if (teamAId === ROUND_ROBIN_BYE || teamBId === ROUND_ROBIN_BYE) continue;
+      pairings.push({ teamAId, teamBId });
+    }
+    if (round < n - 2) rotateRoundRobinOrder(slotOrder);
   }
-  const cap = Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), maxRounds));
-  if (realTeamCount % 2 === 1) {
-    // Med bye skal hver klub spille `cap` runder med modstander → `cap` bye-runde ekstra.
-    return Math.max(1, Math.min(cap + 1, maxRounds));
+
+  return pairings;
+}
+
+function generateCappedRoundRobinPairings(
+  teamIds: readonly string[],
+  cap: number,
+): Array<{ teamAId: string; teamBId: string }> {
+  const matchCount = new Map(teamIds.map((id) => [id, 0]));
+  const usedPairs = new Set<string>();
+  const pairings: Array<{ teamAId: string; teamBId: string }> = [];
+
+  const allAtCap = () => teamIds.every((id) => (matchCount.get(id) ?? 0) >= cap);
+
+  let order = [...teamIds];
+  if (order.length % 2 === 1) order = [...order, ROUND_ROBIN_BYE];
+  const n = order.length;
+  const slotOrder = [...order];
+
+  for (let round = 0; round < n - 1; round += 1) {
+    if (allAtCap()) break;
+    for (let i = 0; i < n / 2; i += 1) {
+      const teamAId = slotOrder[i]!;
+      const teamBId = slotOrder[n - 1 - i]!;
+      if (teamAId === ROUND_ROBIN_BYE || teamBId === ROUND_ROBIN_BYE) continue;
+      tryAddCappedPairing(teamAId, teamBId, cap, matchCount, usedPairs, pairings);
+    }
+    if (round < n - 2) rotateRoundRobinOrder(slotOrder);
   }
-  return cap;
+
+  let progress = true;
+  while (progress) {
+    progress = false;
+    const underCap = teamIds
+      .filter((id) => (matchCount.get(id) ?? 0) < cap)
+      .sort(
+        (a, b) =>
+          (matchCount.get(a) ?? 0) - (matchCount.get(b) ?? 0) || a.localeCompare(b),
+      );
+
+    if (underCap.length < 2) break;
+
+    for (let i = 0; i < underCap.length; i += 1) {
+      for (let j = i + 1; j < underCap.length; j += 1) {
+        if (tryAddCappedPairing(underCap[i]!, underCap[j]!, cap, matchCount, usedPairs, pairings)) {
+          progress = true;
+          break;
+        }
+      }
+      if (progress) break;
+    }
+  }
+
+  return pairings;
 }
 
 /**
- * Alle-mod-alle op til `maxMatchesPerTeam` kampe pr. hold (klassisk rundtournér).
- * Uden cap: fuld round-robin (n−1 kampe pr. hold).
+ * Round-robin op til `maxMatchesPerTeam` kampe pr. hold.
+ * Ulige puljer: ingen hold får flere end cap; total matcher `plannedPoolMatchCount`.
+ * Når cap×hold er ulige kan ét hold få cap−1 — resten cap (grafteori, ikke fejl).
  */
 export function generateRoundRobinMatches<T extends TeamForPairing>(
   teams: readonly T[],
@@ -234,36 +321,23 @@ export function generateRoundRobinMatches<T extends TeamForPairing>(
 ): Array<{ teamAId: string; teamBId: string }> {
   if (teams.length < 2) return [];
 
-  const realTeamCount = teams.length;
-  let order = sortTeamsForPairing(teams).map((t) => t.id);
-  if (order.length % 2 === 1) order = [...order, ROUND_ROBIN_BYE];
+  const teamIds = sortTeamsForPairing(teams).map((t) => t.id);
+  const cap = resolveMatchesPerTeamCap(teams.length, maxMatchesPerTeam);
 
-  const n = order.length;
-  const roundsToPlay = cappedRoundRobinRoundsToPlay(realTeamCount, maxMatchesPerTeam, n);
-
-  const pairings: Array<{ teamAId: string; teamBId: string }> = [];
-  const slotOrder = [...order];
-
-  for (let round = 0; round < roundsToPlay; round += 1) {
-    for (let i = 0; i < n / 2; i += 1) {
-      const teamAId = slotOrder[i]!;
-      const teamBId = slotOrder[n - 1 - i]!;
-      if (teamAId === ROUND_ROBIN_BYE || teamBId === ROUND_ROBIN_BYE) continue;
-      pairings.push({ teamAId, teamBId });
-    }
-    if (round < roundsToPlay - 1) rotateRoundRobinOrder(slotOrder);
+  if (cap == null) {
+    return generateFullRoundRobinPairings(teamIds);
   }
 
-  return pairings;
+  return generateCappedRoundRobinPairings(teamIds, cap);
 }
 
 /** Antal kampe ved begrænset round-robin (til KPI / sync). */
 export function plannedPoolMatchCount(teamCount: number, maxMatchesPerTeam?: number): number {
   if (teamCount < 2) return 0;
-  if (maxMatchesPerTeam == null || !Number.isFinite(maxMatchesPerTeam)) {
+  const cap = resolveMatchesPerTeamCap(teamCount, maxMatchesPerTeam);
+  if (cap == null) {
     return (teamCount * (teamCount - 1)) / 2;
   }
-  const cap = Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), teamCount - 1));
   return Math.floor((teamCount * cap) / 2);
 }
 

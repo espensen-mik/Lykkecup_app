@@ -92,8 +92,9 @@ export function PlanOverviewStatus({ status, loadError }: Props) {
         <Metric label="Mangler plan" value={m.unscheduledMatches} warn={m.unscheduledMatches > 0} />
         <Metric label="Bane-konflikter" value={m.courtConflicts} warn={m.courtConflicts > 0} error={m.courtConflicts > 0} />
         <Metric label="Hold-pause" value={m.teamRestWarnings} warn={m.teamRestWarnings > 0} />
-        <Metric label="Lempet pause" value={m.relaxedRestMatches} warn={m.relaxedRestMatches > 0} />
+        <Metric label="Mangler pause" value={m.relaxedRestMatches} warn={m.relaxedRestMatches > 0} />
         <Metric label="Pulje-sync" value={m.poolsOutOfSync} warn={m.poolsOutOfSync > 0} />
+        <Metric label="Hold spænder perioder" value={m.teamsSpanningPeriods} warn={m.teamsSpanningPeriods > 0} />
         <Metric label="Forældreløse" value={m.orphanMatches} error={m.orphanMatches > 0} />
       </dl>
 
@@ -162,6 +163,19 @@ export function PlanOverviewStatus({ status, loadError }: Props) {
           Ingen konflikter fundet — kampantal og planlægning stemmer med opsætningen.
         </p>
       )}
+
+      {m.unscheduledMatches > 0 ? (
+        <p className="mt-4 text-sm text-amber-900 dark:text-amber-100">
+          <Link
+            href="/kampprogram?filter=unscheduled"
+            className="font-medium text-[#0d9488] hover:underline dark:text-teal-400"
+          >
+            Åbn Kampprogram → Ikke planlagt
+          </Link>
+          {" "}
+          ({m.unscheduledMatches} kamp{m.unscheduledMatches === 1 ? "" : "e"} mangler bane eller tid)
+        </p>
+      ) : null}
 
       <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
         Fuld kontrol af spillere, hold og puljer:{" "}

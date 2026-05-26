@@ -13,6 +13,12 @@ import {
   isOrphanKampprogramMatch,
 } from "@/lib/kampprogram";
 import { buildTeamDetailsById, type TeamPlayerLite } from "@/lib/team-detail";
+import { planMatchesByLevelFromScheduleRows } from "@/lib/lykkecup-regnemaskine";
+import {
+  computeTeamMatchCounts,
+  countRelaxedTeamRestMatches,
+  type KampprogramSchedulingSummary,
+} from "@/lib/scheduling-summary";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 import { isAllDayPeriod, periodWindowMinutes } from "@/lib/tournament-periods";
 import { timeToMinutes } from "@/lib/baner-tider";
@@ -26,7 +32,15 @@ const empty: KampprogramBundle = {
   levelTimingByLevel: {},
   courtAvailabilityByCourtId: {},
   teamDetails: {},
-  stats: { total: 0, scheduled: 0, unscheduled: 0, orphanMatches: 0 },
+  stats: { total: 0, scheduled: 0, unscheduled: 0, orphanMatches: 0, outsidePoolPeriod: 0 },
+  schedulingSummary: {
+    outsidePoolPeriod: 0,
+    relaxedTeamRest: 0,
+    teamsWithPlan: 0,
+    teamsMatchOk: 0,
+    teamsWrongCount: 0,
+    teamRows: [],
+  },
   error: null,
 };
 
@@ -38,7 +52,9 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     await Promise.all([
       client
         .from("matches")
-        .select("id, pool_id, team_a_id, team_b_id, court_id, start_time, end_time, round_index")
+        .select(
+          "id, pool_id, team_a_id, team_b_id, court_id, start_time, end_time, round_index, schedule_relaxed_team_rest",
+        )
         .eq("event_id", eventId)
         .order("start_time", { ascending: true, nullsFirst: false }),
       client
@@ -54,7 +70,9 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       client.from("venues").select("id, name").eq("event_id", eventId),
       client
         .from("level_schedule_settings")
-        .select("level, match_duration_minutes, break_between_matches_minutes, rounds_per_match")
+        .select(
+          "level, plan_matches_per_team, match_duration_minutes, break_between_matches_minutes, rounds_per_match",
+        )
         .eq("event_id", eventId),
       client
         .from("court_availability")
@@ -171,6 +189,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     start_time: string | null;
     end_time: string | null;
     round_index: number | null;
+    schedule_relaxed_team_rest?: boolean;
   }>) {
     const pool = poolById.get(row.pool_id);
     const teamA = teamById.get(row.team_a_id);
@@ -211,8 +230,37 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       endTime: row.end_time,
       roundIndex: row.round_index,
       isScheduled,
+      scheduleRelaxedTeamRest: Boolean(row.schedule_relaxed_team_rest),
     });
   }
+
+  const outsidePoolPeriod = matches.filter((m) => m.scheduledOutsidePoolPeriod).length;
+  const scheduleRows = (levelScheduleRes.data ?? []) as Array<{
+    level: string;
+    plan_matches_per_team: number | null;
+  }>;
+  const planMatchesByLevel = planMatchesByLevelFromScheduleRows(scheduleRows);
+  const teamCounts = computeTeamMatchCounts({
+    teams: teams.map((t) => ({ id: t.id, name: t.name, level: t.level })),
+    matches: (matchesRes.data ?? []) as Array<{
+      id: string;
+      pool_id: string;
+      team_a_id: string;
+      team_b_id: string;
+      schedule_relaxed_team_rest?: boolean;
+    }>,
+    teamIds,
+    poolIds,
+    planMatchesByLevel,
+    scheduleRows,
+  });
+  const schedulingSummary: KampprogramSchedulingSummary = {
+    outsidePoolPeriod,
+    relaxedTeamRest: countRelaxedTeamRestMatches(
+      (matchesRes.data ?? []) as Array<{ schedule_relaxed_team_rest?: boolean }>,
+    ),
+    ...teamCounts,
+  };
 
   const periods: KampprogramPeriod[] = periodRows.map((p) => ({
     id: p.id,
@@ -252,7 +300,9 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       scheduled,
       unscheduled: matches.length - scheduled,
       orphanMatches,
+      outsidePoolPeriod,
     },
+    schedulingSummary,
     error: null,
   };
 }

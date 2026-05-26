@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { KampprogramWorkspace } from "@/components/kampprogram/kampprogram-workspace";
+import { parseKampprogramMatchFilter } from "@/lib/kampprogram";
 import { fetchKampprogramBundle } from "@/lib/kampprogram-server";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +12,14 @@ export const metadata: Metadata = {
   description: "Samlet kampprogram for turneringen — per bane og kronologisk",
 };
 
-export default async function KampprogramPage() {
+export default async function KampprogramPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const { filter: filterParam } = await searchParams;
   const bundle = await fetchKampprogramBundle();
+  const initialMatchFilter = parseKampprogramMatchFilter(filterParam);
 
   if (bundle.error) {
     return (
@@ -49,7 +56,7 @@ export default async function KampprogramPage() {
 
       <div className="overflow-hidden rounded-lg border border-lc-border bg-white shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
         <div className="p-6 sm:p-8">
-          <KampprogramWorkspace initial={bundle} />
+          <KampprogramWorkspace initial={bundle} initialMatchFilter={initialMatchFilter} />
         </div>
       </div>
     </div>

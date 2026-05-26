@@ -17,7 +17,7 @@ export async function fetchTurneringsplanMatchStatus(): Promise<
   const [playersRes, teamsRes, poolsRes, membersRes, matchesRes, courtsRes] = await Promise.all([
     client.from("players").select("id, name, level").eq("event_id", eventId),
     client.from("teams").select("id, name, level, pool_id, sort_order").eq("event_id", eventId),
-    client.from("pools").select("id, name, level").eq("event_id", eventId),
+    client.from("pools").select("id, name, level, period_id").eq("event_id", eventId),
     client.from("team_members").select("player_id, team_id").eq("event_id", eventId),
     client
       .from("matches")
@@ -50,6 +50,7 @@ export async function fetchTurneringsplanMatchStatus(): Promise<
       courtConflicts: 0,
       teamRestWarnings: 0,
       relaxedRestMatches: 0,
+      teamsSpanningPeriods: 0,
     },
     issueGroups: [],
     levelBreakdown: [],
@@ -74,6 +75,10 @@ export async function fetchTurneringsplanMatchStatus(): Promise<
   const teamNamesById = Object.fromEntries((teamsRes.data ?? []).map((t) => [t.id, t.name as string]));
   const courtNamesById = Object.fromEntries((courtsRes.data ?? []).map((c) => [c.id, c.name as string]));
 
+  const poolPeriodIds = Object.fromEntries(
+    ((poolsRes.data ?? []) as Array<{ id: string; period_id: string | null }>).map((p) => [p.id, p.period_id]),
+  );
+
   const status = computeTurneringsplanMatchStatus(
     {
       teams: checkInput.teams,
@@ -83,6 +88,7 @@ export async function fetchTurneringsplanMatchStatus(): Promise<
       scheduleRows,
       courtNamesById,
       teamNamesById,
+      poolPeriodIds,
     },
     check,
   );

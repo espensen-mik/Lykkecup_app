@@ -2,11 +2,11 @@
 
 import { CalendarClock, Loader2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { TeamDetailModal, TeamNameWithHover } from "@/components/teams/team-detail-ui";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { deleteOrphanMatchesAction } from "@/lib/kampprogram-actions";
-import { compareCourtNamesForSchedule, formatTimeForInput } from "@/lib/baner-tider";
+import { compareCourtNamesForSchedule, formatTimeForInput, timeToMinutes } from "@/lib/baner-tider";
 import { formatLevelShortLabel } from "@/lib/holddannelse";
 import { getLevelVisualClasses } from "@/lib/level-colors";
 import {
@@ -14,17 +14,201 @@ import {
   formatCourtWithVenue,
   groupKampprogramByRound,
   type KampprogramBundle,
+  type KampprogramLevelTiming,
   type KampprogramMatch,
+  type KampprogramMatchFilter,
   type KampprogramTableRow,
 } from "@/lib/kampprogram";
+import { RelaxedRestScheduleHover } from "@/components/kampprogram/relaxed-rest-schedule-hover";
 import { kontrolCenterTeamDisplayName, type TeamDetailView } from "@/lib/team-detail";
 import { ManualScheduleDialog } from "@/components/turnering/manual-schedule-dialog";
+import { teamRestMinutesBetweenMatches, teamRestViolatingTeamIdsByMatchId } from "@/lib/turnering-scheduler";
 
 type ViewMode = "court" | "rounds";
 
 type Props = {
   initial: KampprogramBundle;
+  initialMatchFilter?: KampprogramMatchFilter;
 };
+
+type KampprogramMatchConflictHints = {
+  courtOverlap: boolean;
+  teamRestViolation: boolean;
+  violatingTeamIds: string[];
+  teamRestMinutes: number;
+};
+
+function overlapsMinutes(a0: number, a1: number, b0: number, b1: number): boolean {
+  return a0 < b1 && b0 < a1;
+}
+
+function buildKampprogramMatchConflictHints(
+  matches: readonly KampprogramMatch[],
+  levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>,
+): Map<string, KampprogramMatchConflictHints> {
+  const out = new Map<string, KampprogramMatchConflictHints>();
+  const byCourt = new Map<string, Array<{ id: string; start: number; end: number }>>();
+  const byLevel = new Map<string, KampprogramMatch[]>();
+
+  for (const m of matches) {
+    if (m.isOrphan || !m.isScheduled || !m.courtId || !m.startTime || !m.endTime) continue;
+    const start = timeToMinutes(m.startTime);
+    const end = timeToMinutes(m.endTime);
+    if (start == null || end == null || end <= start) continue;
+
+    const courtList = byCourt.get(m.courtId) ?? [];
+    courtList.push({ id: m.id, start, end });
+    byCourt.set(m.courtId, courtList);
+
+    const levelList = byLevel.get(m.levelKey) ?? [];
+    levelList.push(m);
+    byLevel.set(m.levelKey, levelList);
+  }
+
+  const courtOverlapIds = new Set<string>();
+  for (const rows of byCourt.values()) {
+    const sorted = [...rows].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+    for (let i = 1; i < sorted.length; i += 1) {
+      const prev = sorted[i - 1]!;
+      const cur = sorted[i]!;
+      if (!overlapsMinutes(prev.start, prev.end, cur.start, cur.end)) continue;
+      courtOverlapIds.add(prev.id);
+      courtOverlapIds.add(cur.id);
+    }
+  }
+
+  const teamRestByMatchId = new Map<string, { teamIds: string[]; restMinutes: number }>();
+  for (const [levelKey, levelMatches] of byLevel) {
+    const timing = levelTimingByLevel[levelKey];
+    const restMinutes = teamRestMinutesBetweenMatches(timing?.roundLengthMinutes ?? 10);
+    const violations = teamRestViolatingTeamIdsByMatchId(
+      levelMatches.map((m) => ({
+        id: m.id,
+        team_a_id: m.teamAId,
+        team_b_id: m.teamBId,
+        start_time: m.startTime,
+        end_time: m.endTime,
+      })),
+      restMinutes,
+    );
+    for (const [matchId, teamIds] of violations) {
+      teamRestByMatchId.set(matchId, { teamIds, restMinutes });
+    }
+  }
+
+  for (const m of matches) {
+    if (m.isOrphan) continue;
+    const courtOverlap = courtOverlapIds.has(m.id);
+    const teamRest = teamRestByMatchId.get(m.id);
+    const teamRestViolation = Boolean(teamRest);
+    if (!courtOverlap && !teamRestViolation && !m.scheduledOutsidePoolPeriod && !m.scheduleRelaxedTeamRest) {
+      continue;
+    }
+    out.set(m.id, {
+      courtOverlap,
+      teamRestViolation,
+      violatingTeamIds: teamRest?.teamIds ?? [],
+      teamRestMinutes: teamRest?.restMinutes ?? 0,
+    });
+  }
+
+  return out;
+}
+
+function OutsidePoolPeriodBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-100">
+      Uden for pulje-periode
+    </span>
+  );
+}
+
+function MatchStatusBadges({
+  match,
+  allMatches,
+  teamDetails,
+  levelTimingByLevel,
+  conflictHints,
+}: {
+  match: KampprogramMatch;
+  allMatches: readonly KampprogramMatch[];
+  teamDetails: Record<string, TeamDetailView>;
+  levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>;
+  conflictHints?: KampprogramMatchConflictHints;
+}) {
+  const showHardTeamRestViolation =
+    conflictHints?.teamRestViolation && !match.scheduleRelaxedTeamRest;
+
+  const hasBadges =
+    match.scheduledOutsidePoolPeriod ||
+    match.scheduleRelaxedTeamRest ||
+    conflictHints?.courtOverlap ||
+    showHardTeamRestViolation;
+
+  if (!hasBadges) {
+    return <span className="text-xs text-gray-400 dark:text-gray-500">—</span>;
+  }
+
+  const violatingTeamNames = (conflictHints?.violatingTeamIds ?? [])
+    .map((teamId) => kontrolCenterTeamDisplayName(teamDetailOrFallback(teamId, teamDetails)))
+    .join(", ");
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {conflictHints?.courtOverlap ? (
+        <span
+          className="inline-flex shrink-0 items-center rounded-md border border-red-300 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-950 dark:border-red-800 dark:bg-red-950/60 dark:text-red-100"
+          title="Bane overlapper med en anden kamp på samme tid"
+        >
+          Bane-konflikt
+        </span>
+      ) : null}
+      {showHardTeamRestViolation ? (
+        <span
+          className="inline-flex shrink-0 items-center rounded-md border border-red-300 bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-950 dark:border-red-800 dark:bg-red-950/60 dark:text-red-100"
+          title={
+            violatingTeamNames
+              ? `${violatingTeamNames} mangler pause (min. ${conflictHints!.teamRestMinutes} min)`
+              : `Hold mangler pause (min. ${conflictHints!.teamRestMinutes} min)`
+          }
+        >
+          Uden hold-pause
+        </span>
+      ) : null}
+      {match.scheduledOutsidePoolPeriod ? <OutsidePoolPeriodBadge /> : null}
+      {match.scheduleRelaxedTeamRest ? (
+        <RelaxedRestScheduleHover
+          match={match}
+          allMatches={allMatches}
+          teamDetails={teamDetails}
+          levelTimingByLevel={levelTimingByLevel}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function MatchActionButtons({
+  match,
+  onManualSchedule,
+}: {
+  match: KampprogramMatch;
+  onManualSchedule?: (match: KampprogramMatch) => void;
+}) {
+  if (match.isOrphan || !onManualSchedule) return null;
+
+  const label = match.isScheduled ? "Rediger" : "Planlæg manuelt";
+  const buttonClass = match.isScheduled
+    ? "inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-200 dark:hover:bg-gray-800"
+    : "inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50/80 px-2 py-1 text-xs font-medium text-teal-900 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-950/70";
+
+  return (
+    <button type="button" onClick={() => onManualSchedule(match)} className={buttonClass}>
+      <CalendarClock className="h-3 w-3" aria-hidden />
+      {label}
+    </button>
+  );
+}
 
 function fmtTimeRange(start: string | null, end: string | null): string {
   const s = formatTimeForInput(start);
@@ -52,14 +236,20 @@ function MatchTable({
   rows,
   showCourt,
   showManualSchedule,
+  allMatches,
   teamDetails,
+  levelTimingByLevel,
+  conflictHintsByMatchId,
   onOpenTeam,
   onManualSchedule,
 }: {
   rows: KampprogramMatch[];
   showCourt: boolean;
   showManualSchedule?: boolean;
+  allMatches: readonly KampprogramMatch[];
   teamDetails: Record<string, TeamDetailView>;
+  levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>;
+  conflictHintsByMatchId: ReadonlyMap<string, KampprogramMatchConflictHints>;
   onOpenTeam: (teamId: string) => void;
   onManualSchedule?: (match: KampprogramMatch) => void;
 }) {
@@ -77,10 +267,11 @@ function MatchTable({
             <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Niveau</th>
             <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Pulje</th>
             <th className="px-3 py-2.5 font-semibold uppercase tracking-wide" title="Puljens tildelte periode — ikke klokkeslæt">
-              Pulje-periode
+              Periode
             </th>
+            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Status</th>
             {showManualSchedule ? (
-              <th className="px-3 py-2.5 font-semibold uppercase tracking-wide w-36" />
+              <th className="w-40 px-3 py-2.5 font-semibold uppercase tracking-wide" />
             ) : null}
           </tr>
         </thead>
@@ -133,26 +324,19 @@ function MatchTable({
                   </span>
                 </td>
                 <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.poolName}</td>
-                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">
-                  <span>{m.periodName ?? "—"}</span>
-                  {m.scheduledOutsidePoolPeriod ? (
-                    <span className="mt-0.5 block text-xs font-medium text-amber-800 dark:text-amber-300">
-                      Spillet uden for pulje-periode
-                    </span>
-                  ) : null}
+                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.periodName ?? "—"}</td>
+                <td className="px-3 py-3">
+                  <MatchStatusBadges
+                    match={m}
+                    allMatches={allMatches}
+                    teamDetails={teamDetails}
+                    levelTimingByLevel={levelTimingByLevel}
+                    conflictHints={conflictHintsByMatchId.get(m.id)}
+                  />
                 </td>
                 {showManualSchedule ? (
                   <td className="px-3 py-3">
-                    {!m.isScheduled && !m.isOrphan && onManualSchedule ? (
-                      <button
-                        type="button"
-                        onClick={() => onManualSchedule(m)}
-                        className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50/80 px-2 py-1 text-xs font-medium text-teal-900 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-950/70"
-                      >
-                        <CalendarClock className="h-3 w-3" aria-hidden />
-                        Planlæg manuelt
-                      </button>
-                    ) : null}
+                    <MatchActionButtons match={m} onManualSchedule={onManualSchedule} />
                   </td>
                 ) : null}
               </tr>
@@ -167,13 +351,23 @@ function MatchTable({
 function KampprogramTimelineTable({
   rows,
   showCourt,
+  showManualSchedule,
+  allMatches,
   teamDetails,
+  levelTimingByLevel,
+  conflictHintsByMatchId,
   onOpenTeam,
+  onManualSchedule,
 }: {
   rows: KampprogramTableRow[];
   showCourt: boolean;
+  showManualSchedule?: boolean;
+  allMatches: readonly KampprogramMatch[];
   teamDetails: Record<string, TeamDetailView>;
+  levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>;
+  conflictHintsByMatchId: ReadonlyMap<string, KampprogramMatchConflictHints>;
   onOpenTeam: (teamId: string) => void;
+  onManualSchedule?: (match: KampprogramMatch) => void;
 }) {
   if (rows.length === 0) {
     return (
@@ -195,8 +389,12 @@ function KampprogramTimelineTable({
               className="px-3 py-2.5 font-semibold uppercase tracking-wide"
               title="Puljens tildelte periode — ikke klokkeslæt"
             >
-              Pulje-periode
+              Periode
             </th>
+            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Status</th>
+            {showManualSchedule ? (
+              <th className="w-40 px-3 py-2.5 font-semibold uppercase tracking-wide" />
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -205,6 +403,7 @@ function KampprogramTimelineTable({
               index % 2 === 0
                 ? "bg-white dark:bg-gray-900/25"
                 : "bg-gray-50/95 dark:bg-gray-800/40";
+            const actionColSpan = (showCourt ? 1 : 0) + (showManualSchedule ? 1 : 0) + 5;
 
             if (row.type === "idle") {
               return (
@@ -220,7 +419,7 @@ function KampprogramTimelineTable({
                   <td className="px-3 py-3 tabular-nums text-gray-500 dark:text-gray-400">
                     {fmtTimeRange(row.startTime, row.endTime)}
                   </td>
-                  <td colSpan={4} className="px-3 py-3 italic text-gray-500 dark:text-gray-400">
+                  <td colSpan={actionColSpan} className="px-3 py-3 italic text-gray-500 dark:text-gray-400">
                     Ledig bane
                   </td>
                 </tr>
@@ -231,6 +430,9 @@ function KampprogramTimelineTable({
             const lv = getLevelVisualClasses(m.levelKey);
             const detailA = teamDetailOrFallback(m.teamAId, teamDetails);
             const detailB = teamDetailOrFallback(m.teamBId, teamDetails);
+            const showActions =
+              showManualSchedule &&
+              (row.segmentLabel == null || row.segmentLabel.startsWith("1."));
 
             return (
               <tr
@@ -280,20 +482,74 @@ function KampprogramTimelineTable({
                   </span>
                 </td>
                 <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.poolName}</td>
-                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">
-                  <span>{m.periodName ?? "—"}</span>
-                  {m.scheduledOutsidePoolPeriod ? (
-                    <span className="mt-0.5 block text-xs font-medium text-amber-800 dark:text-amber-300">
-                      Spillet uden for pulje-periode
-                    </span>
-                  ) : null}
+                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.periodName ?? "—"}</td>
+                <td className="px-3 py-3">
+                  <MatchStatusBadges
+                    match={m}
+                    allMatches={allMatches}
+                    teamDetails={teamDetails}
+                    levelTimingByLevel={levelTimingByLevel}
+                    conflictHints={conflictHintsByMatchId.get(m.id)}
+                  />
                 </td>
+                {showManualSchedule ? (
+                  <td className="px-3 py-3">
+                    {showActions ? <MatchActionButtons match={m} onManualSchedule={onManualSchedule} /> : null}
+                  </td>
+                ) : null}
               </tr>
             );
           })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function UnscheduledSection({
+  rows,
+  allMatches,
+  teamDetails,
+  levelTimingByLevel,
+  conflictHintsByMatchId,
+  onOpenTeam,
+  onManualSchedule,
+  id,
+}: {
+  rows: KampprogramMatch[];
+  allMatches: readonly KampprogramMatch[];
+  teamDetails: Record<string, TeamDetailView>;
+  levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>;
+  conflictHintsByMatchId: ReadonlyMap<string, KampprogramMatchConflictHints>;
+  onOpenTeam: (teamId: string) => void;
+  onManualSchedule: (match: KampprogramMatch) => void;
+  id?: string;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <section
+      id={id}
+      className="scroll-mt-6 rounded-lg border border-amber-300 bg-amber-50/70 p-4 shadow-sm ring-1 ring-amber-200/80 dark:border-amber-800/60 dark:bg-amber-950/30 dark:ring-amber-900/40"
+    >
+      <h2 className="text-base font-semibold text-amber-950 dark:text-amber-50">Ikke planlagt</h2>
+      <p className="mt-0.5 text-sm text-amber-900/90 dark:text-amber-100/90">
+        {rows.length} kamp{rows.length === 1 ? "" : "e"} mangler bane eller tid — planlæg dem her, eller brug «Rediger» på
+        en planlagt kamp og «Fjern planlægning» for at flytte den hertil.
+      </p>
+      <div className="mt-3">
+        <MatchTable
+          rows={rows}
+          showCourt={false}
+          showManualSchedule
+          allMatches={allMatches}
+          teamDetails={teamDetails}
+          levelTimingByLevel={levelTimingByLevel}
+          conflictHintsByMatchId={conflictHintsByMatchId}
+          onOpenTeam={onOpenTeam}
+          onManualSchedule={onManualSchedule}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -306,12 +562,15 @@ function Kpi({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function KampprogramWorkspace({ initial }: Props) {
+export function KampprogramWorkspace({
+  initial,
+  initialMatchFilter = "all",
+}: Props) {
   const router = useRouter();
   const [view, setView] = useState<ViewMode>("court");
   const [levelFilter, setLevelFilter] = useState("");
   const [periodFilter, setPeriodFilter] = useState("");
-  const [hideUnscheduled, setHideUnscheduled] = useState(false);
+  const [matchFilter, setMatchFilter] = useState<KampprogramMatchFilter>(initialMatchFilter);
   const [previewTeamId, setPreviewTeamId] = useState<string | null>(null);
   const [deletingOrphans, setDeletingOrphans] = useState(false);
   const [orphanActionMsg, setOrphanActionMsg] = useState<string | null>(null);
@@ -321,6 +580,16 @@ export function KampprogramWorkspace({ initial }: Props) {
   const teamDetails = initial.teamDetails;
   const orphanMatches = useMemo(() => initial.matches.filter((m) => m.isOrphan), [initial.matches]);
   const unscheduledValidCount = Math.max(0, initial.stats.unscheduled - initial.stats.orphanMatches);
+
+  useEffect(() => {
+    if (initialMatchFilter === "unscheduled" && unscheduledValidCount > 0) {
+      document.getElementById("ikke-planlagt")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [initialMatchFilter, unscheduledValidCount]);
+  const conflictHintsByMatchId = useMemo(
+    () => buildKampprogramMatchConflictHints(initial.matches, initial.levelTimingByLevel),
+    [initial.matches, initial.levelTimingByLevel],
+  );
 
   async function handleDeleteOrphans() {
     if (orphanMatches.length === 0) return;
@@ -353,26 +622,22 @@ export function KampprogramWorkspace({ initial }: Props) {
   const filtered = useMemo(() => {
     return initial.matches.filter((m) => {
       if (m.isOrphan) return false;
-      if (hideUnscheduled && !m.isScheduled) return false;
+      if (matchFilter === "unscheduled" && m.isScheduled) return false;
+      if (matchFilter === "outside-period" && !m.scheduledOutsidePoolPeriod) return false;
       if (levelFilter && m.levelKey !== levelFilter) return false;
       if (periodFilter && m.periodName !== periodFilter) return false;
       return true;
     });
-  }, [initial.matches, hideUnscheduled, levelFilter, periodFilter]);
+  }, [initial.matches, matchFilter, levelFilter, periodFilter]);
 
   const byCourt = useMemo(() => {
     const map = new Map<string, KampprogramMatch[]>();
     for (const court of initial.courts) map.set(court.id, []);
-    const unassigned: KampprogramMatch[] = [];
 
     for (const m of filtered) {
-      if (!m.isScheduled || !m.courtId) {
-        unassigned.push(m);
-        continue;
-      }
+      if (!m.isScheduled || !m.courtId) continue;
       const list = map.get(m.courtId);
       if (list) list.push(m);
-      else unassigned.push(m);
     }
 
     for (const list of map.values()) {
@@ -382,9 +647,8 @@ export function KampprogramWorkspace({ initial }: Props) {
         return ta.localeCompare(tb, "da") || sortByDisplayName(a.teamAId, b.teamAId);
       });
     }
-    unassigned.sort((a, b) => a.poolName.localeCompare(b.poolName, "da"));
 
-    return { map, unassigned };
+    return map;
   }, [filtered, initial.courts, sortByDisplayName]);
 
   const roundGroups = useMemo(
@@ -407,7 +671,7 @@ export function KampprogramWorkspace({ initial }: Props) {
 
   const courtTimelines = useMemo(() => {
     return initial.courts.map((court) => {
-      const matches = byCourt.map.get(court.id) ?? [];
+      const matches = byCourt.get(court.id) ?? [];
       const rows = buildCourtTimelineRows(court, matches, initial.levelTimingByLevel);
       const idleCount = rows.filter((r) => r.type === "idle").length;
       return { court, matches, rows, idleCount };
@@ -426,9 +690,17 @@ export function KampprogramWorkspace({ initial }: Props) {
   const fieldClass =
     "rounded-md border border-lc-border bg-white px-3.5 py-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800/50 dark:text-gray-100";
 
+  const showUnscheduledSection =
+    unscheduledFiltered.length > 0 && matchFilter !== "outside-period";
+  const showScheduledSections = matchFilter !== "unscheduled";
+
   return (
     <div className="space-y-8">
-      <div className={`grid gap-4 ${initial.stats.orphanMatches > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
+      <div
+        className={`grid gap-4 ${
+          initial.stats.orphanMatches > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"
+        }`}
+      >
         <Kpi label="Kampe i alt" value={initial.stats.total} />
         <Kpi label="Planlagt" value={initial.stats.scheduled} />
         <Kpi label="Mangler bane/tid" value={unscheduledValidCount} />
@@ -466,7 +738,10 @@ export function KampprogramWorkspace({ initial }: Props) {
             <MatchTable
               rows={orphanMatches}
               showCourt={false}
+              allMatches={initial.matches}
               teamDetails={teamDetails}
+              levelTimingByLevel={initial.levelTimingByLevel}
+              conflictHintsByMatchId={conflictHintsByMatchId}
               onOpenTeam={setPreviewTeamId}
             />
           </div>
@@ -524,14 +799,17 @@ export function KampprogramWorkspace({ initial }: Props) {
           </StyledSelect>
         </label>
 
-        <label className="flex items-center gap-2 pb-2.5 text-sm text-gray-700 dark:text-gray-300">
-          <input
-            type="checkbox"
-            checked={hideUnscheduled}
-            onChange={(e) => setHideUnscheduled(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-[#14b8a6] focus:ring-[#14b8a6]/30"
-          />
-          Skjul kampe uden bane/tid
+        <label className="flex min-w-[12rem] flex-col gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Vis kampe
+          <StyledSelect
+            value={matchFilter}
+            onChange={(e) => setMatchFilter(e.target.value as KampprogramMatchFilter)}
+            className={fieldClass}
+          >
+            <option value="all">Alle kampe</option>
+            <option value="unscheduled">Kun mangler bane/tid</option>
+            <option value="outside-period">Uden for pulje-periode</option>
+          </StyledSelect>
         </label>
       </div>
 
@@ -544,7 +822,8 @@ export function KampprogramWorkspace({ initial }: Props) {
         </div>
       ) : view === "court" ? (
         <div className="space-y-6">
-          {courtTimelines.map(({ court, matches, rows, idleCount }) => (
+          {showScheduledSections
+            ? courtTimelines.map(({ court, matches, rows, idleCount }) => (
               <section
                 key={court.id}
                 className="rounded-lg border border-lc-border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50"
@@ -564,36 +843,45 @@ export function KampprogramWorkspace({ initial }: Props) {
                   <KampprogramTimelineTable
                     rows={rows}
                     showCourt={false}
-                    teamDetails={teamDetails}
-                    onOpenTeam={setPreviewTeamId}
-                  />
-                </div>
-              </section>
-            ))}
-          {byCourt.unassigned.length > 0 ? (
-            <section className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
-              <h2 className="text-base font-semibold text-amber-900 dark:text-amber-100">Ikke planlagt</h2>
-              <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">
-                {byCourt.unassigned.length} kamp{byCourt.unassigned.length === 1 ? "" : "e"} uden bane eller tid
-              </p>
-              <div className="mt-3">
-                  <MatchTable
-                    rows={byCourt.unassigned}
-                    showCourt={false}
                     showManualSchedule
+                    allMatches={initial.matches}
                     teamDetails={teamDetails}
+                    levelTimingByLevel={initial.levelTimingByLevel}
+                    conflictHintsByMatchId={conflictHintsByMatchId}
                     onOpenTeam={setPreviewTeamId}
                     onManualSchedule={setManualScheduleMatch}
                   />
-              </div>
-            </section>
+                </div>
+              </section>
+            ))
+            : null}
+          {matchFilter === "outside-period" && filtered.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Ingen kampe uden for pulje-perioden matcher filtrene.
+            </p>
+          ) : null}
+          {showUnscheduledSection ? (
+            <UnscheduledSection
+              id="ikke-planlagt"
+              rows={unscheduledFiltered}
+              allMatches={initial.matches}
+              teamDetails={teamDetails}
+              levelTimingByLevel={initial.levelTimingByLevel}
+              conflictHintsByMatchId={conflictHintsByMatchId}
+              onOpenTeam={setPreviewTeamId}
+              onManualSchedule={setManualScheduleMatch}
+            />
           ) : null}
         </div>
       ) : (
         <div className="space-y-6">
-          {roundGroups.length === 0 && hideUnscheduled ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Ingen planlagte kampe matcher filtrene.</p>
-          ) : (
+          {showScheduledSections && roundGroups.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {matchFilter === "outside-period"
+                ? "Ingen kampe uden for pulje-perioden matcher filtrene."
+                : "Ingen planlagte kampe matcher filtrene."}
+            </p>
+          ) : showScheduledSections ? (
             roundGroups.map((round) => {
               const matchRows = round.rows.filter((r) => r.type === "match");
               const idleCourts = round.rows.filter((r) => r.type === "idle").length;
@@ -614,28 +902,30 @@ export function KampprogramWorkspace({ initial }: Props) {
                     <KampprogramTimelineTable
                       rows={round.rows}
                       showCourt
+                      showManualSchedule
+                      allMatches={initial.matches}
                       teamDetails={teamDetails}
+                      levelTimingByLevel={initial.levelTimingByLevel}
+                      conflictHintsByMatchId={conflictHintsByMatchId}
                       onOpenTeam={setPreviewTeamId}
+                      onManualSchedule={setManualScheduleMatch}
                     />
                   </div>
                 </section>
               );
             })
-          )}
-          {!hideUnscheduled && unscheduledFiltered.length > 0 ? (
-            <section className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
-              <h2 className="text-base font-semibold text-amber-900 dark:text-amber-100">Ikke planlagt</h2>
-              <div className="mt-3">
-                <MatchTable
-                  rows={unscheduledFiltered}
-                  showCourt={false}
-                  showManualSchedule
-                  teamDetails={teamDetails}
-                  onOpenTeam={setPreviewTeamId}
-                  onManualSchedule={setManualScheduleMatch}
-                />
-              </div>
-            </section>
+          ) : null}
+          {showUnscheduledSection ? (
+            <UnscheduledSection
+              id="ikke-planlagt"
+              rows={unscheduledFiltered}
+              allMatches={initial.matches}
+              teamDetails={teamDetails}
+              levelTimingByLevel={initial.levelTimingByLevel}
+              conflictHintsByMatchId={conflictHintsByMatchId}
+              onOpenTeam={setPreviewTeamId}
+              onManualSchedule={setManualScheduleMatch}
+            />
           ) : null}
         </div>
       )}
@@ -649,10 +939,12 @@ export function KampprogramWorkspace({ initial }: Props) {
 
       {manualScheduleMatch ? (
         <ManualScheduleDialog
+          key={manualScheduleMatch.id}
           open
           onClose={() => setManualScheduleMatch(null)}
           matchId={manualScheduleMatch.id}
           levelKey={manualScheduleMatch.levelKey}
+          isScheduled={manualScheduleMatch.isScheduled}
           teamALabel={kontrolCenterTeamDisplayName(
             teamDetailOrFallback(manualScheduleMatch.teamAId, teamDetails),
           )}
@@ -660,6 +952,10 @@ export function KampprogramWorkspace({ initial }: Props) {
             teamDetailOrFallback(manualScheduleMatch.teamBId, teamDetails),
           )}
           onSuccess={(msg) => setScheduleActionMsg(msg)}
+          onRescheduleMatch={(id) => {
+            const next = initial.matches.find((m) => m.id === id && !m.isOrphan);
+            if (next) setManualScheduleMatch(next);
+          }}
         />
       ) : null}
 

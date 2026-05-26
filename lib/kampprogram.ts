@@ -1,4 +1,5 @@
 import type { TeamDetailView } from "@/lib/team-detail";
+import type { KampprogramSchedulingSummary } from "@/lib/scheduling-summary";
 import {
   compareCourtNamesForSchedule,
   formatTimeForInput,
@@ -37,6 +38,8 @@ export type KampprogramMatch = {
   endTime: string | null;
   roundIndex: number | null;
   isScheduled: boolean;
+  /** Planlagt med lempet hold-pause (auto-scheduler). */
+  scheduleRelaxedTeamRest: boolean;
 };
 
 export type KampprogramCourt = {
@@ -487,6 +490,15 @@ export type KampprogramBundle = {
     unscheduled: number;
     /** Kampe uden gyldig pulje/hold (vises som Ukendt hold). */
     orphanMatches: number;
+    outsidePoolPeriod: number;
   };
+  schedulingSummary: KampprogramSchedulingSummary;
   error: string | null;
 };
+
+export type KampprogramMatchFilter = "all" | "unscheduled" | "outside-period";
+
+export function parseKampprogramMatchFilter(raw?: string | null): KampprogramMatchFilter {
+  if (raw === "unscheduled" || raw === "outside-period") return raw;
+  return "all";
+}

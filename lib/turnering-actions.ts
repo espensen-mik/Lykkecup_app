@@ -12,6 +12,9 @@ import {
   assignMatchScheduleForPool,
   listManualScheduleSlotsForMatch,
   minutesToTimestamptz,
+  type ManualScheduleBookedBlock,
+  type ManualScheduleCourtOption,
+  type ManualScheduleMoveSuggestion,
   type ManualScheduleSlotOption,
   type UnscheduledMatchDetail,
 } from "@/lib/turnering-scheduler";
@@ -21,6 +24,7 @@ import {
   periodWindowMinutes,
   type TournamentPeriodRow,
 } from "@/lib/tournament-periods";
+import { findCourtOverlapIssues, findTeamRestIssues, findTeamsSpanningPeriods } from "@/lib/turneringsplan-status";
 
 export type TurneringActionResult = {
   ok: boolean;
@@ -82,6 +86,96 @@ async function buildSchedulingFailureRows(
       : "Kamp";
     return { matchId: d.matchId, label, reason: d.message };
   });
+}
+
+export type PostScheduleCheckResult = {
+  courtConflicts: number;
+  teamRestWarnings: number;
+  teamsSpanningPeriods: number;
+  /** Short summary text to append to a success message, empty when no issues. */
+  summary: string;
+};
+
+/**
+ * After scheduling, fetch the relevant matches and run lightweight conflict
+ * checks (court overlaps, team rest, teams spanning periods). Returns counts
+ * and a short summary string suitable for appending to a toast message.
+ */
+async function fetchPostScheduleChecks(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  poolIds: string[],
+  levelKey: string,
+): Promise<PostScheduleCheckResult> {
+  const empty: PostScheduleCheckResult = { courtConflicts: 0, teamRestWarnings: 0, teamsSpanningPeriods: 0, summary: "" };
+  if (poolIds.length === 0) return empty;
+
+  const [matchesRes, teamsRes, poolsRes, scheduleRes] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("id, pool_id, team_a_id, team_b_id, court_id, start_time, end_time, schedule_relaxed_team_rest")
+      .eq("event_id", TURNERING_EVENT_ID)
+      .in("pool_id", poolIds)
+      .not("court_id", "is", null)
+      .not("start_time", "is", null),
+    supabase
+      .from("teams")
+      .select("id, name, level, pool_id")
+      .eq("event_id", TURNERING_EVENT_ID),
+    supabase
+      .from("pools")
+      .select("id, name, level, period_id")
+      .eq("event_id", TURNERING_EVENT_ID)
+      .in("id", poolIds),
+    supabase
+      .from("level_schedule_settings")
+      .select("level, plan_matches_per_team, match_duration_minutes, break_between_matches_minutes")
+      .eq("event_id", TURNERING_EVENT_ID),
+  ]);
+
+  if (matchesRes.error || teamsRes.error || poolsRes.error || scheduleRes.error) return empty;
+
+  const matches = (matchesRes.data ?? []) as Array<{
+    id: string; pool_id: string; team_a_id: string; team_b_id: string;
+    court_id: string | null; start_time: string | null; end_time: string | null;
+    schedule_relaxed_team_rest?: boolean;
+  }>;
+
+  if (matches.length === 0) return empty;
+
+  const teams = (teamsRes.data ?? []) as Array<{ id: string; name: string; level: string | null; pool_id: string | null }>;
+  const pools = (poolsRes.data ?? []) as Array<{ id: string; name: string; level: string | null; period_id: string | null }>;
+
+  const teamNamesById = Object.fromEntries(teams.map((t) => [t.id, t.name as string]));
+  const poolPeriodIds = Object.fromEntries(pools.map((p) => [p.id, p.period_id as string | null]));
+  const scheduleRows = ((scheduleRes.data ?? []) as Array<{
+    level: string; plan_matches_per_team: number | null;
+    match_duration_minutes?: number | null; break_between_matches_minutes?: number | null;
+  }>);
+
+  const courtConflictIssues = findCourtOverlapIssues(matches, {}, teamNamesById);
+  const { issues: teamRestIssues } = findTeamRestIssues({
+    teams,
+    pools,
+    matches,
+    planMatchesByLevel: {},
+    scheduleRows,
+    courtNamesById: {},
+    teamNamesById,
+  });
+  const spanningIssues = findTeamsSpanningPeriods(matches, poolPeriodIds, teamNamesById);
+
+  const courtConflicts = courtConflictIssues.length;
+  const teamRestWarnings = teamRestIssues.length;
+  const teamsSpanningPeriods = spanningIssues.length;
+
+  const parts: string[] = [];
+  if (courtConflicts > 0) parts.push(`${courtConflicts} bane-konflikt${courtConflicts === 1 ? "" : "er"}`);
+  if (teamRestWarnings > 0) parts.push(`${teamRestWarnings} hold-pause-advarsel${teamRestWarnings === 1 ? "" : "er"}`);
+  if (teamsSpanningPeriods > 0) parts.push(`${teamsSpanningPeriods} hold spænder over to perioder`);
+
+  const summary = parts.length > 0 ? ` OBS: ${parts.join(", ")}.` : "";
+
+  return { courtConflicts, teamRestWarnings, teamsSpanningPeriods, summary };
 }
 
 export type CreatedPoolRow = {
@@ -512,8 +606,8 @@ export async function updateMatchScheduleAction(
   matchId: string,
   levelKey: string,
   courtId: string | null,
-  startTimeIso: string,
-  endTimeIso: string,
+  startTimeIso: string | null,
+  endTimeIso: string | null,
   options?: { scheduleRelaxedTeamRest?: boolean },
 ): Promise<TurneringActionResult> {
   const locked = await planningLockdownBlock();
@@ -544,7 +638,13 @@ export async function updateMatchScheduleAction(
   revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
   revalidatePath("/kampprogram");
 
-  return { ok: true, message: "Kamp opdateret." };
+  return {
+    ok: true,
+    message:
+      courtId == null && startTimeIso == null && endTimeIso == null
+        ? "Planlægning fjernet."
+        : "Kamp opdateret.",
+  };
 }
 
 export type ManualScheduleSlotsActionResult = TurneringActionResult & {
@@ -553,6 +653,9 @@ export type ManualScheduleSlotsActionResult = TurneringActionResult & {
   teamBLabel?: string | null;
   teamRestMinutes?: number;
   slots?: ManualScheduleSlotOption[];
+  moveSuggestions?: ManualScheduleMoveSuggestion[];
+  courts?: ManualScheduleCourtOption[];
+  bookedBlocks?: ManualScheduleBookedBlock[];
 };
 
 export async function fetchManualScheduleSlotsAction(
@@ -579,6 +682,9 @@ export async function fetchManualScheduleSlotsAction(
     teamBLabel: result.teamBLabel,
     teamRestMinutes: result.teamRestMinutes,
     slots: result.slots,
+    moveSuggestions: result.moveSuggestions,
+    courts: result.courts,
+    bookedBlocks: result.bookedBlocks,
   };
 }
 
@@ -744,6 +850,7 @@ export async function generateAllPoolMatchesForLevelAction(
     scheduled?: number;
     matchCount?: number;
     schedulingFailures?: SchedulingFailureRow[];
+    postScheduleChecks?: PostScheduleCheckResult;
   }
 > {
   const locked = await planningLockdownBlock();
@@ -942,14 +1049,19 @@ export async function generateAllPoolMatchesForLevelAction(
     }
   }
 
+  const postScheduleChecks = scheduled > 0
+    ? await fetchPostScheduleChecks(supabase, generatedPoolIds, levelKey)
+    : undefined;
+
   return {
     ok,
     message: `${normalizedLevel}: ${totalMatchCount} kampe i ${generatedPoolIds.length} pulje(r) — ${scheduled} med bane og tid.${partial}${overflow}${skipNote}${errNote}${
       scheduleError && scheduled === 0 ? ` ${scheduleError}` : ""
-    }${unscheduled > 0 ? " Se årsager nedenfor." : ""}`,
+    }${unscheduled > 0 ? " Se årsager nedenfor." : ""}${postScheduleChecks?.summary ?? ""}`,
     matchCount: totalMatchCount,
     scheduled,
     schedulingFailures,
+    postScheduleChecks,
   };
 }
 
@@ -966,6 +1078,7 @@ export async function generateAllPoolMatchesForTournamentAction(
     matchCount?: number;
     levelCount?: number;
     schedulingFailures?: SchedulingFailureRow[];
+    postScheduleChecks?: PostScheduleCheckResult;
   }
 > {
   const locked = await planningLockdownBlock();
@@ -1060,15 +1173,21 @@ export async function generateAllPoolMatchesForTournamentAction(
   const errNote = errors.length > 0 ? ` Fejl: ${errors.join(" ")}` : "";
   const ok = errors.length === 0 && unscheduled === 0 && scheduled > 0;
 
+  const allPoolIds = ((poolsRes.data ?? []) as Array<{ id: string; level: string | null }>).map((p) => p.id);
+  const postScheduleChecks = scheduled > 0
+    ? await fetchPostScheduleChecks(supabase, allPoolIds, "")
+    : undefined;
+
   return {
     ok,
     message: `Hele turneringen: ${totalMatchCount} kampe på ${levelsProcessed} niveau(er) — ${scheduled} med bane og tid.${partial}${skipNote}${errNote}${
       unscheduled > 0 ? " Se detaljer på det enkelte niveau." : ""
-    }`,
+    }${postScheduleChecks?.summary ?? ""}`,
     matchCount: totalMatchCount,
     scheduled,
     levelCount: levelsProcessed,
     schedulingFailures: schedulingFailures.length > 0 ? schedulingFailures : undefined,
+    postScheduleChecks,
   };
 }
 
@@ -1145,7 +1264,7 @@ export async function schedulePoolMatchesAction(
   poolId: string,
   levelKey: string,
 ): Promise<
-  TurneringActionResult & { scheduled?: number; schedulingFailures?: SchedulingFailureRow[] }
+  TurneringActionResult & { scheduled?: number; schedulingFailures?: SchedulingFailureRow[]; postScheduleChecks?: PostScheduleCheckResult }
 > {
   const locked = await planningLockdownBlock();
   if (locked) return locked;
@@ -1263,12 +1382,18 @@ export async function schedulePoolMatchesAction(
     }
   }
 
+  const poolsForCheck = siblingPoolIds.length >= 2 ? siblingPoolIds : [poolId];
+  const postScheduleChecks = schedule.scheduled > 0
+    ? await fetchPostScheduleChecks(supabase, poolsForCheck, levelKey)
+    : undefined;
+
   return {
     ok: schedule.unscheduled === 0,
     message: `${pool.name}: ${schedule.scheduled} kamp(e) planlagt.${partial}${overflow}${
       schedule.error ? ` ${schedule.error}` : ""
-    }${schedule.unscheduled > 0 ? " Se årsager nedenfor." : ""}`,
+    }${schedule.unscheduled > 0 ? " Se årsager nedenfor." : ""}${postScheduleChecks?.summary ?? ""}`,
     scheduled: schedule.scheduled,
     schedulingFailures,
+    postScheduleChecks,
   };
 }

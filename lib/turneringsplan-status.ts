@@ -38,6 +38,8 @@ export type TurneringsplanStatusInput = {
   }>;
   courtNamesById: Record<string, string>;
   teamNamesById: Record<string, string>;
+  /** Optional: pool_id → period_id mapping. Used for the teams-spanning-periods check. */
+  poolPeriodIds?: Record<string, string | null>;
 };
 
 export type TurneringsplanStatusIssueGroup = {
@@ -69,6 +71,7 @@ export type TurneringsplanMatchStatus = {
     courtConflicts: number;
     teamRestWarnings: number;
     relaxedRestMatches: number;
+    teamsSpanningPeriods: number;
   };
   issueGroups: TurneringsplanStatusIssueGroup[];
   levelBreakdown: TurneringsplanLevelBreakdown[];
@@ -94,7 +97,7 @@ function overlaps(a0: number, a1: number, b0: number, b1: number): boolean {
   return a0 < b1 && b0 < a1;
 }
 
-function findCourtOverlapIssues(
+export function findCourtOverlapIssues(
   matches: readonly TurneringsplanStatusMatch[],
   courtNamesById: Record<string, string>,
   teamNamesById: Record<string, string>,
@@ -126,7 +129,7 @@ function findCourtOverlapIssues(
   return issues;
 }
 
-function findTeamRestIssues(input: TurneringsplanStatusInput): {
+export function findTeamRestIssues(input: TurneringsplanStatusInput): {
   issues: string[];
   relaxedCount: number;
 } {
@@ -159,6 +162,40 @@ function findTeamRestIssues(input: TurneringsplanStatusInput): {
   }
 
   return { issues, relaxedCount };
+}
+
+/**
+ * Find teams whose scheduled matches span more than one non-all-day period,
+ * i.e. a team has matches in both Formiddag and Eftermiddag.
+ * Returns a list of display strings (one per team) and the count.
+ */
+export function findTeamsSpanningPeriods(
+  matches: readonly TurneringsplanStatusMatch[],
+  poolPeriodIds: Record<string, string | null>,
+  teamNamesById: Record<string, string>,
+): string[] {
+  const teamPeriods = new Map<string, Set<string>>();
+
+  for (const m of matches) {
+    if (!m.court_id || !m.start_time) continue;
+    const periodId = poolPeriodIds[m.pool_id];
+    if (!periodId) continue;
+
+    for (const teamId of [m.team_a_id, m.team_b_id]) {
+      const set = teamPeriods.get(teamId) ?? new Set<string>();
+      set.add(periodId);
+      teamPeriods.set(teamId, set);
+    }
+  }
+
+  const issues: string[] = [];
+  for (const [teamId, periods] of teamPeriods) {
+    if (periods.size > 1) {
+      issues.push(teamNamesById[teamId] ?? teamId);
+    }
+  }
+  issues.sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" }));
+  return issues;
 }
 
 function computeLevelBreakdown(input: TurneringsplanStatusInput): TurneringsplanLevelBreakdown[] {
@@ -259,6 +296,9 @@ export function computeTurneringsplanMatchStatus(
 
   const courtOverlapIssues = findCourtOverlapIssues(input.matches, input.courtNamesById, input.teamNamesById);
   const { issues: teamRestIssues, relaxedCount } = findTeamRestIssues(input);
+  const spanningIssues = input.poolPeriodIds
+    ? findTeamsSpanningPeriods(input.matches, input.poolPeriodIds, input.teamNamesById)
+    : [];
 
   const issueGroups: TurneringsplanStatusIssueGroup[] = [];
 
@@ -328,6 +368,16 @@ export function computeTurneringsplanMatchStatus(
     });
   }
 
+  if (spanningIssues.length > 0) {
+    issueGroups.push({
+      id: "spanning-periods",
+      title: "Hold spænder over flere perioder",
+      status: "warn",
+      count: spanningIssues.length,
+      items: truncate(spanningIssues),
+    });
+  }
+
   if (orphanMatches > 0) {
     issueGroups.push({
       id: "orphans",
@@ -372,6 +422,7 @@ export function computeTurneringsplanMatchStatus(
       courtConflicts: courtOverlapIssues.length,
       teamRestWarnings: teamRestIssues.length,
       relaxedRestMatches: relaxedCount,
+      teamsSpanningPeriods: spanningIssues.length,
     },
     issueGroups,
     levelBreakdown,
