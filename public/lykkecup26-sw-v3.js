@@ -1,9 +1,5 @@
 /* eslint-disable no-restricted-globals */
-/**
- * Service worker deaktiveret — tidligere caching af HTML under /lykkecup26/
- * gav ødelagt layout ved QR-scan (manglende CSS + strakt hero).
- * Denne fil rydder gamle caches og afregistrerer sig selv.
- */
+/** Teardown — erstatter ældre lykkecup26-sw.js. Ingen fetch-interception. */
 const CACHE_PREFIX = "lc26-cache-";
 
 self.addEventListener("install", (event) => {
@@ -19,5 +15,3 @@ self.addEventListener("activate", (event) => {
       .then(() => self.registration.unregister()),
   );
 });
-
-/* Ingen fetch-handler — alle requests går direkte til netværket. */

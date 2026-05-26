@@ -12,6 +12,7 @@ const PUBLIC_PATHS = new Set([
   "/status",
   "/lykkecup26.webmanifest",
   "/lykkecup26-sw.js",
+  "/lykkecup26-sw-v3.js",
 ]);
 const AUTH_ENTRY_PAGES = new Set(["/login", "/glemt-kode"]);
 

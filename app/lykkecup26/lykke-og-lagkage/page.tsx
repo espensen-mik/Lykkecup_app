@@ -1,3 +1,4 @@
+import "@/components/lykkecup26/lykke-lagkage-critical.css";
 import { LykkeLagkageProgram } from "@/components/lykkecup26/lykke-lagkage-program";
 import { fetchLc26PageContent, type Lc26ProgramContent } from "@/lib/lc26-page-content";
 

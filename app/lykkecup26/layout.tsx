@@ -4,6 +4,9 @@ import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { Lc26PwaBootstrap } from "@/components/lykkecup26/lc26-pwa-bootstrap";
 import { Lykkecup26Shell } from "@/components/lykkecup26/lykkecup26-shell";
 
+/** Egen CSS-chunk for offentlig app — reducer risiko for ustylet QR-førstebesøg. */
+import "../globals.css";
+
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
