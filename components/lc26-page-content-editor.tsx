@@ -121,7 +121,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
     setError(null);
     setNotice(null);
     let parsed: unknown;
-    if (pageKey === "program") parsed = programContent;
+    if (pageKey === "program" || pageKey === "lykke-og-lagkage") parsed = programContent;
     else if (pageKey === "find-rundt") {
       let nextCards = [...findContent.cards];
       const entries = Object.entries(pendingFindCardFiles).filter(([, f]) => Boolean(f));
@@ -260,21 +260,40 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
         ) : null}
       </label>
 
-      {pageKey === "program" ? (
-        <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900/50 dark:bg-sky-950/20">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+      {pageKey === "program" || pageKey === "lykke-og-lagkage" ? (
+        <div
+          className={`space-y-3 rounded-xl border p-4 ${
+            pageKey === "lykke-og-lagkage"
+              ? "border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/20"
+              : "border-sky-200 bg-sky-50/60 dark:border-sky-900/50 dark:bg-sky-950/20"
+          }`}
+        >
+          <p
+            className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${
+              pageKey === "lykke-og-lagkage"
+                ? "text-amber-700 dark:text-amber-300"
+                : "text-sky-700 dark:text-sky-300"
+            }`}
+          >
             <CalendarClock className="h-3.5 w-3.5" aria-hidden />
             Program indhold
           </p>
-          <label className="block">
-            <span className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Billedtekst</span>
-            <textarea
-              value={programContent.caption}
-              onChange={(e) => setProgramContent((c) => ({ ...c, caption: e.target.value }))}
-              rows={2}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-            />
-          </label>
+          {pageKey === "program" ? (
+            <label className="block">
+              <span className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Billedtekst</span>
+              <textarea
+                value={programContent.caption}
+                onChange={(e) => setProgramContent((c) => ({ ...c, caption: e.target.value }))}
+                rows={2}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+            </label>
+          ) : (
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Siden er kun tilgængelig via direkte link / QR — ikke i burger-menuen. Offentlig URL:{" "}
+              <code className="rounded bg-white/80 px-1 py-0.5 text-[11px] dark:bg-gray-900/60">/lykkecup26/lykke-og-lagkage</code>
+            </p>
+          )}
           {programContent.schedule.map((item, idx) => (
             <div key={`program-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -303,6 +322,20 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                   className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                 />
               </div>
+              {pageKey === "lykke-og-lagkage" ? (
+                <input
+                  value={item.location ?? ""}
+                  onChange={(e) =>
+                    setProgramContent((c) => {
+                      const next = [...c.schedule];
+                      next[idx] = { ...next[idx], location: e.target.value };
+                      return { ...c, schedule: next };
+                    })
+                  }
+                  placeholder="Sted (fx SKY Lounge · BOXEN)"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+              ) : null}
               <textarea
                 value={item.note ?? ""}
                 onChange={(e) =>
@@ -374,7 +407,16 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
             onClick={() =>
               setProgramContent((c) => ({
                 ...c,
-                schedule: [...c.schedule, { time: "", title: "", note: "", highlight: false }],
+                schedule: [
+                  ...c.schedule,
+                  {
+                    time: "",
+                    title: "",
+                    note: "",
+                    highlight: false,
+                    ...(pageKey === "lykke-og-lagkage" ? { location: "" } : {}),
+                  },
+                ],
               }))
             }
             className="rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-200"

@@ -32,7 +32,7 @@ export function MitLykkecupClient() {
         <div className="mt-6 rounded-2xl border border-stone-200 bg-white px-6 py-10 text-center shadow-sm">
           <p className="text-[15px] font-medium text-lc26-navy">Ingen gemt profil endnu</p>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-lc26-navy/50">
-            Find din spiller eller træner på forsiden og gem i Mit LykkeCup.
+            Find din spiller eller træner på forsiden — eller gem dit VIP-program via QR-kortet — og vælg Gem i Mit LykkeCup.
           </p>
           <Link
             href="/lykkecup26"
@@ -44,7 +44,11 @@ export function MitLykkecupClient() {
       ) : (
         <section className="mt-6 rounded-2xl border border-lc26-teal/30 bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">
-            {saved.kind === "coach" ? "Min trænerprofil" : "Min spillerprofil"}
+            {saved.kind === "page"
+              ? "Mit gemte program"
+              : saved.kind === "coach"
+                ? "Min trænerprofil"
+                : "Min spillerprofil"}
           </p>
           <p className="mt-2 text-2xl font-semibold tracking-tight text-lc26-navy">{saved.name}</p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">

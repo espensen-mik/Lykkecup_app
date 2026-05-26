@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, ChevronRight, Info, MapPinned, MessageSquareText, Newspaper } from "lucide-react";
+import { CalendarDays, Cake, ChevronRight, Info, MapPinned, MessageSquareText, Newspaper } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "App indhold",
@@ -13,6 +13,12 @@ const LINKS = [
   { href: "/app-indhold/find-rundt-i-mch", label: "Find rundt i MCH", icon: MapPinned, tone: "from-violet-50 to-indigo-50 border-violet-200" },
   { href: "/app-indhold/praktisk-info", label: "Praktisk info", icon: Info, tone: "from-amber-50 to-yellow-50 border-amber-200" },
   { href: "/app-indhold/nyt-fra-lykkeliga", label: "Nyt fra LykkeLiga", icon: Newspaper, tone: "from-fuchsia-50 to-pink-50 border-fuchsia-200" },
+  {
+    href: "/app-indhold/lykke-og-lagkage",
+    label: "Lykke & Lagkage (VIP)",
+    icon: Cake,
+    tone: "from-amber-50 to-orange-50 border-amber-200",
+  },
   { href: "/beskeder", label: "Beskeder", icon: MessageSquareText, tone: "from-emerald-50 to-teal-50 border-emerald-200" },
 ];
 

@@ -3,11 +3,16 @@ import { LYKKECUP26_EVENT_ID } from "@/lib/lykkecup26-public";
 
 export const LC26_PAGE_CONTENT_IMAGE_BUCKET = "lc26_page_content_images";
 
-export type Lc26PageKey = "program" | "find-rundt" | "praktisk-info" | "nyt-fra-lykkeliga";
+export type Lc26PageKey = "program" | "find-rundt" | "praktisk-info" | "nyt-fra-lykkeliga" | "lykke-og-lagkage";
+
+/** Offentlig URL til VIP-programmet (ikke i burger-menu — kun direkte link / QR). */
+export const LC26_LYKKE_LAGKAGE_HREF = "/lykkecup26/lykke-og-lagkage" as const;
 
 export type Lc26ProgramScheduleItem = {
   time: string;
   title: string;
+  /** Fx «SKY Lounge · BOXEN» — bruges på VIP-programmet. */
+  location?: string;
   note?: string;
   highlight?: boolean;
 };
@@ -111,6 +116,48 @@ const defaults: Record<
         },
       ],
     } satisfies Lc26PraktiskInfoContent,
+  },
+  "lykke-og-lagkage": {
+    title: "Lykke & Lagkage",
+    intro:
+      "Kære gæst til LykkeCup. Velkommen til en særlig dag med håndbold i verdensklasse, musik og Danmarks lykkeligste VIP-event. Her finder du dit personlige program for dagen.",
+    heroImageUrl: "/Lykkeoglagkage.jpg",
+    content: {
+      caption: "",
+      schedule: [
+        {
+          time: "9.15",
+          title: "Indløb og åbningsceremoni",
+          location: "SKY Lounge · BOXEN",
+          note: "Oplev den rørende og livsglade indmarch i Boxen, når 950 lykkelige håndboldspillere gør deres entré",
+        },
+        {
+          time: "10.10",
+          title: "Håndboldkampe starter",
+          location: "BOXEN & Hal L",
+          note: "Så er der håndbold i verdensklasse. Alle kampe har en varighed på 9 minutter",
+        },
+        {
+          time: "10.20",
+          title: "Opvisningskamp",
+          location: "Hal L, Bane 7",
+          note: "Der er masser af stjerner, når der spilles opvisningskamp i Hal L.",
+        },
+        {
+          time: "11.00",
+          title: "Lykke & Lagkage",
+          location: "SKY Lounge · BOXEN",
+          note: "Lykke & Lagkage er Danmarks lykkeligste VIP-event, hvor gæster af LykkeLiga får årets status på lykken.",
+          highlight: true,
+        },
+        {
+          time: "12.00",
+          title: "Guidet rundvisning",
+          location: "BOXEN & Hal L",
+          note: "I selskab med medarbejdere og bestyrelse fra LykkeLiga tager vi jer med på rundtur i MCH, hvor I kan snuse til lykken.",
+        },
+      ],
+    } satisfies Lc26ProgramContent,
   },
   "nyt-fra-lykkeliga": {
     title: "Nyt fra LykkeLiga",

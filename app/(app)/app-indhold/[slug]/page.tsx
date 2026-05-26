@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ComponentType } from "react";
-import { CalendarClock, Info, MapPinned, Newspaper } from "lucide-react";
+import { Cake, CalendarClock, Info, MapPinned, Newspaper } from "lucide-react";
 import { Lc26PageContentEditor } from "@/components/lc26-page-content-editor";
 import { PhonePreviewButton } from "@/components/phone-preview-button";
 import { fetchLc26PageContent, type Lc26PageKey } from "@/lib/lc26-page-content";
@@ -15,6 +15,11 @@ const slugToPageKey: Record<string, { key: Lc26PageKey; label: string; previewHr
   "find-rundt-i-mch": { key: "find-rundt", label: "Find rundt i MCH", previewHref: "/lykkecup26/side-2" },
   "praktisk-info": { key: "praktisk-info", label: "Praktisk info", previewHref: "/lykkecup26/side-3" },
   "nyt-fra-lykkeliga": { key: "nyt-fra-lykkeliga", label: "Nyt fra LykkeLiga", previewHref: "/lykkecup26/nyt-fra-lykkeliga" },
+  "lykke-og-lagkage": {
+    key: "lykke-og-lagkage",
+    label: "Lykke & Lagkage (VIP)",
+    previewHref: "/lykkecup26/lykke-og-lagkage",
+  },
 };
 
 const pageVisuals: Record<Lc26PageKey, { icon: ComponentType<{ className?: string }>; style: string }> = {
@@ -22,6 +27,11 @@ const pageVisuals: Record<Lc26PageKey, { icon: ComponentType<{ className?: strin
   "find-rundt": { icon: MapPinned, style: "from-violet-50 via-indigo-50/50 to-white border-violet-200 dark:from-violet-950/20 dark:via-indigo-950/10 dark:to-transparent dark:border-violet-900/40" },
   "praktisk-info": { icon: Info, style: "from-amber-50 via-yellow-50/50 to-white border-amber-200 dark:from-amber-950/20 dark:via-yellow-950/10 dark:to-transparent dark:border-amber-900/40" },
   "nyt-fra-lykkeliga": { icon: Newspaper, style: "from-fuchsia-50 via-pink-50/50 to-white border-fuchsia-200 dark:from-fuchsia-950/20 dark:via-pink-950/10 dark:to-transparent dark:border-fuchsia-900/40" },
+  "lykke-og-lagkage": {
+    icon: Cake,
+    style:
+      "from-amber-50 via-orange-50/50 to-white border-amber-200 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-transparent dark:border-amber-900/40",
+  },
 };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

@@ -3,6 +3,7 @@
 import {
   BarChart3,
   Building2,
+  Cake,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -792,6 +793,10 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
             <Link href="/app-indhold/nyt-fra-lykkeliga" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
               <Newspaper className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Nyt fra LykkeLiga
+            </Link>
+            <Link href="/app-indhold/lykke-og-lagkage" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md py-1.5 pl-3 pr-2 text-[0.8125rem] text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200">
+              <Cake className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Lykke & Lagkage (VIP)
             </Link>
             <Link
               href="/beskeder"

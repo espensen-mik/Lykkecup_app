@@ -10,6 +10,7 @@ export const LC26_STATIC_PAGE_TITLES: Record<string, string> = {
   "/lykkecup26/nyt-fra-lykkeliga": "Nyt fra LykkeLiga",
   "/lykkecup26/beskeder": "Beskeder",
   "/lykkecup26/mit": "Mit LykkeCup",
+  "/lykkecup26/lykke-og-lagkage": "Lykke & Lagkage (VIP)",
 };
 
 export type AnalyticsPathKind = "player" | "coach" | "app" | "other";

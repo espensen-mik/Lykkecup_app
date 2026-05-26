@@ -145,9 +145,11 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
       {savedProfile ? (
         <section
           className={`mb-8 rounded-2xl p-5 sm:mb-10 sm:p-6 ${
-            savedProfile.kind === "coach"
-              ? "border border-lc26-navy/80 bg-lc26-navy shadow-[0_14px_34px_-18px_rgb(22_51_88/0.9)]"
-              : "border border-lc26-teal/70 bg-lc26-teal shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)]"
+            savedProfile.kind === "page"
+              ? "border border-amber-500/70 bg-gradient-to-br from-amber-500 to-amber-600 shadow-[0_14px_34px_-18px_rgb(245_158_11/0.85)]"
+              : savedProfile.kind === "coach"
+                ? "border border-lc26-navy/80 bg-lc26-navy shadow-[0_14px_34px_-18px_rgb(22_51_88/0.9)]"
+                : "border border-lc26-teal/70 bg-lc26-teal shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)]"
           }`}
           aria-labelledby="lc26-saved-heading"
         >
@@ -159,7 +161,11 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
             <p className="text-xl font-semibold tracking-tight text-white">{savedProfile.name}</p>
           </div>
           <p className="mt-1 text-sm font-semibold uppercase tracking-[0.08em] text-white/90">
-            {savedProfile.kind === "coach" ? "Cheftræner" : "Håndboldstjerne"}
+            {savedProfile.kind === "page"
+              ? "VIP-program"
+              : savedProfile.kind === "coach"
+                ? "Cheftræner"
+                : "Håndboldstjerne"}
           </p>
           <p className="mt-1 text-xs text-white/80">Vi husker kun på denne telefon eller browser — uden login.</p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -167,7 +173,11 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
               type="button"
               onClick={() => router.push(getSavedProfileHref(savedProfile))}
               className={`inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold shadow-sm transition hover:bg-stone-50 active:scale-[0.99] sm:w-auto ${
-                savedProfile.kind === "coach" ? "text-lc26-navy" : "text-lc26-teal"
+                savedProfile.kind === "page"
+                  ? "text-amber-800"
+                  : savedProfile.kind === "coach"
+                    ? "text-lc26-navy"
+                    : "text-lc26-teal"
               }`}
             >
               Åbn Mit LykkeCup
