@@ -17,7 +17,7 @@ const LINKS = [
     href: "/app-indhold/lykke-og-lagkage",
     label: "Lykke & Lagkage (VIP)",
     icon: Cake,
-    tone: "from-amber-50 to-orange-50 border-amber-200",
+    tone: "from-[#f7f2e3] to-[#f3edd8] border-[#d3af37]/40",
   },
   { href: "/beskeder", label: "Beskeder", icon: MessageSquareText, tone: "from-emerald-50 to-teal-50 border-emerald-200" },
 ];

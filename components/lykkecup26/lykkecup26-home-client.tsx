@@ -146,7 +146,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
         <section
           className={`mb-8 rounded-2xl p-5 sm:mb-10 sm:p-6 ${
             savedProfile.kind === "page"
-              ? "border border-amber-500/70 bg-gradient-to-br from-amber-500 to-amber-600 shadow-[0_14px_34px_-18px_rgb(245_158_11/0.85)]"
+              ? "border border-lc26-gold/60 bg-gradient-to-br from-lc26-gold to-lc26-gold-dark shadow-[0_14px_34px_-18px_rgb(211_175_55/0.75)]"
               : savedProfile.kind === "coach"
                 ? "border border-lc26-navy/80 bg-lc26-navy shadow-[0_14px_34px_-18px_rgb(22_51_88/0.9)]"
                 : "border border-lc26-teal/70 bg-lc26-teal shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)]"
@@ -174,7 +174,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
               onClick={() => router.push(getSavedProfileHref(savedProfile))}
               className={`inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold shadow-sm transition hover:bg-stone-50 active:scale-[0.99] sm:w-auto ${
                 savedProfile.kind === "page"
-                  ? "text-amber-800"
+                  ? "text-lc26-navy"
                   : savedProfile.kind === "coach"
                     ? "text-lc26-navy"
                     : "text-lc26-teal"

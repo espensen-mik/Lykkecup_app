@@ -264,14 +264,14 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
         <div
           className={`space-y-3 rounded-xl border p-4 ${
             pageKey === "lykke-og-lagkage"
-              ? "border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/20"
+              ? "border-lc26-gold/30 bg-lc26-gold-soft/80 dark:border-lc26-gold/25 dark:bg-lc26-gold/10"
               : "border-sky-200 bg-sky-50/60 dark:border-sky-900/50 dark:bg-sky-950/20"
           }`}
         >
           <p
             className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${
               pageKey === "lykke-og-lagkage"
-                ? "text-amber-700 dark:text-amber-300"
+                ? "text-lc26-gold-dark dark:text-lc26-gold"
                 : "text-sky-700 dark:text-sky-300"
             }`}
           >

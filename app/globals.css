@@ -35,6 +35,9 @@
   /* LykkeCup 26 — navy + primær teal (#00a182) */
   --color-lc26-navy: #163358;
   --color-lc26-teal: #00a182;
+  --color-lc26-gold: #d3af37;
+  --color-lc26-gold-soft: #f7f2e3;
+  --color-lc26-gold-dark: #b5922f;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --color-lc-primary: var(--lc-primary);

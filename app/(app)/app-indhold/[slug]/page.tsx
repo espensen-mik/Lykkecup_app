@@ -30,7 +30,7 @@ const pageVisuals: Record<Lc26PageKey, { icon: ComponentType<{ className?: strin
   "lykke-og-lagkage": {
     icon: Cake,
     style:
-      "from-amber-50 via-orange-50/50 to-white border-amber-200 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-transparent dark:border-amber-900/40",
+      "from-[#f7f2e3] via-[#f3edd8]/60 to-white border-[#d3af37]/35 dark:from-[#2a2618]/30 dark:via-[#2a2618]/15 dark:to-transparent dark:border-[#d3af37]/25",
   },
 };
 

@@ -33,7 +33,7 @@ export function LykkeLagkageProgram({
 
       <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-8 sm:max-w-2xl sm:px-6 sm:pb-14 sm:pt-10">
         <header className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700/90">VIP · LykkeCup 26</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lc26-gold-dark">VIP · LykkeCup 26</p>
           <h1 className="mt-2 text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.65rem]">
             {title}
           </h1>
@@ -54,14 +54,14 @@ export function LykkeLagkageProgram({
                 <div
                   className={`relative flex gap-3 rounded-2xl border p-4 shadow-sm transition sm:gap-5 sm:p-5 ${
                     item.highlight
-                      ? "border-amber-400/50 bg-gradient-to-br from-amber-50 via-white to-white ring-1 ring-amber-300/40"
+                      ? "border-lc26-gold/45 bg-gradient-to-br from-lc26-gold-soft via-white to-white ring-1 ring-lc26-gold/25"
                       : "border-stone-200/90 bg-white"
                   }`}
                 >
                   <div className="flex shrink-0 flex-col items-center gap-1 pt-0.5 sm:w-[4.5rem]">
                     <span
                       className={`font-semibold tabular-nums tracking-tight ${
-                        item.highlight ? "text-amber-800" : "text-lc26-navy/85"
+                        item.highlight ? "text-lc26-gold-dark" : "text-lc26-navy/85"
                       }`}
                     >
                       {item.time}
@@ -69,7 +69,7 @@ export function LykkeLagkageProgram({
                     <span
                       className={`h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5 ${
                         item.highlight
-                          ? "bg-amber-500 shadow-[0_0_0_3px_rgb(245_158_11/0.25)]"
+                          ? "bg-lc26-gold shadow-[0_0_0_3px_rgb(211_175_55/0.28)]"
                           : "bg-stone-300"
                       }`}
                       aria-hidden

@@ -42,15 +42,15 @@ export function Lc26SavePageShortcut({ pagePath, label }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/80 via-white to-white p-4 shadow-sm">
-      <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-amber-800/80">
+    <div className="rounded-2xl border border-lc26-gold/35 bg-gradient-to-br from-lc26-gold-soft via-white to-white p-4 shadow-sm">
+      <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-lc26-gold-dark">
         Gem til næste gang
       </p>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
         <button
           type="button"
           onClick={handleSave}
-          className="inline-flex w-full items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600 sm:w-auto"
+          className="inline-flex w-full items-center justify-center rounded-xl border border-lc26-gold/50 bg-lc26-gold px-4 py-2.5 text-sm font-semibold text-lc26-navy shadow-sm transition hover:bg-lc26-gold-dark hover:text-white sm:w-auto"
         >
           {isSaved ? "Gemt i Mit LykkeCup" : "Gem i Mit LykkeCup"}
         </button>
