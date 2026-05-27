@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -40,6 +41,9 @@ export function KontrolcenterLockdownProvider({
   const router = useRouter();
   const [planningLockdown, setPlanningLockdownState] = useState(initialPlanningLockdown);
   const [toggleBusy, setToggleBusy] = useState(false);
+  const [remoteToast, setRemoteToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didHydrateRealtimeRef = useRef(false);
 
   const isAdmin = currentUser?.role === "admin";
   const isPlanningSection = isPlanningLockdownPath(pathname);
@@ -50,30 +54,81 @@ export function KontrolcenterLockdownProvider({
 
   useEffect(() => {
     const client = getAuthBrowserClient();
+    let cancelled = false;
+
+    function applyPlanningLockdown(next: boolean, source: "initial-sync" | "realtime") {
+      setPlanningLockdownState((prev) => {
+        if (prev === next) return prev;
+        if (source === "realtime" && didHydrateRealtimeRef.current && !toggleBusy) {
+          setRemoteToast(
+            next
+              ? "Lockdown blev slået til af en anden admin."
+              : "Lockdown blev slået fra af en anden admin.",
+          );
+        }
+        return next;
+      });
+    }
+
+    async function refreshPlanningLockdownFromDb(source: "initial-sync" | "realtime") {
+      const { data, error } = await client
+        .from("kontrolcenter_event_settings")
+        .select("planning_lockdown")
+        .eq("event_id", LYKKECUP_EVENT_ID)
+        .maybeSingle();
+      if (cancelled || error) return;
+      applyPlanningLockdown(Boolean(data?.planning_lockdown), source);
+    }
 
     const channel = client
       .channel("kontrolcenter-planning-lockdown")
       .on(
         "postgres_changes",
         {
-          event: "UPDATE",
+          event: "*",
           schema: "public",
           table: "kontrolcenter_event_settings",
           filter: `event_id=eq.${LYKKECUP_EVENT_ID}`,
         },
         (payload) => {
-          const row = payload.new as { planning_lockdown?: boolean } | null;
+          const row =
+            (payload.new as { planning_lockdown?: boolean } | null) ??
+            (payload.old as { planning_lockdown?: boolean } | null);
           if (row && typeof row.planning_lockdown === "boolean") {
-            setPlanningLockdownState(row.planning_lockdown);
+            applyPlanningLockdown(row.planning_lockdown, "realtime");
+            return;
           }
+          void refreshPlanningLockdownFromDb("realtime");
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          void refreshPlanningLockdownFromDb("initial-sync").finally(() => {
+            didHydrateRealtimeRef.current = true;
+          });
+        }
+      });
 
     return () => {
+      cancelled = true;
       void client.removeChannel(channel);
     };
-  }, []);
+  }, [toggleBusy]);
+
+  useEffect(() => {
+    if (!remoteToast) return;
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
+      setRemoteToast(null);
+      toastTimerRef.current = null;
+    }, 3200);
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+    };
+  }, [remoteToast]);
 
   const setPlanningLockdown = useCallback(
     async (enabled: boolean) => {
@@ -107,7 +162,14 @@ export function KontrolcenterLockdownProvider({
   );
 
   return (
-    <KontrolcenterLockdownContext.Provider value={value}>{children}</KontrolcenterLockdownContext.Provider>
+    <KontrolcenterLockdownContext.Provider value={value}>
+      {children}
+      {remoteToast ? (
+        <div className="pointer-events-none fixed bottom-4 right-4 z-[120] max-w-sm rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+          {remoteToast}
+        </div>
+      ) : null}
+    </KontrolcenterLockdownContext.Provider>
   );
 }
 

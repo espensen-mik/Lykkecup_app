@@ -35,6 +35,7 @@ export default async function TurneringDashboardPage() {
     totals.matchesGenerated > 0
       ? Math.round((totals.matchesScheduled / totals.matchesGenerated) * 1000) / 10
       : 0;
+  const unscheduledMatches = Math.max(0, totals.matchesGenerated - totals.matchesScheduled);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8">
@@ -54,24 +55,32 @@ export default async function TurneringDashboardPage() {
         </p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Kpi label="Niveauer" value={levels.length} />
-        <Kpi label="Puljer" value={totals.poolCount} />
-        <Kpi label="Hold i puljer" value={`${totals.pooledTeams}/${totals.teamCount}`} subValue={`${pooledPct}%`} />
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <Kpi label="Niveauer" value={levels.length} tone="teal" />
+        <Kpi label="Hold i alt" value={totals.teamCount} tone="violet" />
+        <Kpi label="Puljer" value={totals.poolCount} tone="amber" />
+        <Kpi
+          label="Kampprogram i alt"
+          value={totals.matchesGenerated}
+          subValue={unscheduledMatches > 0 ? `${unscheduledMatches} uden bane/tid` : "Alle har bane/tid"}
+          tone="blue"
+        />
+        <Kpi
+          label="Hold i puljer"
+          value={`${totals.pooledTeams}/${totals.teamCount}`}
+          subValue={`${pooledPct}%`}
+          tone="emerald"
+        />
         <Kpi
           label="Genererede kampe"
           value={`${totals.matchesGenerated}/${totals.expectedMatches}`}
           subValue={`${matchGeneratedPct}% af forventet`}
-        />
-        <Kpi
-          label="Har bane og tid"
-          value={`${totals.matchesScheduled}/${totals.matchesGenerated}`}
-          subValue={totals.matchesGenerated > 0 ? `${matchScheduledPct}% af genererede` : undefined}
+          tone="rose"
         />
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Niveauer</h2>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Kampprogram pr. niveau</h2>
         {levels.length === 0 ? (
           <p className="rounded-xl border border-dashed border-gray-200 bg-white px-5 py-12 text-center text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900/35 dark:text-gray-400">
             Ingen turneringsdata fundet endnu.
@@ -83,11 +92,13 @@ export default async function TurneringDashboardPage() {
                 <article className="h-full rounded-xl border border-lc-border bg-white p-5 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">{level.levelKey}</h3>
                   <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                    <Stat label="Hold i alt" value={level.teamCount} />
+                    <Stat label="Hold i pulje" value={level.pooledTeams} />
                     <Stat label="Spillere" value={level.playerCount} />
                     <Stat label="Puljer" value={level.poolCount} />
-                    <Stat label="Kampe genereret" value={`${level.matchesGenerated}/${level.expectedMatches}`} />
+                    <Stat label="Kampe i kampprogram" value={level.matchesGenerated} />
+                    <Stat label="Forventede kampe" value={level.expectedMatches} />
                     <Stat label="Har bane/tid" value={level.matchesScheduled} />
-                    <Stat label="Hold i pulje" value={`${level.pooledTeams}/${level.teamCount}`} />
                   </dl>
                   <div className="mt-4 space-y-2">
                     <Progress
@@ -110,12 +121,64 @@ export default async function TurneringDashboardPage() {
   );
 }
 
-function Kpi({ label, value, subValue }: { label: string; value: string | number; subValue?: string }) {
+function Kpi({
+  label,
+  value,
+  subValue,
+  tone = "teal",
+}: {
+  label: string;
+  value: string | number;
+  subValue?: string;
+  tone?: "teal" | "blue" | "violet" | "amber" | "rose" | "emerald";
+}) {
+  const toneClasses: Record<
+    NonNullable<typeof tone>,
+    { shell: string; value: string; label: string; sub: string }
+  > = {
+    teal: {
+      shell: "border-teal-200/80 bg-gradient-to-br from-teal-50/90 to-white dark:border-teal-900/40 dark:from-teal-950/25 dark:to-gray-900/35",
+      value: "text-teal-700 dark:text-teal-300",
+      label: "text-teal-700/80 dark:text-teal-300/80",
+      sub: "text-teal-800/70 dark:text-teal-300/70",
+    },
+    blue: {
+      shell: "border-blue-200/80 bg-gradient-to-br from-blue-50/90 to-white dark:border-blue-900/40 dark:from-blue-950/25 dark:to-gray-900/35",
+      value: "text-blue-700 dark:text-blue-300",
+      label: "text-blue-700/80 dark:text-blue-300/80",
+      sub: "text-blue-800/70 dark:text-blue-300/70",
+    },
+    violet: {
+      shell: "border-violet-200/80 bg-gradient-to-br from-violet-50/90 to-white dark:border-violet-900/40 dark:from-violet-950/25 dark:to-gray-900/35",
+      value: "text-violet-700 dark:text-violet-300",
+      label: "text-violet-700/80 dark:text-violet-300/80",
+      sub: "text-violet-800/70 dark:text-violet-300/70",
+    },
+    amber: {
+      shell: "border-amber-200/80 bg-gradient-to-br from-amber-50/90 to-white dark:border-amber-900/40 dark:from-amber-950/25 dark:to-gray-900/35",
+      value: "text-amber-700 dark:text-amber-300",
+      label: "text-amber-700/80 dark:text-amber-300/80",
+      sub: "text-amber-800/70 dark:text-amber-300/70",
+    },
+    rose: {
+      shell: "border-rose-200/80 bg-gradient-to-br from-rose-50/90 to-white dark:border-rose-900/40 dark:from-rose-950/25 dark:to-gray-900/35",
+      value: "text-rose-700 dark:text-rose-300",
+      label: "text-rose-700/80 dark:text-rose-300/80",
+      sub: "text-rose-800/70 dark:text-rose-300/70",
+    },
+    emerald: {
+      shell: "border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 to-white dark:border-emerald-900/40 dark:from-emerald-950/25 dark:to-gray-900/35",
+      value: "text-emerald-700 dark:text-emerald-300",
+      label: "text-emerald-700/80 dark:text-emerald-300/80",
+      sub: "text-emerald-800/70 dark:text-emerald-300/70",
+    },
+  };
+  const styles = toneClasses[tone];
   return (
-    <div className="rounded-lg border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-[#14b8a6] dark:text-teal-400">{value}</p>
-      {subValue ? <p className="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">{subValue}</p> : null}
+    <div className={`rounded-lg border p-4 shadow-lc-card dark:shadow-none ${styles.shell}`}>
+      <p className={`text-xs font-semibold uppercase tracking-wide ${styles.label}`}>{label}</p>
+      <p className={`mt-2 text-2xl font-semibold tabular-nums tracking-tight ${styles.value}`}>{value}</p>
+      {subValue ? <p className={`mt-1 text-xs font-medium ${styles.sub}`}>{subValue}</p> : null}
     </div>
   );
 }
