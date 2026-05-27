@@ -38,7 +38,6 @@ import {
   LOCKDOWN_HEADER_CLASS,
   LOCKDOWN_RING_OFFSET_CLASS,
 } from "@/lib/kontrolcenter-lockdown-shared";
-import { fetchUnhandledClubFeedbackCount } from "@/lib/club-feedback";
 import {
   mergeTurneringLevelDisplayLabel,
   normalizeLevelKey,
@@ -174,13 +173,34 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
   }, []);
 
   useEffect(() => {
+    const client = getAuthBrowserClient();
     let cancelled = false;
-    (async () => {
-      const count = await fetchUnhandledClubFeedbackCount();
-      if (!cancelled) setKommentarerNyeCount(count);
-    })();
+
+    async function refreshKommentarerCount() {
+      const { count, error } = await client
+        .from("club_feedback")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", LYKKECUP_EVENT_ID)
+        .is("handled_at", null);
+      if (!cancelled && !error) setKommentarerNyeCount(count ?? 0);
+    }
+
+    void refreshKommentarerCount();
+
+    const channel = client
+      .channel("app-shell-kommentarer-count")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "club_feedback", filter: `event_id=eq.${LYKKECUP_EVENT_ID}` },
+        () => {
+          void refreshKommentarerCount();
+        },
+      )
+      .subscribe();
+
     return () => {
       cancelled = true;
+      void client.removeChannel(channel);
     };
   }, []);
 
@@ -250,13 +270,8 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       )
       .subscribe();
 
-    const poll = window.setInterval(() => {
-      void refreshCupChatUnread();
-    }, 45_000);
-
     return () => {
       cancelled = true;
-      window.clearInterval(poll);
       void client.removeChannel(channel);
     };
   }, []);

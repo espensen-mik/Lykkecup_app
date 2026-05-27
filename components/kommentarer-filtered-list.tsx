@@ -2,8 +2,9 @@
 
 import { CheckCircle2, ChevronDown, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
+import { debounceCallback } from "@/lib/debounce-callback";
 import { formatDaDateTime } from "@/lib/datetime";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { StyledSelect } from "@/components/ui/styled-select";
@@ -47,29 +48,33 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorById, setErrorById] = useState<Record<string, string | null>>({});
 
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
   useEffect(() => {
     const supabase = getAuthBrowserClient();
+    const scheduleRefresh = debounceCallback(() => {
+      routerRef.current.refresh();
+    }, 2500);
+
     const channel = supabase
       .channel("kommentarer-live")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "club_feedback", filter: `event_id=eq.${LYKKECUP_EVENT_ID}` },
-        () => router.refresh(),
+        scheduleRefresh,
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "club_feedback_internal_messages", filter: `event_id=eq.${LYKKECUP_EVENT_ID}` },
-        () => router.refresh(),
+        scheduleRefresh,
       )
       .subscribe();
-    const intervalId = window.setInterval(() => {
-      router.refresh();
-    }, 20000);
+
     return () => {
-      window.clearInterval(intervalId);
       void supabase.removeChannel(channel);
     };
-  }, [router]);
+  }, []);
 
   const clubs = useMemo(() => {
     const set = new Set<string>();

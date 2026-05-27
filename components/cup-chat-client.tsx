@@ -208,17 +208,12 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
       )
       .subscribe();
 
-    const id = window.setInterval(() => {
-      void load();
-    }, 25_000);
-
     const onVis = () => {
       if (document.visibilityState === "visible") void load();
     };
     document.addEventListener("visibilitychange", onVis);
 
     return () => {
-      window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
       void supabase.removeChannel(channel);
     };

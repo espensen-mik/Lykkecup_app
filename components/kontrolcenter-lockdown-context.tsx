@@ -51,17 +51,6 @@ export function KontrolcenterLockdownProvider({
   useEffect(() => {
     const client = getAuthBrowserClient();
 
-    async function pullLockdown() {
-      const { data } = await client
-        .from("kontrolcenter_event_settings")
-        .select("planning_lockdown")
-        .eq("event_id", LYKKECUP_EVENT_ID)
-        .maybeSingle();
-      if (data && typeof data.planning_lockdown === "boolean") {
-        setPlanningLockdownState(data.planning_lockdown);
-      }
-    }
-
     const channel = client
       .channel("kontrolcenter-planning-lockdown")
       .on(
@@ -81,10 +70,7 @@ export function KontrolcenterLockdownProvider({
       )
       .subscribe();
 
-    const poll = window.setInterval(() => void pullLockdown(), 45_000);
-
     return () => {
-      window.clearInterval(poll);
       void client.removeChannel(channel);
     };
   }, []);
