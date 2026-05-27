@@ -19,6 +19,7 @@ import {
   minutesToTimestamptz,
   type ManualScheduleBookedBlock,
   type ManualScheduleCourtOption,
+  type ManualScheduleCurrentSlot,
   type ManualScheduleMoveSuggestion,
   type ManualScheduleSlotOption,
   type UnscheduledMatchDetail,
@@ -657,6 +658,7 @@ export type ManualScheduleSlotsActionResult = TurneringActionResult & {
   teamALabel?: string | null;
   teamBLabel?: string | null;
   teamRestMinutes?: number;
+  currentSchedule?: ManualScheduleCurrentSlot | null;
   slots?: ManualScheduleSlotOption[];
   moveSuggestions?: ManualScheduleMoveSuggestion[];
   courts?: ManualScheduleCourtOption[];
@@ -686,6 +688,7 @@ export async function fetchManualScheduleSlotsAction(
     teamALabel: result.teamALabel,
     teamBLabel: result.teamBLabel,
     teamRestMinutes: result.teamRestMinutes,
+    currentSchedule: result.currentSchedule,
     slots: result.slots,
     moveSuggestions: result.moveSuggestions,
     courts: result.courts,

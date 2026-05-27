@@ -27,7 +27,14 @@ export default async function TurneringDashboardPage() {
   }
 
   const pooledPct = totals.teamCount > 0 ? Math.round((totals.pooledTeams / totals.teamCount) * 1000) / 10 : 0;
-  const matchPct = totals.expectedMatches > 0 ? Math.round((totals.matchesGenerated / totals.expectedMatches) * 1000) / 10 : 0;
+  const matchGeneratedPct =
+    totals.expectedMatches > 0
+      ? Math.round((totals.matchesGenerated / totals.expectedMatches) * 1000) / 10
+      : 0;
+  const matchScheduledPct =
+    totals.matchesGenerated > 0
+      ? Math.round((totals.matchesScheduled / totals.matchesGenerated) * 1000) / 10
+      : 0;
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8">
@@ -39,22 +46,27 @@ export default async function TurneringDashboardPage() {
           Turneringsdashboard
         </h1>
         <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-          Overblik over puljer og kampe pr. niveau. Kapacitet og kampebehov planlægges under{" "}
+          Overblik over puljer og kampe pr. niveau. «Forventet» kommer fra puljestørrelse og kampe pr. hold under{" "}
           <Link href="/turnering/baner" className="font-medium text-[#0d9488] underline-offset-4 hover:underline dark:text-teal-400">
             Opsætning → Kampe
           </Link>
-          .
+          — ikke fuld round-robin mellem alle hold i en pulje.
         </p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Kpi label="Niveauer" value={levels.length} />
         <Kpi label="Puljer" value={totals.poolCount} />
         <Kpi label="Hold i puljer" value={`${totals.pooledTeams}/${totals.teamCount}`} subValue={`${pooledPct}%`} />
         <Kpi
           label="Genererede kampe"
           value={`${totals.matchesGenerated}/${totals.expectedMatches}`}
-          subValue={`${matchPct}%`}
+          subValue={`${matchGeneratedPct}% af forventet`}
+        />
+        <Kpi
+          label="Har bane og tid"
+          value={`${totals.matchesScheduled}/${totals.matchesGenerated}`}
+          subValue={totals.matchesGenerated > 0 ? `${matchScheduledPct}% af genererede` : undefined}
         />
       </section>
 
@@ -73,12 +85,16 @@ export default async function TurneringDashboardPage() {
                   <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                     <Stat label="Spillere" value={level.playerCount} />
                     <Stat label="Puljer" value={level.poolCount} />
-                    <Stat label="Kampe" value={level.matchesGenerated} />
+                    <Stat label="Kampe genereret" value={`${level.matchesGenerated}/${level.expectedMatches}`} />
+                    <Stat label="Har bane/tid" value={level.matchesScheduled} />
                     <Stat label="Hold i pulje" value={`${level.pooledTeams}/${level.teamCount}`} />
                   </dl>
                   <div className="mt-4 space-y-2">
-                    <Progress label="Puljefordeling" value={level.teamPooledPct} />
-                    <Progress label="Kampgenerering" value={level.matchCoveragePct} />
+                    <Progress
+                      label="Kampe genereret (ift. Opsætning)"
+                      value={level.matchCoveragePct}
+                    />
+                    <Progress label="Tider sat (ift. genererede)" value={level.matchScheduledPct} />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-3">
                     <LevelLink href={`/turnering/puljer/${levelPathSegment(level.levelKey)}`} label="Åbn puljer" />

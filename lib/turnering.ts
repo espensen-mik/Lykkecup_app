@@ -604,8 +604,12 @@ export type TurneringDashboardLevelStats = {
   unpooledTeams: number;
   teamPooledPct: number;
   matchesGenerated: number;
+  matchesScheduled: number;
   expectedMatches: number;
+  /** Genererede kampe i forhold til forventet (Opsætning → Kampe). */
   matchCoveragePct: number;
+  /** Kampe med bane og tid i forhold til genererede. */
+  matchScheduledPct: number;
 };
 
 export type TurneringDashboardOverview = {
@@ -616,6 +620,7 @@ export type TurneringDashboardOverview = {
     poolCount: number;
     pooledTeams: number;
     matchesGenerated: number;
+    matchesScheduled: number;
     expectedMatches: number;
     poolsReadyForMatches: number;
   };

@@ -14,7 +14,7 @@ import {
   roundLengthMinutes,
   type RoundTiming,
 } from "@/lib/lykkecup-regnemaskine";
-import type { CourtAvailabilityRow } from "@/lib/baner-tider";
+import type { CourtAvailabilityRow, CourtType } from "@/lib/baner-tider";
 
 /** Client-safe types for kampprogram (ingen server-imports). */
 
@@ -46,6 +46,7 @@ export type KampprogramCourt = {
   id: string;
   name: string;
   venueName: string | null;
+  courtType: CourtType;
   sortOrder: number;
 };
 
@@ -479,6 +480,8 @@ export function buildCourtTimelineRows(
 export type KampprogramBundle = {
   matches: KampprogramMatch[];
   courts: KampprogramCourt[];
+  /** Niveau → forventet banestørrelse (Opsætning → Niveau). */
+  levelCourtTypeByLevel: Record<string, CourtType>;
   levels: string[];
   periods: KampprogramPeriod[];
   levelTimingByLevel: Record<string, KampprogramLevelTiming>;

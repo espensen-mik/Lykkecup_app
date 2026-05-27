@@ -12,6 +12,7 @@ import {
 import type {
   ManualScheduleBookedBlock,
   ManualScheduleCourtOption,
+  ManualScheduleCurrentSlot,
   ManualScheduleMoveSuggestion,
   ManualScheduleSlotOption,
 } from "@/lib/turnering-scheduler";
@@ -24,6 +25,8 @@ type Props = {
   matchId: string;
   levelKey: string;
   isScheduled?: boolean;
+  /** Vises med det samme; opdateres fra server ved indlæsning. */
+  currentSchedule?: ManualScheduleCurrentSlot | null;
   teamALabel: string;
   teamBLabel: string;
   onSuccess?: (message: string) => void;
@@ -53,7 +56,6 @@ function isRecommendedSlot(slot: ManualScheduleSlotOption): boolean {
   return (
     slot.isPreferredCourtType &&
     !slot.isOutsidePoolPeriod &&
-    !slot.isDedicatedOtherPoolPeriod &&
     slot.teamsFree &&
     slot.respectsTeamRest
   );
@@ -82,11 +84,6 @@ function SlotBadges({ slot }: { slot: ManualScheduleSlotOption }) {
       {slot.isOutsidePoolPeriod ? (
         <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
           Uden for pulje-periode
-        </span>
-      ) : null}
-      {slot.isDedicatedOtherPoolPeriod ? (
-        <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
-          Anden puljes periode
         </span>
       ) : null}
       {!slot.teamsFree ? (
@@ -183,6 +180,7 @@ export function ManualScheduleDialog({
   matchId,
   levelKey,
   isScheduled = false,
+  currentSchedule: currentScheduleProp = null,
   teamALabel,
   teamBLabel,
   onSuccess,
@@ -197,8 +195,12 @@ export function ManualScheduleDialog({
   const [courts, setCourts] = useState<ManualScheduleCourtOption[]>([]);
   const [bookedBlocks, setBookedBlocks] = useState<ManualScheduleBookedBlock[]>([]);
   const [moveSuggestions, setMoveSuggestions] = useState<ManualScheduleMoveSuggestion[]>([]);
+  const [currentSchedule, setCurrentSchedule] = useState<ManualScheduleCurrentSlot | null>(
+    currentScheduleProp,
+  );
   const [teamRestMinutes, setTeamRestMinutes] = useState(0);
   const [showRecommendedOnly, setShowRecommendedOnly] = useState(false);
+  const [showOtherCourtSizes, setShowOtherCourtSizes] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("recommended");
   const [selectedCourtId, setSelectedCourtId] = useState("");
 
@@ -212,6 +214,7 @@ export function ManualScheduleDialog({
       setCourts(result.courts ?? []);
       setBookedBlocks(result.bookedBlocks ?? []);
       setMoveSuggestions(result.moveSuggestions ?? []);
+      setCurrentSchedule(result.currentSchedule ?? currentScheduleProp ?? null);
       setTeamRestMinutes(result.teamRestMinutes ?? 0);
       const courtList = result.courts ?? [];
       const preferredWithSlots = courtList.find(
@@ -227,32 +230,60 @@ export function ManualScheduleDialog({
       setCourts([]);
       setBookedBlocks([]);
       setMoveSuggestions([]);
+      setCurrentSchedule(currentScheduleProp ?? null);
       setSelectedCourtId("");
     } finally {
       setLoading(false);
     }
-  }, [matchId]);
+  }, [matchId, currentScheduleProp]);
 
   useEffect(() => {
     if (!open) return;
+    setCurrentSchedule(currentScheduleProp ?? null);
     setViewMode("recommended");
     setShowRecommendedOnly(false);
+    setShowOtherCourtSizes(false);
     void loadSlots();
-  }, [open, loadSlots]);
+  }, [open, loadSlots, currentScheduleProp]);
+
+  const displayCurrentSchedule = currentSchedule ?? currentScheduleProp;
+
+  const slotsForCourtSize = useMemo(() => {
+    if (showOtherCourtSizes) return slots;
+    return slots.filter((s) => s.isPreferredCourtType);
+  }, [slots, showOtherCourtSizes]);
+
+  const visibleCourts = useMemo(() => {
+    if (showOtherCourtSizes) return courts;
+    return courts.filter((c) => c.isPreferredCourtType);
+  }, [courts, showOtherCourtSizes]);
 
   const filteredSlots = useMemo(() => {
-    if (showRecommendedOnly) return slots.filter(isRecommendedSlot);
-    return slots;
-  }, [slots, showRecommendedOnly]);
+    if (showRecommendedOnly) return slotsForCourtSize.filter(isRecommendedSlot);
+    return slotsForCourtSize;
+  }, [slotsForCourtSize, showRecommendedOnly]);
 
-  const recommendedCount = useMemo(() => slots.filter(isRecommendedSlot).length, [slots]);
+  const recommendedCount = useMemo(
+    () => slotsForCourtSize.filter(isRecommendedSlot).length,
+    [slotsForCourtSize],
+  );
   const showMoveSuggestions = !loading && recommendedCount === 0 && moveSuggestions.length > 0;
 
   const chronoSlots = useMemo(() => sortSlotsChronologically(filteredSlots), [filteredSlots]);
 
+  useEffect(() => {
+    if (showOtherCourtSizes || !selectedCourtId) return;
+    const selected = courts.find((c) => c.courtId === selectedCourtId);
+    if (selected?.isPreferredCourtType) return;
+    const preferredWithSlots = visibleCourts.find((c) =>
+      slotsForCourtSize.some((s) => s.courtId === c.courtId),
+    );
+    setSelectedCourtId(preferredWithSlots?.courtId ?? visibleCourts[0]?.courtId ?? "");
+  }, [showOtherCourtSizes, selectedCourtId, courts, visibleCourts, slotsForCourtSize]);
+
   const selectedCourt = useMemo(
-    () => courts.find((c) => c.courtId === selectedCourtId) ?? null,
-    [courts, selectedCourtId],
+    () => visibleCourts.find((c) => c.courtId === selectedCourtId) ?? null,
+    [visibleCourts, selectedCourtId],
   );
 
   const courtTimeline = useMemo((): CourtTimelineRow[] => {
@@ -344,13 +375,39 @@ export function ManualScheduleDialog({
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {teamALabel} vs {teamBLabel}
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+          {isScheduled ? (
+            <div className="mt-3 rounded-lg border border-amber-200/90 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/30">
+              <p className="text-xs font-medium uppercase tracking-wide text-amber-900/80 dark:text-amber-200/80">
+                Nuværende planlægning
+              </p>
+              {displayCurrentSchedule ? (
+                <p className="mt-1 text-sm font-semibold tabular-nums text-gray-900 dark:text-white">
+                  <span>{displayCurrentSchedule.timeLabel}</span>
+                  <span className="mx-2 font-normal text-gray-400 dark:text-gray-500">·</span>
+                  <span className="font-medium">{displayCurrentSchedule.courtLabel}</span>
+                </p>
+              ) : loading ? (
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Henter…</p>
+              ) : (
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Ingen bane eller tid sat</p>
+              )}
+            </div>
+          ) : null}
+          <p
+            className={`text-xs leading-relaxed text-gray-500 dark:text-gray-400 ${
+              isScheduled ? "mt-3" : "mt-1"
+            }`}
+          >
             Vælg visning nedenfor. «Uden hold-pause» = for lidt tid mellem kampe (min. {teamRestMinutes} min).
             «Hold optaget» = overlap med anden kamp.
           </p>
           {!loading && slots.length > 0 ? (
             <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-              {recommendedCount} anbefalede · {slots.length} ledige tider · {courts.length} baner
+              {recommendedCount} anbefalede · {slotsForCourtSize.length} ledige tider ·{" "}
+              {visibleCourts.length} baner
+              {!showOtherCourtSizes && slots.length !== slotsForCourtSize.length
+                ? ` (${slots.length - slotsForCourtSize.length} skjult — anden banestørrelse)`
+                : ""}
             </p>
           ) : null}
         </div>
@@ -366,6 +423,15 @@ export function ManualScheduleDialog({
           {!loading && slots.length > 0 ? (
             <div className="mb-4 space-y-3">
               <ViewModeTabs viewMode={viewMode} onChange={setViewMode} />
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={showOtherCourtSizes}
+                  onChange={(e) => setShowOtherCourtSizes(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Vis andre banestørrelser
+              </label>
               {viewMode !== "court" ? (
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                   <input
@@ -374,7 +440,7 @@ export function ManualScheduleDialog({
                     onChange={(e) => setShowRecommendedOnly(e.target.checked)}
                     className="rounded border-gray-300"
                   />
-                  Vis kun anbefalede ({recommendedCount} af {slots.length})
+                  Vis kun anbefalede ({recommendedCount} af {slotsForCourtSize.length})
                 </label>
               ) : null}
             </div>
@@ -431,13 +497,17 @@ export function ManualScheduleDialog({
                 ? showMoveSuggestions
                   ? "Ingen ledige baner/tider lige nu — brug forslagene ovenfor til at flytte blokerende kampe."
                   : "Ingen ledige baner/tider fundet — tjek banernes åbningstider og pauser under Opsætning → Haller & baner."
-                : "Ingen tider matcher filteret «kun anbefalede»."}
+                : slotsForCourtSize.length === 0 && !showOtherCourtSizes
+                  ? "Ingen ledige tider på niveauets banestørrelse — afkryds «Vis andre banestørrelser» for at se flere."
+                  : "Ingen tider matcher filteret «kun anbefalede»."}
             </p>
           ) : null}
 
           {!loading && !error && viewMode === "chrono" && chronoSlots.length === 0 ? (
             <p className="text-sm text-amber-800 dark:text-amber-300">
-              Ingen ledige tider matcher filteret.
+              {slotsForCourtSize.length === 0 && !showOtherCourtSizes && slots.length > 0
+                ? "Ingen ledige tider på niveauets banestørrelse — afkryds «Vis andre banestørrelser» for at se flere."
+                : "Ingen ledige tider matcher filteret."}
             </p>
           ) : null}
 
@@ -491,9 +561,9 @@ export function ManualScheduleDialog({
                   onChange={(e) => setSelectedCourtId(e.target.value)}
                   className={fieldClass}
                 >
-                  {courts.map((court) => {
+                  {visibleCourts.map((court) => {
                     const bookedCount = bookedBlocks.filter((b) => b.courtId === court.courtId).length;
-                    const freeCount = slots.filter((s) => s.courtId === court.courtId).length;
+                    const freeCount = slotsForCourtSize.filter((s) => s.courtId === court.courtId).length;
                     return (
                       <option key={court.courtId} value={court.courtId}>
                         {formatCourtWithVenue(court.courtName, court.venueName)}

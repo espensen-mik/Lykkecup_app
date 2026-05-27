@@ -8,6 +8,19 @@ import { TURNERING_EVENT_ID } from "@/lib/turnering";
 export const COURT_TYPES = ["mini", "kort", "stor"] as const;
 export type CourtType = (typeof COURT_TYPES)[number];
 
+export function courtTypeLabel(t: CourtType): string {
+  switch (t) {
+    case "mini":
+      return "Mini";
+    case "kort":
+      return "Kort";
+    case "stor":
+      return "Stor";
+    default:
+      return t;
+  }
+}
+
 /** Sorter banetyper: Mini → Kort → Stor (ukendte sidst). */
 export function compareCourtTypes(a: string, b: string): number {
   const ia = COURT_TYPES.indexOf(a as CourtType);

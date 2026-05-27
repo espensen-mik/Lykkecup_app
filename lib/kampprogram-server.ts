@@ -1,5 +1,6 @@
 import { createServerSupabase } from "@/lib/auth-server";
-import { compareCourtNamesForSchedule } from "@/lib/baner-tider";
+import { compareCourtNamesForSchedule, type CourtType } from "@/lib/baner-tider";
+import { courtTypeForLevel } from "@/lib/level-court-settings";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
 import type {
   KampprogramBundle,
@@ -27,6 +28,7 @@ import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types
 const empty: KampprogramBundle = {
   matches: [],
   courts: [],
+  levelCourtTypeByLevel: {},
   levels: [],
   periods: [],
   levelTimingByLevel: {},
@@ -48,7 +50,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
   const eventId = TURNERING_EVENT_ID;
   const client = await createServerSupabase();
 
-  const [matchesRes, teamsRes, poolsRes, periodsRes, venuesRes, levelScheduleRes, availabilityRes, membersRes, playersRes, coachesRes, teamCoachesRes] =
+  const [matchesRes, teamsRes, poolsRes, periodsRes, venuesRes, levelScheduleRes, levelCourtRes, availabilityRes, membersRes, playersRes, coachesRes, teamCoachesRes] =
     await Promise.all([
       client
         .from("matches")
@@ -74,6 +76,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
           "level, plan_matches_per_team, match_duration_minutes, break_between_matches_minutes, rounds_per_match",
         )
         .eq("event_id", eventId),
+      client.from("level_court_settings").select("level, court_type").eq("event_id", eventId),
       client
         .from("court_availability")
         .select("court_id, start_time, end_time")
@@ -91,6 +94,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     periodsRes.error?.message ??
     venuesRes.error?.message ??
     levelScheduleRes.error?.message ??
+    levelCourtRes.error?.message ??
     availabilityRes.error?.message ??
     membersRes.error?.message ??
     playersRes.error?.message ??
@@ -106,14 +110,14 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     venueIds.length > 0
       ? await client
           .from("courts")
-          .select("id, name, venue_id, sort_order, is_active")
+          .select("id, name, venue_id, court_type, sort_order, is_active")
           .in("venue_id", venueIds)
           .eq("is_active", true)
           .order("sort_order", { ascending: true })
           .order("name", { ascending: true })
       : await client
           .from("courts")
-          .select("id, name, venue_id, sort_order, is_active")
+          .select("id, name, venue_id, court_type, sort_order, is_active")
           .eq("event_id", eventId)
           .eq("is_active", true)
           .order("sort_order", { ascending: true })
@@ -150,7 +154,13 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
   };
   const periodRows = (periodsRes.data ?? []) as PeriodRow[];
   const periodById = new Map(periodRows.map((p) => [p.id, p]));
-  type CourtRow = { id: string; name: string; venue_id: string | null; sort_order: number | null };
+  type CourtRow = {
+    id: string;
+    name: string;
+    venue_id: string | null;
+    court_type: CourtType;
+    sort_order: number | null;
+  };
   const courtRows = (courtsRes.data ?? []) as CourtRow[];
 
   const courtById = new Map(
@@ -159,6 +169,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       {
         name: c.name,
         venueName: c.venue_id ? (venueById.get(c.venue_id) ?? null) : null,
+        courtType: c.court_type,
       },
     ]),
   );
@@ -168,6 +179,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       id: c.id,
       name: c.name,
       venueName: c.venue_id ? (venueById.get(c.venue_id) ?? null) : null,
+      courtType: c.court_type,
       sortOrder: c.sort_order ?? 0,
     }))
     .sort(
@@ -177,6 +189,8 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
         a.sortOrder - b.sortOrder,
     );
 
+  const levelCourtRows = (levelCourtRes.data ?? []) as Array<{ level: string; court_type: CourtType }>;
+  const levelCourtTypeByLevel: Record<string, CourtType> = {};
   const levelSet = new Set<string>();
   const matches: KampprogramMatch[] = [];
 
@@ -197,6 +211,9 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     const court = row.court_id ? courtById.get(row.court_id) : undefined;
     const levelKey = canonicalBanerLevelLabel(pool?.level ?? teamA?.level ?? teamB?.level);
     levelSet.add(levelKey);
+    if (!levelCourtTypeByLevel[levelKey]) {
+      levelCourtTypeByLevel[levelKey] = courtTypeForLevel(levelKey, levelCourtRows);
+    }
 
     const isOrphan = isOrphanKampprogramMatch(
       { teamAId: row.team_a_id, teamBId: row.team_b_id, poolId: row.pool_id },
@@ -290,6 +307,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
   return {
     matches,
     courts,
+    levelCourtTypeByLevel,
     levels: [...levelSet].sort((a, b) => a.localeCompare(b, "da", { sensitivity: "base" })),
     periods,
     levelTimingByLevel,

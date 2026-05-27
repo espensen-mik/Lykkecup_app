@@ -6,7 +6,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { TeamDetailModal, TeamNameWithHover } from "@/components/teams/team-detail-ui";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { deleteOrphanMatchesAction } from "@/lib/kampprogram-actions";
-import { compareCourtNamesForSchedule, formatTimeForInput, timeToMinutes } from "@/lib/baner-tider";
+import {
+  compareCourtNamesForSchedule,
+  compareCourtTypes,
+  courtTypeLabel,
+  formatTimeForInput,
+  timeToMinutes,
+  type CourtType,
+} from "@/lib/baner-tider";
 import { formatLevelShortLabel } from "@/lib/holddannelse";
 import { getLevelVisualClasses } from "@/lib/level-colors";
 import {
@@ -219,13 +226,7 @@ function fmtTimeRange(start: string | null, end: string | null): string {
 }
 
 /** Ensartet kolonnebredde på tværs af alle bane-/runde-tabeller (undgår hop ved scroll). */
-function KampprogramTableColgroup({
-  showCourt,
-  showManualSchedule,
-}: {
-  showCourt: boolean;
-  showManualSchedule: boolean;
-}) {
+function KampprogramTableColgroup({ showCourt }: { showCourt: boolean }) {
   return (
     <colgroup>
       {showCourt ? <col style={{ width: "11rem" }} /> : null}
@@ -234,19 +235,12 @@ function KampprogramTableColgroup({
       <col style={{ width: "7.25rem" }} />
       <col style={{ width: "5.25rem" }} />
       <col style={{ width: "6.5rem" }} />
-      <col style={{ width: "7.5rem" }} />
-      {showManualSchedule ? <col style={{ width: "10rem" }} /> : null}
+      <col style={{ width: "9.5rem" }} />
     </colgroup>
   );
 }
 
-function KampprogramTableHead({
-  showCourt,
-  showManualSchedule,
-}: {
-  showCourt: boolean;
-  showManualSchedule: boolean;
-}) {
+function KampprogramTableHead({ showCourt }: { showCourt: boolean }) {
   return (
     <thead>
       <tr className="border-b border-gray-200 bg-gray-50/90 text-left text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
@@ -262,9 +256,6 @@ function KampprogramTableHead({
           Periode
         </th>
         <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Status</th>
-        {showManualSchedule ? (
-          <th className="px-3 py-2.5 font-semibold uppercase tracking-wide" aria-label="Handlinger" />
-        ) : null}
       </tr>
     </thead>
   );
@@ -274,7 +265,7 @@ const kampprogramTimeCellClass =
   "whitespace-nowrap px-3 py-3 align-top tabular-nums text-[0.8125rem] leading-snug tracking-tight";
 const kampprogramTableWrapClass =
   "overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700";
-const kampprogramTableClass = "w-full min-w-[52rem] table-fixed text-sm";
+const kampprogramTableClass = "w-full min-w-[44rem] table-fixed text-sm";
 
 function teamDetailOrFallback(
   teamId: string,
@@ -314,12 +305,11 @@ function MatchTable({
   if (rows.length === 0) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">Ingen kampe i dette udsnit.</p>;
   }
-  const showActions = Boolean(showManualSchedule);
   return (
     <div className={kampprogramTableWrapClass}>
       <table className={kampprogramTableClass}>
-        <KampprogramTableColgroup showCourt={Boolean(showCourt)} showManualSchedule={showActions} />
-        <KampprogramTableHead showCourt={Boolean(showCourt)} showManualSchedule={showActions} />
+        <KampprogramTableColgroup showCourt={Boolean(showCourt)} />
+        <KampprogramTableHead showCourt={Boolean(showCourt)} />
         <tbody>
           {rows.map((m, index) => {
             const lv = getLevelVisualClasses(m.levelKey);
@@ -375,19 +365,19 @@ function MatchTable({
                   {m.periodName ?? "—"}
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <MatchStatusBadges
-                    match={m}
-                    allMatches={allMatches}
-                    teamDetails={teamDetails}
-                    levelTimingByLevel={levelTimingByLevel}
-                    conflictHints={conflictHintsByMatchId.get(m.id)}
-                  />
+                  <div className="flex flex-col gap-2">
+                    <MatchStatusBadges
+                      match={m}
+                      allMatches={allMatches}
+                      teamDetails={teamDetails}
+                      levelTimingByLevel={levelTimingByLevel}
+                      conflictHints={conflictHintsByMatchId.get(m.id)}
+                    />
+                    {showManualSchedule ? (
+                      <MatchActionButtons match={m} onManualSchedule={onManualSchedule} />
+                    ) : null}
+                  </div>
                 </td>
-                {showManualSchedule ? (
-                  <td className="px-3 py-3 align-top">
-                    <MatchActionButtons match={m} onManualSchedule={onManualSchedule} />
-                  </td>
-                ) : null}
               </tr>
             );
           })}
@@ -424,19 +414,18 @@ function KampprogramTimelineTable({
     );
   }
 
-  const showActionsCol = Boolean(showManualSchedule);
   return (
     <div className={kampprogramTableWrapClass}>
       <table className={kampprogramTableClass}>
-        <KampprogramTableColgroup showCourt={Boolean(showCourt)} showManualSchedule={showActionsCol} />
-        <KampprogramTableHead showCourt={Boolean(showCourt)} showManualSchedule={showActionsCol} />
+        <KampprogramTableColgroup showCourt={Boolean(showCourt)} />
+        <KampprogramTableHead showCourt={Boolean(showCourt)} />
         <tbody>
           {rows.map((row, index) => {
             const zebra =
               index % 2 === 0
                 ? "bg-white dark:bg-gray-900/25"
                 : "bg-gray-50/95 dark:bg-gray-800/40";
-            const actionColSpan = (showCourt ? 1 : 0) + (showManualSchedule ? 1 : 0) + 5;
+            const trailingColSpan = 5;
 
             if (row.type === "idle") {
               return (
@@ -454,7 +443,7 @@ function KampprogramTimelineTable({
                   <td className={`${kampprogramTimeCellClass} text-gray-500 dark:text-gray-400`}>
                     {fmtTimeRange(row.startTime, row.endTime)}
                   </td>
-                  <td colSpan={actionColSpan} className="px-3 py-3 italic text-gray-500 dark:text-gray-400">
+                  <td colSpan={trailingColSpan} className="px-3 py-3 italic text-gray-500 dark:text-gray-400">
                     Ledig bane
                   </td>
                 </tr>
@@ -523,19 +512,19 @@ function KampprogramTimelineTable({
                   {m.periodName ?? "—"}
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <MatchStatusBadges
-                    match={m}
-                    allMatches={allMatches}
-                    teamDetails={teamDetails}
-                    levelTimingByLevel={levelTimingByLevel}
-                    conflictHints={conflictHintsByMatchId.get(m.id)}
-                  />
+                  <div className="flex flex-col gap-2">
+                    <MatchStatusBadges
+                      match={m}
+                      allMatches={allMatches}
+                      teamDetails={teamDetails}
+                      levelTimingByLevel={levelTimingByLevel}
+                      conflictHints={conflictHintsByMatchId.get(m.id)}
+                    />
+                    {showActions ? (
+                      <MatchActionButtons match={m} onManualSchedule={onManualSchedule} />
+                    ) : null}
+                  </div>
                 </td>
-                {showManualSchedule ? (
-                  <td className="px-3 py-3 align-top">
-                    {showActions ? <MatchActionButtons match={m} onManualSchedule={onManualSchedule} /> : null}
-                  </td>
-                ) : null}
               </tr>
             );
           })}
@@ -609,6 +598,7 @@ export function KampprogramWorkspace({
   const [view, setView] = useState<ViewMode>("court");
   const [levelFilter, setLevelFilter] = useState("");
   const [periodFilter, setPeriodFilter] = useState("");
+  const [courtTypeFilter, setCourtTypeFilter] = useState("");
   const [matchFilter, setMatchFilter] = useState<KampprogramMatchFilter>(initialMatchFilter);
   const [previewTeamId, setPreviewTeamId] = useState<string | null>(null);
   const [deletingOrphans, setDeletingOrphans] = useState(false);
@@ -658,6 +648,24 @@ export function KampprogramWorkspace({
     [teamDetails],
   );
 
+  const courtTypeByCourtId = useMemo(
+    () => new Map(initial.courts.map((c) => [c.id, c.courtType])),
+    [initial.courts],
+  );
+
+  const courtTypeOptions = useMemo(() => {
+    const types = new Set(initial.courts.map((c) => c.courtType));
+    return [...types].sort(compareCourtTypes);
+  }, [initial.courts]);
+
+  const resolveMatchCourtType = useCallback(
+    (m: KampprogramMatch): CourtType | null => {
+      if (m.courtId) return courtTypeByCourtId.get(m.courtId) ?? null;
+      return initial.levelCourtTypeByLevel[m.levelKey] ?? null;
+    },
+    [courtTypeByCourtId, initial.levelCourtTypeByLevel],
+  );
+
   const filtered = useMemo(() => {
     return initial.matches.filter((m) => {
       if (m.isOrphan) return false;
@@ -665,9 +673,20 @@ export function KampprogramWorkspace({
       if (matchFilter === "outside-period" && !m.scheduledOutsidePoolPeriod) return false;
       if (levelFilter && m.levelKey !== levelFilter) return false;
       if (periodFilter && m.periodName !== periodFilter) return false;
+      if (courtTypeFilter) {
+        const ct = resolveMatchCourtType(m);
+        if (ct !== courtTypeFilter) return false;
+      }
       return true;
     });
-  }, [initial.matches, matchFilter, levelFilter, periodFilter]);
+  }, [
+    initial.matches,
+    matchFilter,
+    levelFilter,
+    periodFilter,
+    courtTypeFilter,
+    resolveMatchCourtType,
+  ]);
 
   const byCourt = useMemo(() => {
     const map = new Map<string, KampprogramMatch[]>();
@@ -708,14 +727,19 @@ export function KampprogramWorkspace({
     ],
   );
 
+  const courtsForView = useMemo(() => {
+    if (!courtTypeFilter) return initial.courts;
+    return initial.courts.filter((c) => c.courtType === courtTypeFilter);
+  }, [initial.courts, courtTypeFilter]);
+
   const courtTimelines = useMemo(() => {
-    return initial.courts.map((court) => {
+    return courtsForView.map((court) => {
       const matches = byCourt.get(court.id) ?? [];
       const rows = buildCourtTimelineRows(court, matches, initial.levelTimingByLevel);
       const idleCount = rows.filter((r) => r.type === "idle").length;
       return { court, matches, rows, idleCount };
     });
-  }, [initial.courts, initial.levelTimingByLevel, byCourt]);
+  }, [courtsForView, initial.levelTimingByLevel, byCourt]);
 
   const unscheduledFiltered = useMemo(() => filtered.filter((m) => !m.isScheduled), [filtered]);
 
@@ -838,6 +862,22 @@ export function KampprogramWorkspace({
           </StyledSelect>
         </label>
 
+        <label className="flex min-w-[10rem] flex-col gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Banestørrelse
+          <StyledSelect
+            value={courtTypeFilter}
+            onChange={(e) => setCourtTypeFilter(e.target.value)}
+            className={fieldClass}
+          >
+            <option value="">Alle banestørrelser</option>
+            {courtTypeOptions.map((ct) => (
+              <option key={ct} value={ct}>
+                {courtTypeLabel(ct)}
+              </option>
+            ))}
+          </StyledSelect>
+        </label>
+
         <label className="flex min-w-[12rem] flex-col gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
           Vis kampe
           <StyledSelect
@@ -872,6 +912,9 @@ export function KampprogramWorkspace({
                   {court.venueName ? (
                     <span className="font-normal text-gray-500 dark:text-gray-400"> · {court.venueName}</span>
                   ) : null}
+                  <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                    {courtTypeLabel(court.courtType)}
+                  </span>
                 </h2>
                 <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                   {matches.length === 0
@@ -894,9 +937,12 @@ export function KampprogramWorkspace({
               </section>
             ))
             : null}
-          {matchFilter === "outside-period" && filtered.length === 0 ? (
+          {filtered.length === 0 && (matchFilter !== "all" || levelFilter || periodFilter || courtTypeFilter) ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Ingen kampe matcher filtrene.</p>
+          ) : null}
+          {courtTypeFilter && showScheduledSections && courtTimelines.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Ingen kampe uden for pulje-perioden matcher filtrene.
+              Ingen baner med størrelsen {courtTypeLabel(courtTypeFilter as CourtType)}.
             </p>
           ) : null}
           {showUnscheduledSection ? (
@@ -984,6 +1030,22 @@ export function KampprogramWorkspace({
           matchId={manualScheduleMatch.id}
           levelKey={manualScheduleMatch.levelKey}
           isScheduled={manualScheduleMatch.isScheduled}
+          currentSchedule={
+            manualScheduleMatch.isScheduled &&
+            manualScheduleMatch.startTime &&
+            manualScheduleMatch.endTime
+              ? {
+                  timeLabel: fmtTimeRange(
+                    manualScheduleMatch.startTime,
+                    manualScheduleMatch.endTime,
+                  ),
+                  courtLabel: formatCourtWithVenue(
+                    manualScheduleMatch.courtName ?? "Bane",
+                    manualScheduleMatch.venueName,
+                  ),
+                }
+              : null
+          }
           teamALabel={kontrolCenterTeamDisplayName(
             teamDetailOrFallback(manualScheduleMatch.teamAId, teamDetails),
           )}

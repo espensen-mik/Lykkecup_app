@@ -1012,6 +1012,18 @@ export function TurneringPlanWorkspace({
           onClose={() => setManualScheduleMatch(null)}
           matchId={manualScheduleMatch.id}
           levelKey={levelKey}
+          isScheduled={Boolean(manualScheduleMatch.court_id && manualScheduleMatch.start_time)}
+          currentSchedule={
+            manualScheduleMatch.court_id &&
+            manualScheduleMatch.start_time &&
+            manualScheduleMatch.end_time
+              ? {
+                  timeLabel: `${fmtTime(manualScheduleMatch.start_time)}\u2011${fmtTime(manualScheduleMatch.end_time)}`,
+                  courtLabel:
+                    courtNameById.get(manualScheduleMatch.court_id) ?? "Bane",
+                }
+              : null
+          }
           teamALabel={teamDetailOrFallback(manualScheduleMatch.team_a_id).teamName}
           teamBLabel={teamDetailOrFallback(manualScheduleMatch.team_b_id).teamName}
           onSuccess={(msg) => setActionMsg(msg)}

@@ -8,7 +8,12 @@ import {
   sortLevelKeysForNav,
   turneringLevelMergeKey,
 } from "@/lib/holddannelse";
-import { roundLengthMinutes, type RoundTiming } from "@/lib/lykkecup-regnemaskine";
+import {
+  planMatchesByLevelFromScheduleRows,
+  resolvePlanMatchesPerTeam,
+  roundLengthMinutes,
+  type RoundTiming,
+} from "@/lib/lykkecup-regnemaskine";
 import { fetchLevelSchedulePlanningRows } from "@/lib/level-schedule-settings";
 import { poolPlanningHint } from "@/lib/puljer";
 import { teamRestMinutesBetweenMatches } from "@/lib/turnering-scheduler";
@@ -18,6 +23,7 @@ import {
   type PuljerOverviewLevel,
   type TurneringsplanOverviewLevel,
   type TurneringDashboardLevelStats,
+  plannedPoolMatchCount,
   type TurneringDashboardOverview,
   type TurneringLevelBundle,
   type TurneringPlanLevelBundle,
@@ -400,11 +406,12 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
 export async function fetchTurneringDashboardOverview(): Promise<TurneringDashboardOverview> {
   const client = await createServerSupabase();
   const eventId = TURNERING_EVENT_ID;
-  const [playersRes, teamsRes, poolsRes, matchesRes] = await Promise.all([
+  const [playersRes, teamsRes, poolsRes, matchesRes, scheduleFetch] = await Promise.all([
     client.from("players").select("id, level").eq("event_id", eventId),
     client.from("teams").select("id, level, pool_id").eq("event_id", eventId),
     client.from("pools").select("id, level").eq("event_id", eventId),
-    client.from("matches").select("id, pool_id").eq("event_id", eventId),
+    client.from("matches").select("id, pool_id, court_id, start_time").eq("event_id", eventId),
+    fetchLevelSchedulePlanningRows(client, eventId),
   ]);
 
   if (playersRes.error) {
@@ -416,6 +423,7 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
         poolCount: 0,
         pooledTeams: 0,
         matchesGenerated: 0,
+        matchesScheduled: 0,
         expectedMatches: 0,
         poolsReadyForMatches: 0,
       },
@@ -431,6 +439,7 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
         poolCount: 0,
         pooledTeams: 0,
         matchesGenerated: 0,
+        matchesScheduled: 0,
         expectedMatches: 0,
         poolsReadyForMatches: 0,
       },
@@ -446,6 +455,7 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
         poolCount: 0,
         pooledTeams: 0,
         matchesGenerated: 0,
+        matchesScheduled: 0,
         expectedMatches: 0,
         poolsReadyForMatches: 0,
       },
@@ -461,17 +471,42 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
         poolCount: 0,
         pooledTeams: 0,
         matchesGenerated: 0,
+        matchesScheduled: 0,
         expectedMatches: 0,
         poolsReadyForMatches: 0,
       },
       error: matchesRes.error.message,
     };
   }
+  if (scheduleFetch.error) {
+    return {
+      levels: [],
+      totals: {
+        playerCount: 0,
+        teamCount: 0,
+        poolCount: 0,
+        pooledTeams: 0,
+        matchesGenerated: 0,
+        matchesScheduled: 0,
+        expectedMatches: 0,
+        poolsReadyForMatches: 0,
+      },
+      error: scheduleFetch.error,
+    };
+  }
+
+  const scheduleRows = scheduleFetch.rows;
+  const planMatchesByLevel = planMatchesByLevelFromScheduleRows(scheduleRows);
 
   const players = (playersRes.data ?? []) as { id: string; level: string | null }[];
   const teams = (teamsRes.data ?? []) as { id: string; level: string | null; pool_id: string | null }[];
   const pools = (poolsRes.data ?? []) as { id: string; level: string | null }[];
-  const matches = (matchesRes.data ?? []) as { id: string; pool_id: string | null }[];
+  const matches = (matchesRes.data ?? []) as {
+    id: string;
+    pool_id: string | null;
+    court_id: string | null;
+    start_time: string | null;
+  }[];
 
   const levelMap = new Map<string, TurneringDashboardLevelStats>();
   const ensureLevel = (bucketKey: string, label: string): TurneringDashboardLevelStats => {
@@ -486,8 +521,10 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
       unpooledTeams: 0,
       teamPooledPct: 0,
       matchesGenerated: 0,
+      matchesScheduled: 0,
       expectedMatches: 0,
       matchCoveragePct: 0,
+      matchScheduledPct: 0,
     };
     levelMap.set(bucketKey, row);
     return row;
@@ -499,9 +536,11 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
   }
 
   const poolLevelById = new Map<string, string>();
+  const poolLevelKeyById = new Map<string, string>();
   for (const pool of pools) {
     const level = canonicalLevelBucket(pool.level);
     poolLevelById.set(pool.id, level.bucketKey);
+    poolLevelKeyById.set(pool.id, level.label);
     ensureLevel(level.bucketKey, level.label).poolCount += 1;
   }
 
@@ -525,12 +564,17 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
     const row = levelMap.get(bucketKey);
     if (!row) continue;
     row.matchesGenerated += 1;
+    if (match.court_id && match.start_time) row.matchesScheduled += 1;
   }
 
   for (const [poolId, teamCount] of teamCountByPool.entries()) {
     const bucketKey = poolLevelById.get(poolId);
-    if (!bucketKey) continue;
-    const expected = teamCount >= 2 ? (teamCount * (teamCount - 1)) / 2 : 0;
+    const levelKey = poolLevelKeyById.get(poolId);
+    if (!bucketKey || !levelKey) continue;
+    const planPerTeam =
+      resolvePlanMatchesPerTeam(levelKey, planMatchesByLevel, scheduleRows) ??
+      poolPlanningHint(levelKey, scheduleRows).matchesPerTeam;
+    const expected = plannedPoolMatchCount(teamCount, planPerTeam);
     const row = levelMap.get(bucketKey);
     if (!row) continue;
     row.expectedMatches += expected;
@@ -540,6 +584,8 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
     row.teamPooledPct = row.teamCount > 0 ? Math.round((row.pooledTeams / row.teamCount) * 1000) / 10 : 0;
     row.matchCoveragePct =
       row.expectedMatches > 0 ? Math.round((row.matchesGenerated / row.expectedMatches) * 1000) / 10 : 0;
+    row.matchScheduledPct =
+      row.matchesGenerated > 0 ? Math.round((row.matchesScheduled / row.matchesGenerated) * 1000) / 10 : 0;
   }
 
   const levels = sortLevelKeysForNav([...levelMap.values()].map((v) => v.levelKey)).map(
@@ -553,6 +599,7 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
       acc.poolCount += row.poolCount;
       acc.pooledTeams += row.pooledTeams;
       acc.matchesGenerated += row.matchesGenerated;
+      acc.matchesScheduled += row.matchesScheduled;
       acc.expectedMatches += row.expectedMatches;
       return acc;
     },
@@ -562,6 +609,7 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
       poolCount: 0,
       pooledTeams: 0,
       matchesGenerated: 0,
+      matchesScheduled: 0,
       expectedMatches: 0,
       poolsReadyForMatches: 0,
     },
