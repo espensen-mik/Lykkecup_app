@@ -445,19 +445,22 @@ function KampprogramTimelineTable({
               return (
                 <tr
                   key={`idle-${row.courtId}-${row.startTime}`}
-                  className={`border-b border-gray-100 last:border-0 dark:border-gray-800/80 ${zebra}`}
+                  className="border-b border-emerald-100/90 bg-emerald-50/70 last:border-0 dark:border-emerald-900/40 dark:bg-emerald-950/30"
                 >
                   {showCourt ? (
-                    <td className="px-3 py-3 align-top text-gray-500 dark:text-gray-400">
+                    <td className="px-3 py-3 align-top text-emerald-800/80 dark:text-emerald-200/80">
                       <span className="block truncate" title={formatCourtWithVenue(row.courtName, row.venueName)}>
                         {formatCourtWithVenue(row.courtName, row.venueName)}
                       </span>
                     </td>
                   ) : null}
-                  <td className={`${kampprogramTimeCellClass} text-gray-500 dark:text-gray-400`}>
+                  <td className={`${kampprogramTimeCellClass} text-emerald-800/80 dark:text-emerald-200/80`}>
                     {fmtTimeRange(row.startTime, row.endTime)}
                   </td>
-                  <td colSpan={trailingColSpan} className="px-3 py-3 italic text-gray-500 dark:text-gray-400">
+                  <td
+                    colSpan={trailingColSpan}
+                    className="px-3 py-3 font-medium italic text-emerald-800/90 dark:text-emerald-200/90"
+                  >
                     Ledig bane
                   </td>
                 </tr>
