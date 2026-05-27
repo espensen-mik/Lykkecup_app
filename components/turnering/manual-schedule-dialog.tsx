@@ -83,7 +83,7 @@ function SlotBadges({ slot }: { slot: ManualScheduleSlotOption }) {
       ) : null}
       {slot.isOutsidePoolPeriod ? (
         <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
-          Uden for pulje-periode
+          udenfor periode
         </span>
       ) : null}
       {!slot.teamsFree ? (

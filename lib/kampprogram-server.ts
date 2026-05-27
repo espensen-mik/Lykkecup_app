@@ -21,7 +21,7 @@ import {
   type KampprogramSchedulingSummary,
 } from "@/lib/scheduling-summary";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
-import { isAllDayPeriod, periodWindowMinutes } from "@/lib/tournament-periods";
+import { isMatchStartOutsidePoolPeriod } from "@/lib/tournament-periods";
 import { timeToMinutes } from "@/lib/baner-tider";
 import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 
@@ -231,12 +231,11 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     const isScheduled = Boolean(row.court_id && row.start_time && row.end_time);
     const poolPeriod = pool?.period_id ? periodById.get(pool.period_id) : undefined;
     let scheduledOutsidePoolPeriod = false;
-    if (isScheduled && poolPeriod && row.start_time && !isAllDayPeriod(poolPeriod)) {
-      const matchStart = timeToMinutes(row.start_time);
-      const win = periodWindowMinutes(poolPeriod);
-      if (matchStart != null && win) {
-        scheduledOutsidePoolPeriod = matchStart < win.startMinutes || matchStart >= win.endMinutes;
-      }
+    if (isScheduled && row.start_time) {
+      scheduledOutsidePoolPeriod = isMatchStartOutsidePoolPeriod(
+        timeToMinutes(row.start_time),
+        poolPeriod,
+      );
     }
     matches.push({
       id: row.id,

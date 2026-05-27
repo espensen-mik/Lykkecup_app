@@ -23,6 +23,7 @@ import {
 } from "@/lib/period-capacity";
 import {
   isAllDayPeriod,
+  isMatchStartOutsidePoolPeriod,
   periodWindowForScheduling,
   periodWindowMinutes,
   type TournamentPeriodRow,
@@ -3665,10 +3666,12 @@ function isRecommendedManualSlot(
   primaryPeriodId: string,
   dedicatedOtherPoolPeriodIds: ReadonlySet<string>,
   preferredCourtIds: ReadonlySet<string>,
+  periodsById: ReadonlyMap<string, TournamentPeriodRow>,
 ): boolean {
+  const poolPeriod = primaryPeriodId ? periodsById.get(primaryPeriodId) : undefined;
   return (
     preferredCourtIds.has(slot.courtId) &&
-    (!primaryPeriodId || slot.periodId === primaryPeriodId) &&
+    !isMatchStartOutsidePoolPeriod(slot.startMinutes, poolPeriod) &&
     !dedicatedOtherPoolPeriodIds.has(slot.periodId) &&
     slot.teamsFree &&
     slot.respectsTeamRest
@@ -3747,6 +3750,7 @@ function countRecommendedManualSlots(
   dedicatedOtherPoolPeriodIds: ReadonlySet<string>,
   preferredCourtIds: ReadonlySet<string>,
 ): number {
+  const periodsById = new Map(periods.map((p) => [p.id, p]));
   const merged = findAllSlotsForMatchManual(
     periods,
     match,
@@ -3758,7 +3762,13 @@ function countRecommendedManualSlots(
     scheduledRoundStartMinutes,
   );
   return merged.filter((slot) =>
-    isRecommendedManualSlot(slot, primaryPeriodId, dedicatedOtherPoolPeriodIds, preferredCourtIds),
+    isRecommendedManualSlot(
+      slot,
+      primaryPeriodId,
+      dedicatedOtherPoolPeriodIds,
+      preferredCourtIds,
+      periodsById,
+    ),
   ).length;
 }
 
@@ -3795,12 +3805,15 @@ function findManualScheduleMoveSuggestions(input: {
   levelKeyByPoolId: ReadonlyMap<string, string>;
   poolIdByMatchId: ReadonlyMap<string, string>;
 }): ManualScheduleMoveSuggestion[] {
+  const periodsById = new Map(input.periods.map((p) => [p.id, p]));
+  const poolPeriod = input.primaryPeriodId ? periodsById.get(input.primaryPeriodId) : undefined;
   const recommendedCount = input.merged.filter((slot) =>
     isRecommendedManualSlot(
       slot,
       input.primaryPeriodId,
       input.dedicatedOtherPoolPeriodIds,
       input.preferredCourtIds,
+      periodsById,
     ),
   ).length;
   if (recommendedCount > 0) return [];
@@ -3824,7 +3837,7 @@ function findManualScheduleMoveSuggestions(input: {
   const nearMissSlots = input.merged.filter(
     (slot) =>
       input.preferredCourtIds.has(slot.courtId) &&
-      (!input.primaryPeriodId || slot.periodId === input.primaryPeriodId) &&
+      !isMatchStartOutsidePoolPeriod(slot.startMinutes, poolPeriod) &&
       !input.dedicatedOtherPoolPeriodIds.has(slot.periodId),
   );
 
@@ -4291,11 +4304,14 @@ export async function listManualScheduleSlotsForMatch(
 
   const slots: ManualScheduleSlotOption[] = merged.map((slot) => {
     const period = periodsById.get(slot.periodId);
-    const periodName = period?.name ?? "—";
+    const poolPeriod = primaryPeriodId ? periodsById.get(primaryPeriodId) : undefined;
+    const isOutsidePoolPeriod = isMatchStartOutsidePoolPeriod(slot.startMinutes, poolPeriod);
+    const periodName = isOutsidePoolPeriod
+      ? (period?.name ?? "—")
+      : (poolPeriod?.name ?? period?.name ?? "—");
     const startLabel = minutesToTimeInput(slot.startMinutes);
     const endLabel = minutesToTimeInput(slot.endMinutes);
     const courtType = courtTypeById.get(slot.courtId) ?? requiredType;
-    const isOutsidePoolPeriod = Boolean(primaryPeriodId && slot.periodId !== primaryPeriodId);
     return {
       courtId: slot.courtId,
       courtName: courtNameById.get(slot.courtId) ?? "Bane",

@@ -60,6 +60,16 @@ export function periodWindowMinutes(period: Pick<TournamentPeriodRow, "start_tim
   return { startMinutes, endMinutes };
 }
 
+export function isMatchStartOutsidePoolPeriod(
+  startMinutes: number | null,
+  poolPeriod: Pick<TournamentPeriodRow, "start_time" | "end_time" | "is_all_day" | "name"> | null | undefined,
+): boolean {
+  if (startMinutes == null || !poolPeriod || isAllDayPeriod(poolPeriod)) return false;
+  const win = periodWindowMinutes(poolPeriod);
+  if (!win) return false;
+  return startMinutes < win.startMinutes || startMinutes >= win.endMinutes;
+}
+
 /** Planlægningsvindue: for «Hele dagen» = banernes tilgængelighed (ikke Formiddag/Eftermiddag). */
 export function periodWindowForScheduling(
   period: Pick<TournamentPeriodRow, "start_time" | "end_time" | "is_all_day" | "name">,
