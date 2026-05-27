@@ -8,7 +8,7 @@ import {
   preferencesTooltipText,
   type PreferenceBadgeLabel,
 } from "@/lib/player-preferences";
-import { supabase } from "@/lib/supabase";
+import { getAuthBrowserClient } from "@/lib/auth-browser";
 import type { HoldCoachRow, HoldPlayerRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 import { StyledSelect } from "@/components/ui/styled-select";
 
@@ -65,6 +65,7 @@ export function TeamBuilder({
   initialTeamCoaches,
   initialActiveTeamId,
 }: Props) {
+  const supabase = useMemo(() => getAuthBrowserClient(), []);
   const canonical = normalizeLevelKey(levelKey);
   /** Åbne hold først (øverst), lukkede hold sidst — inden for hver gruppe nyeste `sort_order` først. */
   const sortTeamsForDisplay = useCallback((rows: TeamRow[]) => {
@@ -298,7 +299,7 @@ export function TeamBuilder({
       setMembers((prev) => [...prev, row]);
       setAssignedGlobally((prev) => new Set(prev).add(playerId));
     },
-    [activeTeamId, assignedGlobally, teamById],
+    [activeTeamId, assignedGlobally, teamById, supabase],
   );
 
   const removeMember = useCallback(async (member: TeamMemberRow) => {
@@ -316,7 +317,7 @@ export function TeamBuilder({
       next.delete(member.player_id);
       return next;
     });
-  }, []);
+  }, [supabase]);
 
   const addCoachToActiveTeam = useCallback(
     async (coachId: string) => {
@@ -358,7 +359,7 @@ export function TeamBuilder({
       const row = data as TeamCoachRow;
       setTeamCoachLinks((prev) => [...prev, row]);
     },
-    [activeTeamId, teamCoachLinks, teamById],
+    [activeTeamId, teamCoachLinks, teamById, supabase],
   );
 
   const removeTeamCoach = useCallback(async (link: TeamCoachRow) => {
@@ -371,7 +372,7 @@ export function TeamBuilder({
       return;
     }
     setTeamCoachLinks((prev) => prev.filter((x) => x.id !== link.id));
-  }, []);
+  }, [supabase]);
 
   const toggleTeamCollapsed = useCallback((teamId: string) => {
     setCollapsedTeamIds((prev) => {
@@ -411,7 +412,7 @@ export function TeamBuilder({
         return copy;
       });
     },
-    [teams, nicknameDrafts],
+    [teams, nicknameDrafts, supabase],
   );
 
   const toggleTeamCompleted = useCallback(async (team: TeamRow) => {
@@ -436,7 +437,7 @@ export function TeamBuilder({
       delete copy[team.id];
       return copy;
     });
-  }, []);
+  }, [sortTeamsForDisplay, supabase]);
 
   const createTeam = useCallback(async () => {
     setActionError(null);
@@ -462,7 +463,7 @@ export function TeamBuilder({
     const t = data as TeamRow;
     setTeams((prev) => sortTeamsForDisplay([...prev, t]));
     setActiveTeamId(t.id);
-  }, [teams, canonical, sortTeamsForDisplay]);
+  }, [teams, canonical, sortTeamsForDisplay, supabase]);
 
   const deleteTeam = useCallback(
     async (team: TeamRow) => {
@@ -546,7 +547,7 @@ export function TeamBuilder({
         return copy;
       });
     },
-    [members, teamCoachLinks, activeTeamId, sortTeamsForDisplay],
+    [members, teamCoachLinks, activeTeamId, sortTeamsForDisplay, supabase],
   );
 
   type TeamListItem = { kind: "team"; team: TeamRow } | { kind: "header" };
