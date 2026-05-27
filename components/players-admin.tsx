@@ -377,13 +377,23 @@ export function PlayersAdmin({
                 const isAssigned = assignedPlayerIdSet.has(p.id);
                 const matchCount = matchCountByPlayerId[p.id] ?? 0;
                 const expectedMatches = resolvePlanMatchesPerTeam(p.level, planMatchesByLevel);
-                const matchesOk =
-                  isAssigned && expectedMatches != null && matchCount === expectedMatches;
+                const matchState =
+                  !isAssigned || expectedMatches == null
+                    ? "neutral"
+                    : matchCount < expectedMatches
+                      ? "low"
+                      : matchCount > expectedMatches
+                        ? "high"
+                        : "ok";
                 const matchTitle =
                   expectedMatches != null
-                    ? matchesOk
+                    ? matchState === "ok"
                       ? `${matchCount} kampe — matcher indstillingen for niveauet (${expectedMatches})`
-                      : `${matchCount} kampe — forventet ${expectedMatches} for niveauet`
+                      : matchState === "high"
+                        ? `${matchCount} kampe — flere end ${expectedMatches} i Opsætning → Kampe`
+                        : matchState === "low"
+                          ? `${matchCount} kampe — minimum ${expectedMatches} for niveauet`
+                          : `${matchCount} kampe — ingen gemt kampe/hold-indstilling for dette niveau (Opsætning → Kampe)`
                     : `${matchCount} kampe — ingen gemt kampe/hold-indstilling for dette niveau (Opsætning → Kampe)`;
                 return (
                 <tr
@@ -433,9 +443,16 @@ export function PlayersAdmin({
                     )}
                   </td>
                   <td className="border-l border-emerald-200/80 bg-emerald-50/45 px-5 py-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/15">
-                    {matchesOk ? (
+                    {matchState === "ok" ? (
                       <span
                         className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-emerald-300 bg-emerald-500/15 px-1 text-xs font-semibold text-emerald-700 shadow-sm dark:border-emerald-700 dark:bg-emerald-400/20 dark:text-emerald-200"
+                        title={matchTitle}
+                      >
+                        {matchCount}
+                      </span>
+                    ) : matchState === "high" ? (
+                      <span
+                        className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-amber-300 bg-amber-400/20 px-1 text-xs font-semibold text-amber-900 shadow-sm dark:border-amber-600 dark:bg-amber-500/25 dark:text-amber-100"
                         title={matchTitle}
                       >
                         {matchCount}
@@ -443,7 +460,7 @@ export function PlayersAdmin({
                     ) : (
                       <span
                         className={`tabular-nums ${
-                          isAssigned && expectedMatches != null
+                          matchState === "low"
                             ? "font-semibold text-red-700 dark:text-red-300"
                             : "text-gray-600 dark:text-gray-300"
                         }`}

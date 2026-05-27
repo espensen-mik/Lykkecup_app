@@ -160,8 +160,8 @@ export function analyzePoolMatchSync<T extends TeamForPairing>(
     if (count > 1) duplicateCount += count - 1;
   }
 
-  const teamsWrongCount = cap != null
-    ? teams.filter((t) => (matchCountByTeam.get(t.id) ?? 0) !== cap).map((t) => t.id)
+  const teamsUnderMin = cap != null
+    ? teams.filter((t) => (matchCountByTeam.get(t.id) ?? 0) < cap).map((t) => t.id)
     : [];
   const teamsWithoutMatch = teams.filter((t) => !teamsInMatches.has(t.id)).map((t) => t.id);
 
@@ -172,7 +172,7 @@ export function analyzePoolMatchSync<T extends TeamForPairing>(
   const isSynced = noTeamsToSchedule
     ? !hasMatches
     : cap != null
-      ? teamsWrongCount.length === 0 && duplicateCount === 0 && invalidCount === 0
+      ? teamsUnderMin.length === 0 && duplicateCount === 0 && invalidCount === 0
       : duplicateCount === 0 && invalidCount === 0;
 
   let message: string | null = null;
@@ -183,14 +183,14 @@ export function analyzePoolMatchSync<T extends TeamForPairing>(
         teamsWithoutMatch.length === 1
           ? `${names} er ikke med i de genererede kampe — typisk fordi hold er tilføjet efter sidste generering. Generér kampe igen.`
           : `Disse hold mangler i kampprogrammet: ${names}. Generér kampe igen efter ændring af puljen.`;
-    } else if (teamsWrongCount.length > 0 && cap != null) {
-      const names = teamsWrongCount
+    } else if (teamsUnderMin.length > 0 && cap != null) {
+      const names = teamsUnderMin
         .map((id) => {
           const actual = matchCountByTeam.get(id) ?? 0;
           return `${nameById.get(id) ?? id} (${actual}/${cap})`;
         })
         .join(", ");
-      message = `Hold med forkert antal kampe: ${names}. Generér kampe igen for niveauet.`;
+      message = `Hold med for få kampe: ${names}. Generér kampe igen for niveauet.`;
     } else if (duplicateCount > 0) {
       message = `${duplicateCount} dublet-kamp(e). Generér kampe igen.`;
     } else if (invalidCount > 0) {
@@ -202,7 +202,7 @@ export function analyzePoolMatchSync<T extends TeamForPairing>(
 
   return {
     isSynced,
-    missingCount: teamsWrongCount.length,
+    missingCount: teamsUnderMin.length,
     unexpectedCount: 0,
     duplicateCount,
     invalidCount,
@@ -227,10 +227,20 @@ export function resolveMatchesPerTeamCap(
   return Math.max(1, Math.min(Math.floor(maxMatchesPerTeam), teamCount - 1));
 }
 
-/** True når alle hold kan få præcis `cap` kampe (n×cap skal være lige). */
+/** @deprecated Brug min-mål-generering; ulige n×cap løses med at ét hold kan få én kamp ekstra. */
 export function canAllTeamsReachMatchCap(teamCount: number, cap: number): boolean {
   if (teamCount < 2 || cap < 1) return false;
-  return (teamCount * cap) % 2 === 0;
+  return cap <= teamCount - 1;
+}
+
+/** Maks kampe for ét hold når vi løfter andre op til minimum (typisk mål + 1). */
+export function resolveSoftMaxMatchesPerTeam(
+  teamCount: number,
+  targetPerTeam?: number,
+): number | null {
+  const minTarget = resolveMatchesPerTeamCap(teamCount, targetPerTeam);
+  if (minTarget == null) return null;
+  return Math.min(minTarget + 1, teamCount - 1);
 }
 
 export function resolveMatchPoolId(poolA: string, poolB: string): string {
@@ -245,10 +255,12 @@ export type LevelMatchPairing = {
   poolId: string;
 };
 
-function tryAddCappedPairing(
+/** Tilføj kamp: alle hold skal mindst `minTarget` kampe; op til `softMax` for at løfte under-min hold. */
+function tryAddMinTargetPairing(
   teamAId: string,
   teamBId: string,
-  cap: number,
+  minTarget: number,
+  softMax: number,
   matchCount: Map<string, number>,
   usedPairs: Set<string>,
   pairings: Array<{ teamAId: string; teamBId: string }>,
@@ -258,7 +270,8 @@ function tryAddCappedPairing(
   if (usedPairs.has(key)) return false;
   const countA = matchCount.get(teamAId) ?? 0;
   const countB = matchCount.get(teamBId) ?? 0;
-  if (countA >= cap || countB >= cap) return false;
+  if (countA >= softMax || countB >= softMax) return false;
+  if (countA >= minTarget && countB >= minTarget) return false;
   pairings.push({ teamAId, teamBId });
   usedPairs.add(key);
   matchCount.set(teamAId, countA + 1);
@@ -287,47 +300,35 @@ function generateFullRoundRobinPairings(teamIds: readonly string[]): Array<{ tea
   return pairings;
 }
 
-function generateCappedRoundRobinPairings(
+function fillUnderMinTargetPairings(
   teamIds: readonly string[],
-  cap: number,
-): Array<{ teamAId: string; teamBId: string }> {
-  const matchCount = new Map(teamIds.map((id) => [id, 0]));
-  const usedPairs = new Set<string>();
-  const pairings: Array<{ teamAId: string; teamBId: string }> = [];
-
-  const allAtCap = () => teamIds.every((id) => (matchCount.get(id) ?? 0) >= cap);
-
-  let order = [...teamIds];
-  if (order.length % 2 === 1) order = [...order, ROUND_ROBIN_BYE];
-  const n = order.length;
-  const slotOrder = [...order];
-
-  for (let round = 0; round < n - 1; round += 1) {
-    if (allAtCap()) break;
-    for (let i = 0; i < n / 2; i += 1) {
-      const teamAId = slotOrder[i]!;
-      const teamBId = slotOrder[n - 1 - i]!;
-      if (teamAId === ROUND_ROBIN_BYE || teamBId === ROUND_ROBIN_BYE) continue;
-      tryAddCappedPairing(teamAId, teamBId, cap, matchCount, usedPairs, pairings);
-    }
-    if (round < n - 2) rotateRoundRobinOrder(slotOrder);
-  }
+  minTarget: number,
+  softMax: number,
+  matchCount: Map<string, number>,
+  usedPairs: Set<string>,
+  pairings: Array<{ teamAId: string; teamBId: string }>,
+): void {
+  const allAtMin = () => teamIds.every((id) => (matchCount.get(id) ?? 0) >= minTarget);
 
   let progress = true;
-  while (progress) {
+  while (progress && !allAtMin()) {
     progress = false;
-    const underCap = teamIds
-      .filter((id) => (matchCount.get(id) ?? 0) < cap)
+    const underMin = teamIds
+      .filter((id) => (matchCount.get(id) ?? 0) < minTarget)
       .sort(
         (a, b) =>
           (matchCount.get(a) ?? 0) - (matchCount.get(b) ?? 0) || a.localeCompare(b),
       );
 
-    if (underCap.length < 2) break;
-
-    for (let i = 0; i < underCap.length; i += 1) {
-      for (let j = i + 1; j < underCap.length; j += 1) {
-        if (tryAddCappedPairing(underCap[i]!, underCap[j]!, cap, matchCount, usedPairs, pairings)) {
+    for (const teamAId of underMin) {
+      const opponents = teamIds
+        .filter((id) => id !== teamAId)
+        .sort(
+          (a, b) =>
+            (matchCount.get(a) ?? 0) - (matchCount.get(b) ?? 0) || a.localeCompare(b),
+        );
+      for (const teamBId of opponents) {
+        if (tryAddMinTargetPairing(teamAId, teamBId, minTarget, softMax, matchCount, usedPairs, pairings)) {
           progress = true;
           break;
         }
@@ -335,12 +336,42 @@ function generateCappedRoundRobinPairings(
       if (progress) break;
     }
   }
+}
 
+function generateMinTargetPairings(
+  teamIds: readonly string[],
+  targetPerTeam?: number,
+): Array<{ teamAId: string; teamBId: string }> {
+  const minTarget = resolveMatchesPerTeamCap(teamIds.length, targetPerTeam);
+  if (minTarget == null) return generateFullRoundRobinPairings(teamIds);
+  const softMax = resolveSoftMaxMatchesPerTeam(teamIds.length, targetPerTeam)!;
+
+  const matchCount = new Map(teamIds.map((id) => [id, 0]));
+  const usedPairs = new Set<string>();
+  const pairings: Array<{ teamAId: string; teamBId: string }> = [];
+
+  let order = [...teamIds];
+  if (order.length % 2 === 1) order = [...order, ROUND_ROBIN_BYE];
+  const n = order.length;
+  const slotOrder = [...order];
+
+  for (let round = 0; round < n - 1; round += 1) {
+    if (teamIds.every((id) => (matchCount.get(id) ?? 0) >= minTarget)) break;
+    for (let i = 0; i < n / 2; i += 1) {
+      const teamAId = slotOrder[i]!;
+      const teamBId = slotOrder[n - 1 - i]!;
+      if (teamAId === ROUND_ROBIN_BYE || teamBId === ROUND_ROBIN_BYE) continue;
+      tryAddMinTargetPairing(teamAId, teamBId, minTarget, softMax, matchCount, usedPairs, pairings);
+    }
+    if (round < n - 2) rotateRoundRobinOrder(slotOrder);
+  }
+
+  fillUnderMinTargetPairings(teamIds, minTarget, softMax, matchCount, usedPairs, pairings);
   return pairings;
 }
 
 /**
- * Round-robin op til `maxMatchesPerTeam` kampe pr. hold (én pulje).
+ * Round-robin med minimum `maxMatchesPerTeam` kampe pr. hold (én pulje).
  * Brug `generateLevelCappedMatches` når der kan være flere puljer på niveauet.
  */
 export function generateRoundRobinMatches<T extends TeamForPairing>(
@@ -348,22 +379,16 @@ export function generateRoundRobinMatches<T extends TeamForPairing>(
   maxMatchesPerTeam?: number,
 ): Array<{ teamAId: string; teamBId: string }> {
   if (teams.length < 2) return [];
-
   const teamIds = sortTeamsForPairing(teams).map((t) => t.id);
-  const cap = resolveMatchesPerTeamCap(teams.length, maxMatchesPerTeam);
-
-  if (cap == null) {
-    return generateFullRoundRobinPairings(teamIds);
-  }
-
-  return generateCappedRoundRobinPairings(teamIds, cap);
+  return generateMinTargetPairings(teamIds, maxMatchesPerTeam);
 }
 
 function addLevelPairing(
   teamAId: string,
   teamBId: string,
   poolId: string,
-  cap: number,
+  minTarget: number,
+  softMax: number,
   poolByTeamId: ReadonlyMap<string, string>,
   matchCount: Map<string, number>,
   usedPairs: Set<string>,
@@ -374,7 +399,8 @@ function addLevelPairing(
   if (usedPairs.has(key)) return false;
   const countA = matchCount.get(teamAId) ?? 0;
   const countB = matchCount.get(teamBId) ?? 0;
-  if (countA >= cap || countB >= cap) return false;
+  if (countA >= softMax || countB >= softMax) return false;
+  if (countA >= minTarget && countB >= minTarget) return false;
   pairings.push({
     teamAId,
     teamBId,
@@ -388,7 +414,8 @@ function addLevelPairing(
 
 function balanceLevelPairings(
   teams: readonly LevelMatchTeam[],
-  cap: number,
+  minTarget: number,
+  softMax: number,
   poolByTeamId: ReadonlyMap<string, string>,
   matchCount: Map<string, number>,
   usedPairs: Set<string>,
@@ -398,24 +425,32 @@ function balanceLevelPairings(
   let progress = true;
   while (progress) {
     progress = false;
-    const underCap = teams
+    const underMin = teams
       .map((t) => t.id)
-      .filter((id) => (matchCount.get(id) ?? 0) < cap)
+      .filter((id) => (matchCount.get(id) ?? 0) < minTarget)
       .sort(
         (a, b) =>
           (matchCount.get(a) ?? 0) - (matchCount.get(b) ?? 0) || a.localeCompare(b),
       );
 
-    if (underCap.length < 2) break;
+    if (underMin.length === 0) break;
 
     let best: { a: string; b: string; crossPool: boolean } | null = null;
-    for (let i = 0; i < underCap.length; i += 1) {
-      for (let j = i + 1; j < underCap.length; j += 1) {
-        const a = underCap[i]!;
-        const b = underCap[j]!;
+    for (const a of underMin) {
+      const opponents = teams
+        .map((t) => t.id)
+        .filter((id) => id !== a)
+        .sort(
+          (x, y) =>
+            (matchCount.get(x) ?? 0) - (matchCount.get(y) ?? 0) || x.localeCompare(y),
+        );
+      for (const b of opponents) {
         const key = matchPairKey(a, b);
         if (usedPairs.has(key)) continue;
-        if ((matchCount.get(a) ?? 0) >= cap || (matchCount.get(b) ?? 0) >= cap) continue;
+        const countA = matchCount.get(a) ?? 0;
+        const countB = matchCount.get(b) ?? 0;
+        if (countA >= softMax || countB >= softMax) continue;
+        if (countA >= minTarget && countB >= minTarget) continue;
         const crossPool = poolByTeamId.get(a) !== poolByTeamId.get(b);
         if (!best) {
           best = { a, b, crossPool };
@@ -426,7 +461,7 @@ function balanceLevelPairings(
           continue;
         }
         if (best.crossPool === crossPool) {
-          const score = (matchCount.get(a) ?? 0) + (matchCount.get(b) ?? 0);
+          const score = countA + countB;
           const bestScore = (matchCount.get(best.a) ?? 0) + (matchCount.get(best.b) ?? 0);
           if (score < bestScore) best = { a, b, crossPool };
         }
@@ -439,7 +474,8 @@ function balanceLevelPairings(
         best.a,
         best.b,
         resolveMatchPoolId(poolByTeamId.get(best.a)!, poolByTeamId.get(best.b)!),
-        cap,
+        minTarget,
+        softMax,
         poolByTeamId,
         matchCount,
         usedPairs,
@@ -452,8 +488,8 @@ function balanceLevelPairings(
 }
 
 /**
- * Generér kampe for hele et niveau: først inden for puljer, derefter på tværs af puljer
- * så alle hold kan nå præcis `maxMatchesPerTeam` når n×cap er lige.
+ * Generér kampe for hele et niveau: minimum `maxMatchesPerTeam` for hvert hold.
+ * Ved ulige paritet kan enkelte hold få én kamp ekstra (aldrig færre end målet).
  */
 export function generateLevelCappedMatches(
   teams: readonly LevelMatchTeam[],
@@ -462,8 +498,8 @@ export function generateLevelCappedMatches(
   if (teams.length < 2) return [];
 
   const sortedTeams = sortTeamsForPairing(teams);
-  const cap = resolveMatchesPerTeamCap(sortedTeams.length, maxMatchesPerTeam);
-  if (cap == null) {
+  const minTarget = resolveMatchesPerTeamCap(sortedTeams.length, maxMatchesPerTeam);
+  if (minTarget == null) {
     const poolByTeamId = new Map(sortedTeams.map((t) => [t.id, t.poolId]));
     return generateFullRoundRobinPairings(sortedTeams.map((t) => t.id)).map((p) => ({
       ...p,
@@ -471,6 +507,7 @@ export function generateLevelCappedMatches(
     }));
   }
 
+  const softMax = resolveSoftMaxMatchesPerTeam(sortedTeams.length, maxMatchesPerTeam)!;
   const poolByTeamId = new Map(sortedTeams.map((t) => [t.id, t.poolId]));
   const matchCount = new Map(sortedTeams.map((t) => [t.id, 0]));
   const usedPairs = new Set<string>();
@@ -485,15 +522,16 @@ export function generateLevelCappedMatches(
 
   for (const poolTeams of teamsByPool.values()) {
     if (poolTeams.length < 2) continue;
-    for (const pairing of generateCappedRoundRobinPairings(
-      sortTeamsForPairing(poolTeams).map((t) => t.id),
-      cap,
-    )) {
+    const poolIds = sortTeamsForPairing(poolTeams).map((t) => t.id);
+    const poolMin = resolveMatchesPerTeamCap(poolIds.length, maxMatchesPerTeam)!;
+    const poolSoftMax = resolveSoftMaxMatchesPerTeam(poolIds.length, maxMatchesPerTeam)!;
+    for (const pairing of generateMinTargetPairings(poolIds, maxMatchesPerTeam)) {
       addLevelPairing(
         pairing.teamAId,
         pairing.teamBId,
         poolByTeamId.get(pairing.teamAId)!,
-        cap,
+        poolMin,
+        poolSoftMax,
         poolByTeamId,
         matchCount,
         usedPairs,
@@ -502,12 +540,12 @@ export function generateLevelCappedMatches(
     }
   }
 
-  balanceLevelPairings(sortedTeams, cap, poolByTeamId, matchCount, usedPairs, pairings, true);
+  balanceLevelPairings(sortedTeams, minTarget, softMax, poolByTeamId, matchCount, usedPairs, pairings, true);
 
   return pairings;
 }
 
-/** Ekstra kampe på tværs af puljer for at løfte hold op til cap (uden at slette eksisterende). */
+/** Ekstra kampe på tværs af puljer for at løfte hold op til minimum (uden at slette eksisterende). */
 export function computeLevelBalanceAdditions(
   teams: readonly LevelMatchTeam[],
   existingMatches: readonly { team_a_id: string; team_b_id: string }[],
@@ -515,8 +553,9 @@ export function computeLevelBalanceAdditions(
 ): LevelMatchPairing[] {
   if (teams.length < 2) return [];
   const sortedTeams = sortTeamsForPairing(teams);
-  const cap = resolveMatchesPerTeamCap(sortedTeams.length, maxMatchesPerTeam);
-  if (cap == null) return [];
+  const minTarget = resolveMatchesPerTeamCap(sortedTeams.length, maxMatchesPerTeam);
+  if (minTarget == null) return [];
+  const softMax = resolveSoftMaxMatchesPerTeam(sortedTeams.length, maxMatchesPerTeam)!;
 
   const teamIds = new Set(sortedTeams.map((t) => t.id));
   const poolByTeamId = new Map(sortedTeams.map((t) => [t.id, t.poolId]));
@@ -537,18 +576,18 @@ export function computeLevelBalanceAdditions(
     }
   }
 
-  balanceLevelPairings(sortedTeams, cap, poolByTeamId, matchCount, usedPairs, additions, true);
+  balanceLevelPairings(sortedTeams, minTarget, softMax, poolByTeamId, matchCount, usedPairs, additions, true);
   return additions;
 }
 
-/** Antal kampe ved begrænset round-robin (til KPI / sync). */
+/** Forventet kampe når alle hold skal have mindst `maxMatchesPerTeam` (én kan få +1 ved ulige paritet). */
 export function plannedPoolMatchCount(teamCount: number, maxMatchesPerTeam?: number): number {
   if (teamCount < 2) return 0;
   const cap = resolveMatchesPerTeamCap(teamCount, maxMatchesPerTeam);
   if (cap == null) {
     return (teamCount * (teamCount - 1)) / 2;
   }
-  return Math.floor((teamCount * cap) / 2);
+  return Math.ceil((teamCount * cap) / 2);
 }
 
 /** Forventet kampe når alle hold på niveauet skal have præcis cap kampe. */

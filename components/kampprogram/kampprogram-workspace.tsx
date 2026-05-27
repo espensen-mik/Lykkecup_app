@@ -213,10 +213,68 @@ function MatchActionButtons({
 function fmtTimeRange(start: string | null, end: string | null): string {
   const s = formatTimeForInput(start);
   const e = formatTimeForInput(end);
-  if (s && e) return `${s}–${e}`;
+  if (s && e) return `${s}\u2011${e}`;
   if (s) return s;
   return "—";
 }
+
+/** Ensartet kolonnebredde på tværs af alle bane-/runde-tabeller (undgår hop ved scroll). */
+function KampprogramTableColgroup({
+  showCourt,
+  showManualSchedule,
+}: {
+  showCourt: boolean;
+  showManualSchedule: boolean;
+}) {
+  return (
+    <colgroup>
+      {showCourt ? <col style={{ width: "11rem" }} /> : null}
+      <col style={{ width: "6.75rem" }} />
+      <col />
+      <col style={{ width: "7.25rem" }} />
+      <col style={{ width: "5.25rem" }} />
+      <col style={{ width: "6.5rem" }} />
+      <col style={{ width: "7.5rem" }} />
+      {showManualSchedule ? <col style={{ width: "10rem" }} /> : null}
+    </colgroup>
+  );
+}
+
+function KampprogramTableHead({
+  showCourt,
+  showManualSchedule,
+}: {
+  showCourt: boolean;
+  showManualSchedule: boolean;
+}) {
+  return (
+    <thead>
+      <tr className="border-b border-gray-200 bg-gray-50/90 text-left text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
+        {showCourt ? <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Bane</th> : null}
+        <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Tid</th>
+        <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Kamp</th>
+        <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Niveau</th>
+        <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Pulje</th>
+        <th
+          className="px-3 py-2.5 font-semibold uppercase tracking-wide"
+          title="Puljens tildelte periode — ikke klokkeslæt"
+        >
+          Periode
+        </th>
+        <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Status</th>
+        {showManualSchedule ? (
+          <th className="px-3 py-2.5 font-semibold uppercase tracking-wide" aria-label="Handlinger" />
+        ) : null}
+      </tr>
+    </thead>
+  );
+}
+
+const kampprogramTimeCellClass =
+  "whitespace-nowrap px-3 py-3 align-top tabular-nums text-[0.8125rem] leading-snug tracking-tight";
+const kampprogramTableWrapClass =
+  "overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700";
+const kampprogramTableClass = "w-full min-w-[52rem] table-fixed text-sm";
 
 function teamDetailOrFallback(
   teamId: string,
@@ -256,25 +314,12 @@ function MatchTable({
   if (rows.length === 0) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">Ingen kampe i dette udsnit.</p>;
   }
+  const showActions = Boolean(showManualSchedule);
   return (
-    <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-      <table className="min-w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 bg-gray-50/90 text-left text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
-            {showCourt ? <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Bane</th> : null}
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Tid</th>
-            <th className="min-w-[14rem] px-3 py-2.5 font-semibold uppercase tracking-wide">Kamp</th>
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Niveau</th>
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Pulje</th>
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide" title="Puljens tildelte periode — ikke klokkeslæt">
-              Periode
-            </th>
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Status</th>
-            {showManualSchedule ? (
-              <th className="w-40 px-3 py-2.5 font-semibold uppercase tracking-wide" />
-            ) : null}
-          </tr>
-        </thead>
+    <div className={kampprogramTableWrapClass}>
+      <table className={kampprogramTableClass}>
+        <KampprogramTableColgroup showCourt={Boolean(showCourt)} showManualSchedule={showActions} />
+        <KampprogramTableHead showCourt={Boolean(showCourt)} showManualSchedule={showActions} />
         <tbody>
           {rows.map((m, index) => {
             const lv = getLevelVisualClasses(m.levelKey);
@@ -287,19 +332,21 @@ function MatchTable({
             return (
               <tr key={m.id} className={`border-b border-gray-100 last:border-0 dark:border-gray-800/80 ${zebra}`}>
                 {showCourt ? (
-                  <td className="px-3 py-3 text-gray-900 dark:text-white">
+                  <td className="px-3 py-3 align-top text-gray-900 dark:text-white">
                     {m.courtName ? (
-                      <span className="font-medium">{formatCourtWithVenue(m.courtName, m.venueName)}</span>
+                      <span className="block truncate font-medium" title={formatCourtWithVenue(m.courtName, m.venueName)}>
+                        {formatCourtWithVenue(m.courtName, m.venueName)}
+                      </span>
                     ) : (
                       "—"
                     )}
                   </td>
                 ) : null}
-                <td className="px-3 py-3 tabular-nums font-medium text-gray-700 dark:text-gray-200">
+                <td className={`${kampprogramTimeCellClass} font-medium text-gray-700 dark:text-gray-200`}>
                   {fmtTimeRange(m.startTime, m.endTime)}
                 </td>
-                <td className="px-3 py-3">
-                  <div className="flex min-w-0 max-w-[22rem] flex-wrap items-center gap-x-1.5 gap-y-0.5 sm:flex-nowrap">
+                <td className="px-3 py-3 align-top">
+                  <div className="flex min-w-0 items-center gap-x-1.5 gap-y-0.5">
                     <TeamNameWithHover
                       detail={detailA}
                       onOpenDetail={() => onOpenTeam(m.teamAId)}
@@ -318,14 +365,16 @@ function MatchTable({
                     />
                   </div>
                 </td>
-                <td className="px-3 py-3">
-                  <span className={lv.badge} title={m.levelKey}>
+                <td className="px-3 py-3 align-top">
+                  <span className={`${lv.badge} whitespace-nowrap`} title={m.levelKey}>
                     {formatLevelShortLabel(m.levelKey)}
                   </span>
                 </td>
-                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.poolName}</td>
-                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.periodName ?? "—"}</td>
-                <td className="px-3 py-3">
+                <td className="whitespace-nowrap px-3 py-3 align-top text-gray-600 dark:text-gray-300">{m.poolName}</td>
+                <td className="whitespace-nowrap px-3 py-3 align-top text-gray-600 dark:text-gray-300">
+                  {m.periodName ?? "—"}
+                </td>
+                <td className="px-3 py-3 align-top">
                   <MatchStatusBadges
                     match={m}
                     allMatches={allMatches}
@@ -335,7 +384,7 @@ function MatchTable({
                   />
                 </td>
                 {showManualSchedule ? (
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-3 align-top">
                     <MatchActionButtons match={m} onManualSchedule={onManualSchedule} />
                   </td>
                 ) : null}
@@ -375,28 +424,12 @@ function KampprogramTimelineTable({
     );
   }
 
+  const showActionsCol = Boolean(showManualSchedule);
   return (
-    <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-      <table className="min-w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 bg-gray-50/90 text-left text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
-            {showCourt ? <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Bane</th> : null}
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Tid</th>
-            <th className="min-w-[14rem] px-3 py-2.5 font-semibold uppercase tracking-wide">Kamp</th>
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Niveau</th>
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Pulje</th>
-            <th
-              className="px-3 py-2.5 font-semibold uppercase tracking-wide"
-              title="Puljens tildelte periode — ikke klokkeslæt"
-            >
-              Periode
-            </th>
-            <th className="px-3 py-2.5 font-semibold uppercase tracking-wide">Status</th>
-            {showManualSchedule ? (
-              <th className="w-40 px-3 py-2.5 font-semibold uppercase tracking-wide" />
-            ) : null}
-          </tr>
-        </thead>
+    <div className={kampprogramTableWrapClass}>
+      <table className={kampprogramTableClass}>
+        <KampprogramTableColgroup showCourt={Boolean(showCourt)} showManualSchedule={showActionsCol} />
+        <KampprogramTableHead showCourt={Boolean(showCourt)} showManualSchedule={showActionsCol} />
         <tbody>
           {rows.map((row, index) => {
             const zebra =
@@ -412,11 +445,13 @@ function KampprogramTimelineTable({
                   className={`border-b border-gray-100 last:border-0 dark:border-gray-800/80 ${zebra}`}
                 >
                   {showCourt ? (
-                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400">
-                      {formatCourtWithVenue(row.courtName, row.venueName)}
+                    <td className="px-3 py-3 align-top text-gray-500 dark:text-gray-400">
+                      <span className="block truncate" title={formatCourtWithVenue(row.courtName, row.venueName)}>
+                        {formatCourtWithVenue(row.courtName, row.venueName)}
+                      </span>
                     </td>
                   ) : null}
-                  <td className="px-3 py-3 tabular-nums text-gray-500 dark:text-gray-400">
+                  <td className={`${kampprogramTimeCellClass} text-gray-500 dark:text-gray-400`}>
                     {fmtTimeRange(row.startTime, row.endTime)}
                   </td>
                   <td colSpan={actionColSpan} className="px-3 py-3 italic text-gray-500 dark:text-gray-400">
@@ -440,24 +475,26 @@ function KampprogramTimelineTable({
                 className={`border-b border-gray-100 last:border-0 dark:border-gray-800/80 ${zebra}`}
               >
                 {showCourt ? (
-                  <td className="px-3 py-3 text-gray-900 dark:text-white">
+                  <td className="px-3 py-3 align-top text-gray-900 dark:text-white">
                     {m.courtName ? (
-                      <span className="font-medium">{formatCourtWithVenue(m.courtName, m.venueName)}</span>
+                      <span className="block truncate font-medium" title={formatCourtWithVenue(m.courtName, m.venueName)}>
+                        {formatCourtWithVenue(m.courtName, m.venueName)}
+                      </span>
                     ) : (
                       "—"
                     )}
                   </td>
                 ) : null}
-                <td className="px-3 py-3 tabular-nums font-medium text-gray-700 dark:text-gray-200">
-                  <span>{fmtTimeRange(row.slotStartTime, row.slotEndTime)}</span>
+                <td className={`${kampprogramTimeCellClass} font-medium text-gray-700 dark:text-gray-200`}>
+                  <span className="whitespace-nowrap">{fmtTimeRange(row.slotStartTime, row.slotEndTime)}</span>
                   {row.segmentLabel ? (
-                    <span className="mt-0.5 block text-xs font-medium text-teal-800 dark:text-teal-300">
+                    <span className="mt-0.5 block whitespace-nowrap text-xs font-medium text-teal-800 dark:text-teal-300">
                       {row.segmentLabel}
                     </span>
                   ) : null}
                 </td>
-                <td className="px-3 py-3">
-                  <div className="flex min-w-0 max-w-[22rem] flex-wrap items-center gap-x-1.5 gap-y-0.5 sm:flex-nowrap">
+                <td className="px-3 py-3 align-top">
+                  <div className="flex min-w-0 items-center gap-x-1.5 gap-y-0.5">
                     <TeamNameWithHover
                       detail={detailA}
                       onOpenDetail={() => onOpenTeam(m.teamAId)}
@@ -476,14 +513,16 @@ function KampprogramTimelineTable({
                     />
                   </div>
                 </td>
-                <td className="px-3 py-3">
-                  <span className={lv.badge} title={m.levelKey}>
+                <td className="px-3 py-3 align-top">
+                  <span className={`${lv.badge} whitespace-nowrap`} title={m.levelKey}>
                     {formatLevelShortLabel(m.levelKey)}
                   </span>
                 </td>
-                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.poolName}</td>
-                <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{m.periodName ?? "—"}</td>
-                <td className="px-3 py-3">
+                <td className="whitespace-nowrap px-3 py-3 align-top text-gray-600 dark:text-gray-300">{m.poolName}</td>
+                <td className="whitespace-nowrap px-3 py-3 align-top text-gray-600 dark:text-gray-300">
+                  {m.periodName ?? "—"}
+                </td>
+                <td className="px-3 py-3 align-top">
                   <MatchStatusBadges
                     match={m}
                     allMatches={allMatches}
@@ -493,7 +532,7 @@ function KampprogramTimelineTable({
                   />
                 </td>
                 {showManualSchedule ? (
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-3 align-top">
                     {showActions ? <MatchActionButtons match={m} onManualSchedule={onManualSchedule} /> : null}
                   </td>
                 ) : null}

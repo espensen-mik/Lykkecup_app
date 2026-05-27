@@ -8,7 +8,7 @@ import {
 } from "@/lib/puljer";
 import { resolvePlanMatchesPerTeam } from "@/lib/lykkecup-regnemaskine";
 import { isAllDayPeriod, periodWindowMinutes } from "@/lib/tournament-periods";
-import { analyzePoolMatchSync, canAllTeamsReachMatchCap, plannedLevelMatchCount } from "@/lib/turnering";
+import { analyzePoolMatchSync, plannedLevelMatchCount } from "@/lib/turnering";
 import { findCourtOverlapIssues } from "@/lib/turneringsplan-status";
 
 export type CheckStatus = "ok" | "warn" | "error";
@@ -160,8 +160,8 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
       continue;
     }
     teamsWithExpected += 1;
-    if (actual === expected) teamsMatchOk += 1;
-    else teamsWrongMatchCount.push(`${team.name}: ${actual} kampe (forventet ${expected})`);
+    if (actual >= expected) teamsMatchOk += 1;
+    else teamsWrongMatchCount.push(`${team.name}: ${actual} kampe (minimum ${expected})`);
   }
 
   const checkTeamMatchCount = finalizeItem(
@@ -169,7 +169,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
       id: "team-match-count",
       title: "Kampe pr. hold",
       description:
-        "Hvert hold skal have præcis det aftalte antal kampe fra Opsætning → Kampe.",
+        "Hvert hold skal have mindst det aftalte antal kampe fra Opsætning → Kampe. Enkelte hold kan have én ekstra ved ulige puljestørrelse.",
       metrics: [
         { label: "Hold med mål", value: teamsWithExpected },
         { label: "Korrekt antal", value: teamsMatchOk },
@@ -197,15 +197,15 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     if (expected == null) continue;
     playersChecked += 1;
     const actual = teamMatchCount.get(team.id) ?? 0;
-    if (actual === expected) playersMatchOk += 1;
-    else playersWrongMatches.push(`${p.name} (${team.name}): ${actual} kampe (forventet ${expected})`);
+    if (actual >= expected) playersMatchOk += 1;
+    else playersWrongMatches.push(`${p.name} (${team.name}): ${actual} kampe (minimum ${expected})`);
   }
 
   const checkPlayerMatchCount = finalizeItem({
     id: "player-match-count",
     title: "Kampe pr. spiller",
     description:
-      "Spillere arver antal kampe fra deres hold — skal matche Opsætning → Kampe præcis.",
+      "Spillere arver antal kampe fra deres hold — mindst Opsætning → Kampe (aldrig færre).",
     metrics: [
       { label: "Spillere tjekket", value: playersChecked },
       { label: "Korrekt antal", value: playersMatchOk },
@@ -528,7 +528,6 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     "warn",
   );
 
-  const levelParityIssues: string[] = [];
   const teamsByLevel = new Map<string, typeof input.teams>();
   for (const team of input.teams) {
     if (!team.pool_id || !poolIds.has(team.pool_id)) continue;
@@ -537,31 +536,6 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     list.push(team);
     teamsByLevel.set(levelKey, list);
   }
-  for (const [levelKey, levelTeams] of teamsByLevel) {
-    if (levelTeams.length < 2) continue;
-    const planPerTeam = resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel, input.scheduleRows);
-    if (planPerTeam == null) continue;
-    if (!canAllTeamsReachMatchCap(levelTeams.length, planPerTeam)) {
-      levelParityIssues.push(
-        `${levelKey}: ${levelTeams.length} hold × ${planPerTeam} kampe/hold giver ulige total — alle kan ikke få ${planPerTeam} kampe. Tilføj/fjern et hold på niveauet eller ændre kampe/hold under Opsætning.`,
-      );
-    }
-  }
-
-  const checkLevelMatchParity = finalizeItem(
-    {
-      id: "level-match-parity",
-      title: "Kampe/hold kan fordeles",
-      description:
-        "Antal hold × kampe/hold skal være lige på hvert niveau, ellers kan ikke alle hold få det aftalte antal kampe.",
-      metrics: [
-        { label: "Niveauer tjekket", value: teamsByLevel.size },
-        { label: "Kan ikke fordeles", value: levelParityIssues.length },
-      ],
-      issues: levelParityIssues,
-    },
-    "error",
-  );
 
   let expectedMatchesTotal = 0;
   let generatedInPools = 0;
@@ -612,7 +586,6 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     checkTeamsInPools,
     checkEmptyTeams,
     checkPlanSettings,
-    checkLevelMatchParity,
     checkPoolSync,
     checkTeamMatchCount,
     checkPlayerMatchCount,
