@@ -133,12 +133,15 @@ function OutsidePoolPeriodBadge() {
   );
 }
 
-function matchHasHardTeamRestViolation(
+/** Matches that show «Mangler pause» or «Uden hold-pause» in Status. */
+function matchHasPauseIssue(
   m: KampprogramMatch,
   conflictHintsByMatchId: ReadonlyMap<string, KampprogramMatchConflictHints>,
 ): boolean {
-  if (!m.isScheduled || m.scheduleRelaxedTeamRest) return false;
-  return Boolean(conflictHintsByMatchId.get(m.id)?.teamRestViolation);
+  if (m.isOrphan || !m.isScheduled) return false;
+  if (m.scheduleRelaxedTeamRest) return true;
+  const hints = conflictHintsByMatchId.get(m.id);
+  return Boolean(hints?.teamRestViolation);
 }
 
 function MatchStatusBadges({
@@ -685,7 +688,7 @@ export function KampprogramWorkspace({
       if (m.isOrphan) return false;
       if (matchFilter === "unscheduled" && m.isScheduled) return false;
       if (matchFilter === "outside-period" && !m.scheduledOutsidePoolPeriod) return false;
-      if (matchFilter === "missing-team-rest" && !matchHasHardTeamRestViolation(m, conflictHintsByMatchId)) {
+      if (matchFilter === "missing-team-rest" && !matchHasPauseIssue(m, conflictHintsByMatchId)) {
         return false;
       }
       if (levelFilter && m.levelKey !== levelFilter) return false;
@@ -756,9 +759,11 @@ export function KampprogramWorkspace({
   }, [courtsForView, initial.levelTimingByLevel, byCourt]);
 
   const displayedCourtTimelines = useMemo(() => {
-    if (!courtTypeFilter) return courtTimelines;
-    return courtTimelines.filter((t) => t.matches.length > 0);
-  }, [courtTimelines, courtTypeFilter]);
+    if (courtTypeFilter || matchFilter === "missing-team-rest" || matchFilter === "outside-period") {
+      return courtTimelines.filter((t) => t.matches.length > 0);
+    }
+    return courtTimelines;
+  }, [courtTimelines, courtTypeFilter, matchFilter]);
 
   const unscheduledFiltered = useMemo(() => filtered.filter((m) => !m.isScheduled), [filtered]);
 
@@ -1021,7 +1026,7 @@ export function KampprogramWorkspace({
               {matchFilter === "outside-period"
                 ? "Ingen kampe uden for pulje-perioden matcher filtrene."
                 : matchFilter === "missing-team-rest"
-                  ? "Ingen planlagte kampe med manglende hold-pause matcher filtrene."
+                  ? "Ingen kampe med pause-problemer matcher filtrene."
                   : "Ingen planlagte kampe matcher filtrene."}
             </p>
           ) : showScheduledSections ? (
