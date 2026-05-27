@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ListerExportClient } from "@/components/lister-export-client";
 import { fetchListerExportData } from "@/lib/lister";
+import { fetchKampprogramBundle } from "@/lib/kampprogram-server";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,10 @@ export const metadata: Metadata = {
 };
 
 export default async function ListerPage() {
-  const { teams, players, coaches, error } = await fetchListerExportData();
+  const [{ teams, players, coaches, error }, kampprogram] = await Promise.all([
+    fetchListerExportData(),
+    fetchKampprogramBundle(),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-8">
@@ -26,7 +30,14 @@ export default async function ListerPage() {
         </p>
       </header>
 
-      <ListerExportClient teams={teams} players={players} coaches={coaches} fetchError={error} />
+      <ListerExportClient
+        teams={teams}
+        players={players}
+        coaches={coaches}
+        fetchError={error}
+        kampprogramMatches={kampprogram.matches}
+        kampprogramTeamDetails={kampprogram.teamDetails}
+      />
     </div>
   );
 }

@@ -530,7 +530,6 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
 
   const teamsByLevel = new Map<string, typeof input.teams>();
   for (const team of input.teams) {
-    if (!team.pool_id || !poolIds.has(team.pool_id)) continue;
     const levelKey = canonicalBanerLevelLabel(team.level);
     const list = teamsByLevel.get(levelKey) ?? [];
     list.push(team);
@@ -565,7 +564,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     {
       id: "match-totals",
       title: "Samlet kampantal",
-      description: "Antal genererede kampe vs. forventet på tværs af alle puljer.",
+      description: "Antal genererede kampe vs. forventet når hvert hold spiller minimum kampe/hold fra Opsætning.",
       metrics: [
         { label: "Forventet", value: expectedMatchesTotal },
         { label: "Genereret (gyldige)", value: generatedInPools },
@@ -574,7 +573,7 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
       issues:
         generatedInPools !== expectedMatchesTotal
           ? [
-              `Der er ${generatedInPools} gyldige kampe, men forventet ${expectedMatchesTotal} ud fra puljer og kampe pr. hold`,
+              `Der er ${generatedInPools} gyldige kampe, men forventet ${expectedMatchesTotal} når hvert hold spiller minimum kampe/hold`,
             ]
           : [],
     },

@@ -590,7 +590,10 @@ export function plannedPoolMatchCount(teamCount: number, maxMatchesPerTeam?: num
   return Math.ceil((teamCount * cap) / 2);
 }
 
-/** Forventet kampe når alle hold på niveauet skal have præcis cap kampe. */
+/**
+ * Kampe i alt når hvert hold skal spille mindst `matchesPerTeam`.
+ * Hvert hold bidrager med én kamp-plads pr. kamp → ceil(hold × kampe/hold / 2).
+ */
 export function plannedLevelMatchCount(teamCount: number, maxMatchesPerTeam?: number): number {
   return plannedPoolMatchCount(teamCount, maxMatchesPerTeam);
 }

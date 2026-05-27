@@ -27,6 +27,7 @@ import {
   analyzePoolMatchSync,
   MATCH_RELAXED_TEAM_REST_NOTICE,
   MATCH_UNSCHEDULED_NOTICE,
+  plannedLevelMatchCount,
   plannedPoolMatchCount,
   type MatchRow,
 } from "@/lib/turnering";
@@ -212,12 +213,8 @@ export function TurneringPlanWorkspace({
   }, [pools, teamsByPool, matchesByPool, activePlanMatchesPerTeam]);
 
   const estimatedTotalMatches = useMemo(
-    () =>
-      pools.reduce(
-        (sum, p) => sum + plannedPoolMatchCount(teamsByPool.get(p.id)?.length ?? 0, activePlanMatchesPerTeam),
-        0,
-      ),
-    [pools, teamsByPool, activePlanMatchesPerTeam],
+    () => plannedLevelMatchCount(initialTeams.length, activePlanMatchesPerTeam),
+    [initialTeams.length, activePlanMatchesPerTeam],
   );
 
   const hasDuplicatePoolNames = useMemo(() => {

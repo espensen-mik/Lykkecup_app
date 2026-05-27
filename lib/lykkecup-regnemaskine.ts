@@ -286,7 +286,7 @@ export function totalMatchesForLevel(
   }
   const product = plannedTeamCount * matchesPerTeam;
   const parityOk = product % 2 === 0;
-  /** Planning estimate: each kamp bruger to hold → ceil(T×K/2) også når T×K er ulige. */
+  /** Planning estimate: each kamp bruger to hold → ceil(hold × kampe/hold / 2). */
   const totalMatches = Math.ceil(product / 2);
   return { totalMatches, parityOk };
 }

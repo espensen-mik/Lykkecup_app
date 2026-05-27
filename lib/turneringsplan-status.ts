@@ -9,7 +9,7 @@ import { isOrphanKampprogramMatch } from "@/lib/kampprogram";
 import type { CheckStatus, LykkecupCheckResult } from "@/lib/lykkecup-check";
 import { findLevelScheduleRow, poolPlanningHint } from "@/lib/puljer";
 import { resolvePlanMatchesPerTeam, roundLengthMinutes, type RoundTiming } from "@/lib/lykkecup-regnemaskine";
-import { plannedPoolMatchCount } from "@/lib/turnering";
+import { plannedLevelMatchCount } from "@/lib/turnering";
 import { teamRestMinutesBetweenMatches, teamRestViolatingTeamIdsByMatchId } from "@/lib/turnering-scheduler";
 
 const MAX_ISSUES = 12;
@@ -201,12 +201,20 @@ export function findTeamsSpanningPeriods(
 function computeLevelBreakdown(input: TurneringsplanStatusInput): TurneringsplanLevelBreakdown[] {
   const teamIds = new Set(input.teams.map((t) => t.id));
   const poolIds = new Set(input.pools.map((p) => p.id));
-  const teamsByPool = new Map<string, typeof input.teams>();
-  for (const p of input.pools) teamsByPool.set(p.id, []);
-  for (const t of input.teams) {
-    if (!t.pool_id) continue;
-    const list = teamsByPool.get(t.pool_id);
-    if (list) list.push(t);
+
+  const teamsByLevel = new Map<string, { levelKey: string; teams: typeof input.teams }>();
+  for (const team of input.teams) {
+    const mergeKey = turneringLevelMergeKey(team.level);
+    const prev = teamsByLevel.get(mergeKey);
+    if (prev) {
+      prev.teams.push(team);
+      prev.levelKey = mergeTurneringLevelDisplayLabel(prev.levelKey, team.level);
+    } else {
+      teamsByLevel.set(mergeKey, {
+        levelKey: canonicalBanerLevelLabel(team.level),
+        teams: [team],
+      });
+    }
   }
 
   const matchesByPool = new Map<string, TurneringsplanStatusMatch[]>();
@@ -217,32 +225,23 @@ function computeLevelBreakdown(input: TurneringsplanStatusInput): Turneringsplan
   }
 
   const levelAgg = new Map<string, TurneringsplanLevelBreakdown>();
-
-  const ensure = (levelRaw: string | null | undefined) => {
-    const mergeKey = turneringLevelMergeKey(levelRaw);
-    const prev = levelAgg.get(mergeKey);
-    if (prev) {
-      prev.levelKey = mergeTurneringLevelDisplayLabel(prev.levelKey, levelRaw);
-      return prev;
-    }
-    const row: TurneringsplanLevelBreakdown = {
-      levelKey: canonicalBanerLevelLabel(levelRaw),
-      expected: 0,
+  for (const [mergeKey, { levelKey, teams }] of teamsByLevel) {
+    const planPerTeam =
+      resolvePlanMatchesPerTeam(levelKey, input.planMatchesByLevel, input.scheduleRows) ??
+      poolPlanningHint(levelKey, input.scheduleRows).matchesPerTeam;
+    levelAgg.set(mergeKey, {
+      levelKey,
+      expected: plannedLevelMatchCount(teams.length, planPerTeam),
       generated: 0,
       scheduled: 0,
       unscheduled: 0,
-    };
-    levelAgg.set(mergeKey, row);
-    return row;
-  };
+    });
+  }
 
   for (const pool of input.pools) {
-    const row = ensure(pool.level);
-    const teams = teamsByPool.get(pool.id) ?? [];
-    const planPerTeam =
-      resolvePlanMatchesPerTeam(row.levelKey, input.planMatchesByLevel, input.scheduleRows) ??
-      poolPlanningHint(row.levelKey, input.scheduleRows).matchesPerTeam;
-    row.expected += plannedPoolMatchCount(teams.length, planPerTeam);
+    const mergeKey = turneringLevelMergeKey(pool.level);
+    const row = levelAgg.get(mergeKey);
+    if (!row) continue;
 
     for (const m of matchesByPool.get(pool.id) ?? []) {
       if (isOrphanKampprogramMatch({ teamAId: m.team_a_id, teamBId: m.team_b_id, poolId: m.pool_id }, teamIds, poolIds)) {
@@ -309,7 +308,7 @@ export function computeTurneringsplanMatchStatus(
       status: "error",
       count: 1,
       items: truncate([
-        `Forventet ${expectedMatches} kampe ud fra puljer og Opsætning → Kampe, men ${generatedMatches} gyldige kampe er genereret`,
+        `Forventet ${expectedMatches} kampe når hvert hold spiller minimum kampe/hold fra Opsætning, men ${generatedMatches} gyldige kampe er genereret`,
       ]),
     });
   }

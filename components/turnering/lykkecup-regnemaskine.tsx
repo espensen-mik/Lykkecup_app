@@ -303,7 +303,7 @@ export function LykkecupRegnemaskine({
         <div>
           {!embedded ? <h2 className="text-base font-semibold text-gray-900 dark:text-white">Kampe</h2> : null}
           <p className={`max-w-3xl text-sm text-gray-500 dark:text-gray-400 ${embedded ? "" : "mt-1"}`}>
-            Overblik over kampebehov (hold fra Holddannelse × kampe/hold) vs. runder på banerne
+            Overblik over kampebehov (alle hold × minimum kampe/hold fra Opsætning) vs. runder på banerne
             {embedded && onOpenTab ? (
               <>
                 {" "}

@@ -23,7 +23,7 @@ import {
   type PuljerOverviewLevel,
   type TurneringsplanOverviewLevel,
   type TurneringDashboardLevelStats,
-  plannedPoolMatchCount,
+  plannedLevelMatchCount,
   type TurneringDashboardOverview,
   type TurneringLevelBundle,
   type TurneringPlanLevelBundle,
@@ -536,11 +536,9 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
   }
 
   const poolLevelById = new Map<string, string>();
-  const poolLevelKeyById = new Map<string, string>();
   for (const pool of pools) {
     const level = canonicalLevelBucket(pool.level);
     poolLevelById.set(pool.id, level.bucketKey);
-    poolLevelKeyById.set(pool.id, level.label);
     ensureLevel(level.bucketKey, level.label).poolCount += 1;
   }
 
@@ -567,17 +565,11 @@ export async function fetchTurneringDashboardOverview(): Promise<TurneringDashbo
     if (match.court_id && match.start_time) row.matchesScheduled += 1;
   }
 
-  for (const [poolId, teamCount] of teamCountByPool.entries()) {
-    const bucketKey = poolLevelById.get(poolId);
-    const levelKey = poolLevelKeyById.get(poolId);
-    if (!bucketKey || !levelKey) continue;
+  for (const row of levelMap.values()) {
     const planPerTeam =
-      resolvePlanMatchesPerTeam(levelKey, planMatchesByLevel, scheduleRows) ??
-      poolPlanningHint(levelKey, scheduleRows).matchesPerTeam;
-    const expected = plannedPoolMatchCount(teamCount, planPerTeam);
-    const row = levelMap.get(bucketKey);
-    if (!row) continue;
-    row.expectedMatches += expected;
+      resolvePlanMatchesPerTeam(row.levelKey, planMatchesByLevel, scheduleRows) ??
+      poolPlanningHint(row.levelKey, scheduleRows).matchesPerTeam;
+    row.expectedMatches = plannedLevelMatchCount(row.teamCount, planPerTeam);
   }
 
   for (const row of levelMap.values()) {

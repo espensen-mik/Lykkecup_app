@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { AllTeamsExport } from "@/components/all-teams-export";
+import { compareCourtNamesForSchedule, formatTimeForInput } from "@/lib/baner-tider";
 import { downloadCsv } from "@/lib/csv";
+import { formatCourtWithVenue, type KampprogramMatch } from "@/lib/kampprogram";
 import type { ListerCoachRow, ListerPlayerRow, ListerTeamRow } from "@/lib/lister";
+import { kontrolCenterTeamDisplayName, type TeamDetailView } from "@/lib/team-detail";
 
 const INGEN_KLUB = "Ingen klub";
 
@@ -12,10 +15,22 @@ type Props = {
   teams: ListerTeamRow[];
   players: ListerPlayerRow[];
   coaches: ListerCoachRow[];
+  kampprogramMatches: KampprogramMatch[];
+  kampprogramTeamDetails: Record<string, TeamDetailView>;
   fetchError: string | null;
 };
 
-type PrintKind = "clubNames" | "clubDetails" | "alpha" | "playersByClub" | "mixedByClub" | "singleClub" | "coachTshirtByClub" | null;
+type PrintKind =
+  | "clubNames"
+  | "clubDetails"
+  | "alpha"
+  | "playersByClub"
+  | "mixedByClub"
+  | "singleClub"
+  | "coachTshirtByClub"
+  | "kampprogramChronological"
+  | "kampprogramByCourt"
+  | null;
 
 function csvSlug(s: string): string {
   return s
@@ -60,7 +75,14 @@ function normalizeTshirtSize(value: string | null | undefined): string {
 const rowBtnClass =
   "inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800";
 
-export function ListerExportClient({ teams, players, coaches, fetchError }: Props) {
+export function ListerExportClient({
+  teams,
+  players,
+  coaches,
+  kampprogramMatches,
+  kampprogramTeamDetails,
+  fetchError,
+}: Props) {
   const [printKind, setPrintKind] = useState<PrintKind>(null);
   const [selectedClub, setSelectedClub] = useState<string>("");
 
@@ -268,6 +290,38 @@ export function ListerExportClient({ teams, players, coaches, fetchError }: Prop
     downloadCsv("lister-klub-detaljer.csv", rows);
   }, [clubDetails]);
 
+  const kampprogramRows = useMemo(
+    () =>
+      kampprogramMatches
+        .filter((m) => !m.isOrphan)
+        .map((m) => ({
+          id: m.id,
+          time: formatTimeForInput(m.startTime) ?? "—",
+          courtLabel: m.courtName ? formatCourtWithVenue(m.courtName, m.venueName) : "—",
+          level: m.levelKey || "—",
+          pool: m.poolName || "—",
+          teamA: kontrolCenterTeamDisplayName(kampprogramTeamDetails[m.teamAId] ?? { teamName: "Ukendt hold", nickname: null, players: [], coaches: [] }),
+          teamB: kontrolCenterTeamDisplayName(kampprogramTeamDetails[m.teamBId] ?? { teamName: "Ukendt hold", nickname: null, players: [], coaches: [] }),
+        }))
+        .sort((a, b) => a.time.localeCompare(b.time, "da") || a.courtLabel.localeCompare(b.courtLabel, "da", { sensitivity: "base" })),
+    [kampprogramMatches, kampprogramTeamDetails],
+  );
+
+  const kampprogramByCourt = useMemo(() => {
+    const groups = new Map<string, typeof kampprogramRows>();
+    for (const row of kampprogramRows) {
+      const list = groups.get(row.courtLabel) ?? [];
+      list.push(row);
+      groups.set(row.courtLabel, list);
+    }
+    return [...groups.entries()]
+      .sort((a, b) => compareCourtNamesForSchedule(a[0], b[0]))
+      .map(([court, rows]) => ({
+        court,
+        rows: [...rows].sort((a, b) => a.time.localeCompare(b.time, "da") || a.pool.localeCompare(b.pool, "da", { sensitivity: "base" })),
+      }));
+  }, [kampprogramRows]);
+
   if (fetchError) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
@@ -393,6 +447,36 @@ export function ListerExportClient({ teams, players, coaches, fetchError }: Prop
               <button type="button" className={rowBtnClass} onClick={downloadCoachTshirtByClub}>
                 <Download className="h-3.5 w-3.5" aria-hidden />
                 CSV
+              </button>
+            </div>
+          </li>
+
+          <li className="flex flex-col gap-3 rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-gray-900 dark:text-white">Kampprogram - kronologisk</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={rowBtnClass}
+                disabled={kampprogramRows.length === 0}
+                onClick={() => runPrint("kampprogramChronological")}
+              >
+                <Printer className="h-3.5 w-3.5" aria-hidden />
+                Udskriv
+              </button>
+            </div>
+          </li>
+
+          <li className="flex flex-col gap-3 rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-gray-900 dark:text-white">Kampprogram per bane</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={rowBtnClass}
+                disabled={kampprogramByCourt.length === 0}
+                onClick={() => runPrint("kampprogramByCourt")}
+              >
+                <Printer className="h-3.5 w-3.5" aria-hidden />
+                Udskriv
               </button>
             </div>
           </li>
@@ -681,6 +765,79 @@ export function ListerExportClient({ teams, players, coaches, fetchError }: Prop
                   ))}
                 </tbody>
               </table>
+            )}
+          </div>
+        ) : null}
+
+        {printKind === "kampprogramChronological" ? (
+          <div className="text-black">
+            <h1 className="mb-6 text-xl font-bold">Kampprogram - kronologisk</h1>
+            {kampprogramRows.length === 0 ? (
+              <p className="text-sm text-neutral-600">Ingen kampe i kampprogrammet.</p>
+            ) : (
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className={th}>Tid</th>
+                    <th className={th}>Bane</th>
+                    <th className={th}>Kamp</th>
+                    <th className={th}>Niveau</th>
+                    <th className={th}>Pulje</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kampprogramRows.map((row) => (
+                    <tr key={row.id}>
+                      <td className={td}>{row.time}</td>
+                      <td className={td}>{row.courtLabel}</td>
+                      <td className={td}>
+                        {row.teamA} vs. {row.teamB}
+                      </td>
+                      <td className={td}>{row.level}</td>
+                      <td className={td}>{row.pool}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ) : null}
+
+        {printKind === "kampprogramByCourt" ? (
+          <div className="text-black">
+            <h1 className="mb-6 text-xl font-bold">Kampprogram per bane</h1>
+            {kampprogramByCourt.length === 0 ? (
+              <p className="text-sm text-neutral-600">Ingen kampe i kampprogrammet.</p>
+            ) : (
+              <div className="space-y-8">
+                {kampprogramByCourt.map((group) => (
+                  <section key={group.court} className="break-inside-avoid">
+                    <h2 className="mb-2 border-b-2 border-black pb-1 text-base font-bold">{group.court}</h2>
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className={th}>Tid</th>
+                          <th className={th}>Kamp</th>
+                          <th className={th}>Niveau</th>
+                          <th className={th}>Pulje</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((row) => (
+                          <tr key={row.id}>
+                            <td className={td}>{row.time}</td>
+                            <td className={td}>
+                              {row.teamA} vs. {row.teamB}
+                            </td>
+                            <td className={td}>{row.level}</td>
+                            <td className={td}>{row.pool}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                ))}
+              </div>
             )}
           </div>
         ) : null}

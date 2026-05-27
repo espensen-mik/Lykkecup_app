@@ -1,6 +1,6 @@
 import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
+import { createServerSupabase } from "@/lib/auth-server";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
-import { supabase } from "@/lib/supabase";
 
 export type ListerTeamRow = {
   id: string;
@@ -42,6 +42,7 @@ export async function fetchListerExportData(): Promise<{
   error: string | null;
 }> {
   const eventId = LYKKECUP_EVENT_ID;
+  const supabase = await createServerSupabase();
 
   const [
     { data: teamsData, error: tErr },

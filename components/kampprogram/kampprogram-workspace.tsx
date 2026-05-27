@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Loader2, Trash2 } from "lucide-react";
+import { CalendarClock, Download, Loader2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TeamDetailModal, TeamNameWithHover } from "@/components/teams/team-detail-ui";
@@ -245,6 +245,64 @@ function fmtTimeRange(start: string | null, end: string | null): string {
   if (s && e) return `${s}\u2011${e}`;
   if (s) return s;
   return "—";
+}
+
+type KampprogramCsvRow = {
+  rowType: "match" | "idle" | "unscheduled";
+  section: string;
+  court: string;
+  time: string;
+  teamA: string;
+  teamB: string;
+  level: string;
+  pool: string;
+  period: string;
+  status: string;
+  segment: string;
+};
+
+function csvEscape(value: string): string {
+  if (value.includes('"') || value.includes(",") || value.includes("\n")) {
+    return `"${value.replaceAll('"', '""')}"`;
+  }
+  return value;
+}
+
+function matchStatusLabels(
+  m: KampprogramMatch,
+  allMatches: readonly KampprogramMatch[],
+  levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>,
+  conflictHintsByMatchId: ReadonlyMap<string, KampprogramMatchConflictHints>,
+): string {
+  const labels: string[] = [];
+  const conflict = conflictHintsByMatchId.get(m.id);
+  if (conflict?.courtOverlap) labels.push("Bane-konflikt");
+  if (conflict?.teamRestViolation && !m.scheduleRelaxedTeamRest) labels.push("Uden hold-pause");
+  if (m.scheduledOutsidePoolPeriod) labels.push("udenfor periode");
+  if (matchHasCurrentPauseIssue(m, allMatches, levelTimingByLevel)) labels.push("Mangler pause");
+  return labels.join(" | ") || "OK";
+}
+
+function formatKampprogramCsvTimestamps(downloadedAt: Date): { iso: string; local: string } {
+  return {
+    iso: downloadedAt.toISOString(),
+    local: new Intl.DateTimeFormat("da-DK", { dateStyle: "short", timeStyle: "medium" }).format(downloadedAt),
+  };
+}
+
+/** Eksempel til UI — viser præcis format uden at opdatere ved hver render. */
+const KAMPPROGRAM_CSV_TIMESTAMP_EXAMPLE = formatKampprogramCsvTimestamps(new Date("2026-05-27T14:30:00.000Z"));
+
+function triggerCsvDownload(filename: string, csvText: string): void {
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 /** Ensartet kolonnebredde på tværs af alle bane-/runde-tabeller (undgår hop ved scroll). */
@@ -816,6 +874,160 @@ export function KampprogramWorkspace({
     matchFilter !== "missing-team-rest";
   const showScheduledSections = matchFilter !== "unscheduled";
 
+  const csvRows = useMemo((): KampprogramCsvRow[] => {
+    const rows: KampprogramCsvRow[] = [];
+
+    if (showScheduledSections && view === "court") {
+      for (const timeline of displayedCourtTimelines) {
+        for (const row of timeline.rows) {
+          if (row.type === "idle") {
+            rows.push({
+              rowType: "idle",
+              section: timeline.court.name,
+              court: formatCourtWithVenue(row.courtName, row.venueName),
+              time: fmtTimeRange(row.startTime, row.endTime),
+              teamA: "",
+              teamB: "",
+              level: "",
+              pool: "",
+              period: "",
+              status: "Ledig bane",
+              segment: "",
+            });
+            continue;
+          }
+          const m = row.match;
+          rows.push({
+            rowType: "match",
+            section: timeline.court.name,
+            court: m.courtName ? formatCourtWithVenue(m.courtName, m.venueName) : "—",
+            time: fmtTimeRange(row.slotStartTime, row.slotEndTime),
+            teamA: kontrolCenterTeamDisplayName(teamDetailOrFallback(m.teamAId, teamDetails)),
+            teamB: kontrolCenterTeamDisplayName(teamDetailOrFallback(m.teamBId, teamDetails)),
+            level: m.levelKey,
+            pool: m.poolName,
+            period: m.periodName ?? "—",
+            status: matchStatusLabels(m, initial.matches, initial.levelTimingByLevel, conflictHintsByMatchId),
+            segment: row.segmentLabel ?? "",
+          });
+        }
+      }
+    }
+
+    if (showScheduledSections && view === "rounds") {
+      for (const round of roundGroups) {
+        for (const row of round.rows) {
+          if (row.type === "idle") {
+            rows.push({
+              rowType: "idle",
+              section: round.label,
+              court: formatCourtWithVenue(row.courtName, row.venueName),
+              time: fmtTimeRange(row.startTime, row.endTime),
+              teamA: "",
+              teamB: "",
+              level: "",
+              pool: "",
+              period: "",
+              status: "Ledig bane",
+              segment: "",
+            });
+            continue;
+          }
+          const m = row.match;
+          rows.push({
+            rowType: "match",
+            section: round.label,
+            court: m.courtName ? formatCourtWithVenue(m.courtName, m.venueName) : "—",
+            time: fmtTimeRange(row.slotStartTime, row.slotEndTime),
+            teamA: kontrolCenterTeamDisplayName(teamDetailOrFallback(m.teamAId, teamDetails)),
+            teamB: kontrolCenterTeamDisplayName(teamDetailOrFallback(m.teamBId, teamDetails)),
+            level: m.levelKey,
+            pool: m.poolName,
+            period: m.periodName ?? "—",
+            status: matchStatusLabels(m, initial.matches, initial.levelTimingByLevel, conflictHintsByMatchId),
+            segment: row.segmentLabel ?? "",
+          });
+        }
+      }
+    }
+
+    if (showUnscheduledSection) {
+      for (const m of unscheduledFiltered) {
+        rows.push({
+          rowType: "unscheduled",
+          section: "Ikke planlagt",
+          court: "—",
+          time: fmtTimeRange(m.startTime, m.endTime),
+          teamA: kontrolCenterTeamDisplayName(teamDetailOrFallback(m.teamAId, teamDetails)),
+          teamB: kontrolCenterTeamDisplayName(teamDetailOrFallback(m.teamBId, teamDetails)),
+          level: m.levelKey,
+          pool: m.poolName,
+          period: m.periodName ?? "—",
+          status: matchStatusLabels(m, initial.matches, initial.levelTimingByLevel, conflictHintsByMatchId),
+          segment: "",
+        });
+      }
+    }
+
+    return rows;
+  }, [
+    showScheduledSections,
+    view,
+    displayedCourtTimelines,
+    teamDetails,
+    initial.matches,
+    initial.levelTimingByLevel,
+    conflictHintsByMatchId,
+    roundGroups,
+    showUnscheduledSection,
+    unscheduledFiltered,
+  ]);
+
+  const downloadCsv = useCallback(() => {
+    const { iso: downloadedAtIso, local: downloadedAtLocal } = formatKampprogramCsvTimestamps(new Date());
+    const activeViewLabel = view === "court" ? "per-bane" : "kronologisk";
+    const headers = [
+      "downloaded_at_iso",
+      "downloaded_at_local",
+      "active_view",
+      "row_type",
+      "section",
+      "court",
+      "time",
+      "team_a",
+      "team_b",
+      "level",
+      "pool",
+      "period",
+      "status",
+      "segment",
+    ];
+    const lines = [headers.join(",")];
+    for (const row of csvRows) {
+      const cells = [
+        downloadedAtIso,
+        downloadedAtLocal,
+        activeViewLabel,
+        row.rowType,
+        row.section,
+        row.court,
+        row.time,
+        row.teamA,
+        row.teamB,
+        row.level,
+        row.pool,
+        row.period,
+        row.status,
+        row.segment,
+      ].map(csvEscape);
+      lines.push(cells.join(","));
+    }
+
+    const stamp = downloadedAtIso.replaceAll(":", "-").replace(".", "-");
+    const filename = `kampprogram-${activeViewLabel}-${stamp}.csv`;
+    triggerCsvDownload(filename, lines.join("\n"));
+  }, [csvRows, view]);
+
   return (
     <div className="space-y-8">
       <div
@@ -965,6 +1177,25 @@ export function KampprogramWorkspace({
             <option value="outside-period">Udenfor periode</option>
           </StyledSelect>
         </label>
+
+        <div className="flex min-w-[14rem] flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={downloadCsv}
+            disabled={csvRows.length === 0}
+            className="inline-flex h-[42px] items-center justify-center gap-2 rounded-md border border-lc-border bg-white px-3.5 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-100 dark:hover:bg-gray-800"
+          >
+            <Download className="h-4 w-4" aria-hidden />
+            Download CSV ({csvRows.length})
+          </button>
+          <p className="max-w-xs text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+            Hver række får{" "}
+            <span className="font-mono text-[10px] text-gray-600 dark:text-gray-300">downloaded_at_iso</span> (UTC, fx{" "}
+            {KAMPPROGRAM_CSV_TIMESTAMP_EXAMPLE.iso}) og{" "}
+            <span className="font-mono text-[10px] text-gray-600 dark:text-gray-300">downloaded_at_local</span> (da-DK,
+            fx {KAMPPROGRAM_CSV_TIMESTAMP_EXAMPLE.local}) — tidsstempel sættes ved download.
+          </p>
+        </div>
       </div>
 
       {initial.stats.total === 0 ? (
