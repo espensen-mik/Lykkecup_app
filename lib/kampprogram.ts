@@ -499,9 +499,9 @@ export type KampprogramBundle = {
   error: string | null;
 };
 
-export type KampprogramMatchFilter = "all" | "unscheduled" | "outside-period";
+export type KampprogramMatchFilter = "all" | "unscheduled" | "outside-period" | "missing-team-rest";
 
 export function parseKampprogramMatchFilter(raw?: string | null): KampprogramMatchFilter {
-  if (raw === "unscheduled" || raw === "outside-period") return raw;
+  if (raw === "unscheduled" || raw === "outside-period" || raw === "missing-team-rest") return raw;
   return "all";
 }

@@ -124,10 +124,21 @@ function buildKampprogramMatchConflictHints(
 
 function OutsidePoolPeriodBadge() {
   return (
-    <span className="inline-flex shrink-0 items-center rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-100">
-      Uden for pulje-periode
+    <span
+      className="inline-flex shrink-0 items-center rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-100"
+      title="Kampens starttid ligger uden for pulje-periodens klokke-vindue"
+    >
+      udenfor periode
     </span>
   );
+}
+
+function matchHasHardTeamRestViolation(
+  m: KampprogramMatch,
+  conflictHintsByMatchId: ReadonlyMap<string, KampprogramMatchConflictHints>,
+): boolean {
+  if (!m.isScheduled || m.scheduleRelaxedTeamRest) return false;
+  return Boolean(conflictHintsByMatchId.get(m.id)?.teamRestViolation);
 }
 
 function MatchStatusBadges({
@@ -674,6 +685,9 @@ export function KampprogramWorkspace({
       if (m.isOrphan) return false;
       if (matchFilter === "unscheduled" && m.isScheduled) return false;
       if (matchFilter === "outside-period" && !m.scheduledOutsidePoolPeriod) return false;
+      if (matchFilter === "missing-team-rest" && !matchHasHardTeamRestViolation(m, conflictHintsByMatchId)) {
+        return false;
+      }
       if (levelFilter && m.levelKey !== levelFilter) return false;
       if (periodFilter && m.periodName !== periodFilter) return false;
       if (!matchPassesCourtTypeFilter(m)) return false;
@@ -685,6 +699,7 @@ export function KampprogramWorkspace({
     levelFilter,
     periodFilter,
     matchPassesCourtTypeFilter,
+    conflictHintsByMatchId,
   ]);
 
   const byCourt = useMemo(() => {
@@ -747,6 +762,25 @@ export function KampprogramWorkspace({
 
   const unscheduledFiltered = useMemo(() => filtered.filter((m) => !m.isScheduled), [filtered]);
 
+  const unscheduledNavCount = useMemo(() => {
+    return initial.matches.filter((m) => {
+      if (m.isOrphan || m.isScheduled) return false;
+      if (levelFilter && m.levelKey !== levelFilter) return false;
+      if (periodFilter && m.periodName !== periodFilter) return false;
+      if (!matchPassesCourtTypeFilter(m)) return false;
+      return true;
+    }).length;
+  }, [initial.matches, levelFilter, periodFilter, matchPassesCourtTypeFilter]);
+
+  const scrollToUnplanned = useCallback(() => {
+    if (matchFilter === "outside-period" || matchFilter === "missing-team-rest") {
+      setMatchFilter("all");
+    }
+    window.setTimeout(() => {
+      document.getElementById("ikke-planlagt")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }, [matchFilter]);
+
   const previewDetail = useMemo(() => {
     if (!previewTeamId) return null;
     const detail = teamDetails[previewTeamId];
@@ -758,7 +792,9 @@ export function KampprogramWorkspace({
     "rounded-md border border-lc-border bg-white px-3.5 py-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800/50 dark:text-gray-100";
 
   const showUnscheduledSection =
-    unscheduledFiltered.length > 0 && matchFilter !== "outside-period";
+    unscheduledFiltered.length > 0 &&
+    matchFilter !== "outside-period" &&
+    matchFilter !== "missing-team-rest";
   const showScheduledSections = matchFilter !== "unscheduled";
 
   return (
@@ -775,6 +811,21 @@ export function KampprogramWorkspace({
           <Kpi label="Forældreløse" value={initial.stats.orphanMatches} />
         ) : null}
       </div>
+
+      {unscheduledNavCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={scrollToUnplanned}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-950 shadow-sm transition hover:border-amber-400 hover:bg-amber-100 dark:border-amber-800/70 dark:bg-amber-950/40 dark:text-amber-50 dark:hover:bg-amber-950/60"
+          >
+            <CalendarClock className="h-4 w-4 shrink-0" aria-hidden />
+            {unscheduledNavCount} kamp{unscheduledNavCount === 1 ? "" : "e"} mangler planlægning — gå til uplanlagte
+            kampe
+          </button>
+        </div>
+      ) : null}
+
       {initial.stats.orphanMatches > 0 ? (
         <section className="rounded-lg border border-red-200 bg-red-50/60 p-4 dark:border-red-900/50 dark:bg-red-950/25">
           <h2 className="text-base font-semibold text-red-900 dark:text-red-100">Forældreløse kampe</h2>
@@ -891,7 +942,8 @@ export function KampprogramWorkspace({
           >
             <option value="all">Alle kampe</option>
             <option value="unscheduled">Kun mangler bane/tid</option>
-            <option value="outside-period">Uden for pulje-periode</option>
+            <option value="missing-team-rest">Mangler pause</option>
+            <option value="outside-period">Udenfor periode</option>
           </StyledSelect>
         </label>
       </div>
@@ -968,7 +1020,9 @@ export function KampprogramWorkspace({
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {matchFilter === "outside-period"
                 ? "Ingen kampe uden for pulje-perioden matcher filtrene."
-                : "Ingen planlagte kampe matcher filtrene."}
+                : matchFilter === "missing-team-rest"
+                  ? "Ingen planlagte kampe med manglende hold-pause matcher filtrene."
+                  : "Ingen planlagte kampe matcher filtrene."}
             </p>
           ) : showScheduledSections ? (
             roundGroups.map((round) => {
