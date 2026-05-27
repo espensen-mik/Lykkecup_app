@@ -21,6 +21,17 @@ export function courtTypeLabel(t: CourtType): string {
   }
 }
 
+/** Normaliser DB/legacy værdier til `mini` | `kort` | `stor`. */
+export function normalizeCourtType(raw: string | null | undefined): CourtType {
+  const t = String(raw ?? "")
+    .toLowerCase()
+    .trim();
+  if (t === "mini" || t === "small") return "mini";
+  if (t === "stor" || t === "large") return "stor";
+  if (t === "kort") return "kort";
+  return "kort";
+}
+
 /** Sorter banetyper: Mini → Kort → Stor (ukendte sidst). */
 export function compareCourtTypes(a: string, b: string): number {
   const ia = COURT_TYPES.indexOf(a as CourtType);

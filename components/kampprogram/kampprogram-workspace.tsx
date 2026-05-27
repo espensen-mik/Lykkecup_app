@@ -658,12 +658,15 @@ export function KampprogramWorkspace({
     return [...types].sort(compareCourtTypes);
   }, [initial.courts]);
 
-  const resolveMatchCourtType = useCallback(
-    (m: KampprogramMatch): CourtType | null => {
-      if (m.courtId) return courtTypeByCourtId.get(m.courtId) ?? null;
-      return initial.levelCourtTypeByLevel[m.levelKey] ?? null;
+  const matchPassesCourtTypeFilter = useCallback(
+    (m: KampprogramMatch): boolean => {
+      if (!courtTypeFilter) return true;
+      if (m.isScheduled && m.courtId) {
+        return courtTypeByCourtId.get(m.courtId) === courtTypeFilter;
+      }
+      return initial.levelCourtTypeByLevel[m.levelKey] === courtTypeFilter;
     },
-    [courtTypeByCourtId, initial.levelCourtTypeByLevel],
+    [courtTypeByCourtId, courtTypeFilter, initial.levelCourtTypeByLevel],
   );
 
   const filtered = useMemo(() => {
@@ -673,10 +676,7 @@ export function KampprogramWorkspace({
       if (matchFilter === "outside-period" && !m.scheduledOutsidePoolPeriod) return false;
       if (levelFilter && m.levelKey !== levelFilter) return false;
       if (periodFilter && m.periodName !== periodFilter) return false;
-      if (courtTypeFilter) {
-        const ct = resolveMatchCourtType(m);
-        if (ct !== courtTypeFilter) return false;
-      }
+      if (!matchPassesCourtTypeFilter(m)) return false;
       return true;
     });
   }, [
@@ -684,8 +684,7 @@ export function KampprogramWorkspace({
     matchFilter,
     levelFilter,
     periodFilter,
-    courtTypeFilter,
-    resolveMatchCourtType,
+    matchPassesCourtTypeFilter,
   ]);
 
   const byCourt = useMemo(() => {
@@ -709,28 +708,28 @@ export function KampprogramWorkspace({
     return map;
   }, [filtered, initial.courts, sortByDisplayName]);
 
+  const courtsForView = useMemo(() => {
+    if (!courtTypeFilter) return initial.courts;
+    return initial.courts.filter((c) => c.courtType === courtTypeFilter);
+  }, [initial.courts, courtTypeFilter]);
+
   const roundGroups = useMemo(
     () =>
       groupKampprogramByRound(
         filtered,
         initial.levelTimingByLevel,
-        initial.courts,
+        courtsForView,
         initial.courtAvailabilityByCourtId,
         sortByDisplayName,
       ),
     [
       filtered,
       initial.levelTimingByLevel,
-      initial.courts,
+      courtsForView,
       initial.courtAvailabilityByCourtId,
       sortByDisplayName,
     ],
   );
-
-  const courtsForView = useMemo(() => {
-    if (!courtTypeFilter) return initial.courts;
-    return initial.courts.filter((c) => c.courtType === courtTypeFilter);
-  }, [initial.courts, courtTypeFilter]);
 
   const courtTimelines = useMemo(() => {
     return courtsForView.map((court) => {
@@ -740,6 +739,11 @@ export function KampprogramWorkspace({
       return { court, matches, rows, idleCount };
     });
   }, [courtsForView, initial.levelTimingByLevel, byCourt]);
+
+  const displayedCourtTimelines = useMemo(() => {
+    if (!courtTypeFilter) return courtTimelines;
+    return courtTimelines.filter((t) => t.matches.length > 0);
+  }, [courtTimelines, courtTypeFilter]);
 
   const unscheduledFiltered = useMemo(() => filtered.filter((m) => !m.isScheduled), [filtered]);
 
@@ -902,7 +906,7 @@ export function KampprogramWorkspace({
       ) : view === "court" ? (
         <div className="space-y-6">
           {showScheduledSections
-            ? courtTimelines.map(({ court, matches, rows, idleCount }) => (
+            ? displayedCourtTimelines.map(({ court, matches, rows, idleCount }) => (
               <section
                 key={court.id}
                 className="rounded-lg border border-lc-border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50"
@@ -940,7 +944,7 @@ export function KampprogramWorkspace({
           {filtered.length === 0 && (matchFilter !== "all" || levelFilter || periodFilter || courtTypeFilter) ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">Ingen kampe matcher filtrene.</p>
           ) : null}
-          {courtTypeFilter && showScheduledSections && courtTimelines.length === 0 ? (
+          {courtTypeFilter && showScheduledSections && displayedCourtTimelines.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Ingen baner med størrelsen {courtTypeLabel(courtTypeFilter as CourtType)}.
             </p>

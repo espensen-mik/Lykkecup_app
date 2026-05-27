@@ -1,5 +1,5 @@
 import { createServerSupabase } from "@/lib/auth-server";
-import { compareCourtNamesForSchedule, type CourtType } from "@/lib/baner-tider";
+import { compareCourtNamesForSchedule, normalizeCourtType, type CourtType } from "@/lib/baner-tider";
 import { courtTypeForLevel } from "@/lib/level-court-settings";
 import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
 import type {
@@ -158,20 +158,23 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
     id: string;
     name: string;
     venue_id: string | null;
-    court_type: CourtType;
+    court_type: string;
     sort_order: number | null;
   };
   const courtRows = (courtsRes.data ?? []) as CourtRow[];
 
   const courtById = new Map(
-    courtRows.map((c) => [
-      c.id,
-      {
-        name: c.name,
-        venueName: c.venue_id ? (venueById.get(c.venue_id) ?? null) : null,
-        courtType: c.court_type,
-      },
-    ]),
+    courtRows.map((c) => {
+      const courtType = normalizeCourtType(c.court_type);
+      return [
+        c.id,
+        {
+          name: c.name,
+          venueName: c.venue_id ? (venueById.get(c.venue_id) ?? null) : null,
+          courtType,
+        },
+      ] as const;
+    }),
   );
 
   const courts: KampprogramCourt[] = courtRows
@@ -179,7 +182,7 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
       id: c.id,
       name: c.name,
       venueName: c.venue_id ? (venueById.get(c.venue_id) ?? null) : null,
-      courtType: c.court_type,
+      courtType: normalizeCourtType(c.court_type),
       sortOrder: c.sort_order ?? 0,
     }))
     .sort(
@@ -189,7 +192,12 @@ export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
         a.sortOrder - b.sortOrder,
     );
 
-  const levelCourtRows = (levelCourtRes.data ?? []) as Array<{ level: string; court_type: CourtType }>;
+  const levelCourtRows = ((levelCourtRes.data ?? []) as Array<{ level: string; court_type: string }>).map(
+    (r) => ({
+      level: r.level,
+      court_type: normalizeCourtType(r.court_type),
+    }),
+  );
   const levelCourtTypeByLevel: Record<string, CourtType> = {};
   const levelSet = new Set<string>();
   const matches: KampprogramMatch[] = [];
