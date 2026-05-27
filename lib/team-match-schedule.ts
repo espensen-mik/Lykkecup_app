@@ -97,6 +97,22 @@ export function buildTeamScheduleLines(
   return lines;
 }
 
+/** True when at least one hold on kampen har for kort pause før denne kamp lige nu. */
+export function matchHasCurrentPauseIssue(
+  match: KampprogramMatch,
+  allMatches: readonly KampprogramMatch[],
+  levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>,
+): boolean {
+  if (match.isOrphan || !match.isScheduled) return false;
+
+  for (const teamId of [match.teamAId, match.teamBId]) {
+    const lines = buildTeamScheduleLines(allMatches, teamId, match.id, {}, levelTimingByLevel);
+    const line = lines.find((l) => l.matchId === match.id);
+    if (line?.gapTooShort) return true;
+  }
+  return false;
+}
+
 export function buildRelaxedRestScheduleBlocks(
   match: KampprogramMatch,
   allMatches: readonly KampprogramMatch[],

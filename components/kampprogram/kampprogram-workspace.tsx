@@ -27,6 +27,7 @@ import {
   type KampprogramTableRow,
 } from "@/lib/kampprogram";
 import { RelaxedRestScheduleHover } from "@/components/kampprogram/relaxed-rest-schedule-hover";
+import { matchHasCurrentPauseIssue } from "@/lib/team-match-schedule";
 import { kontrolCenterTeamDisplayName, type TeamDetailView } from "@/lib/team-detail";
 import { ManualScheduleDialog } from "@/components/turnering/manual-schedule-dialog";
 import { teamRestMinutesBetweenMatches, teamRestViolatingTeamIdsByMatchId } from "@/lib/turnering-scheduler";
@@ -108,7 +109,7 @@ function buildKampprogramMatchConflictHints(
     const courtOverlap = courtOverlapIds.has(m.id);
     const teamRest = teamRestByMatchId.get(m.id);
     const teamRestViolation = Boolean(teamRest);
-    if (!courtOverlap && !teamRestViolation && !m.scheduledOutsidePoolPeriod && !m.scheduleRelaxedTeamRest) {
+    if (!courtOverlap && !teamRestViolation && !m.scheduledOutsidePoolPeriod) {
       continue;
     }
     out.set(m.id, {
@@ -133,15 +134,17 @@ function OutsidePoolPeriodBadge() {
   );
 }
 
-/** Matches that show «Mangler pause» or «Uden hold-pause» in Status. */
+/** Matches that show «Mangler pause» or «Uden hold-pause» in Status (baseret på aktuel tidsplan). */
 function matchHasPauseIssue(
   m: KampprogramMatch,
+  allMatches: readonly KampprogramMatch[],
+  levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>,
   conflictHintsByMatchId: ReadonlyMap<string, KampprogramMatchConflictHints>,
 ): boolean {
   if (m.isOrphan || !m.isScheduled) return false;
-  if (m.scheduleRelaxedTeamRest) return true;
   const hints = conflictHintsByMatchId.get(m.id);
-  return Boolean(hints?.teamRestViolation);
+  if (hints?.teamRestViolation && !m.scheduleRelaxedTeamRest) return true;
+  return matchHasCurrentPauseIssue(m, allMatches, levelTimingByLevel);
 }
 
 function MatchStatusBadges({
@@ -159,10 +162,15 @@ function MatchStatusBadges({
 }) {
   const showHardTeamRestViolation =
     conflictHints?.teamRestViolation && !match.scheduleRelaxedTeamRest;
+  const showRelaxedPauseBadge = matchHasCurrentPauseIssue(
+    match,
+    allMatches,
+    levelTimingByLevel,
+  );
 
   const hasBadges =
     match.scheduledOutsidePoolPeriod ||
-    match.scheduleRelaxedTeamRest ||
+    showRelaxedPauseBadge ||
     conflictHints?.courtOverlap ||
     showHardTeamRestViolation;
 
@@ -197,7 +205,7 @@ function MatchStatusBadges({
         </span>
       ) : null}
       {match.scheduledOutsidePoolPeriod ? <OutsidePoolPeriodBadge /> : null}
-      {match.scheduleRelaxedTeamRest ? (
+      {showRelaxedPauseBadge ? (
         <RelaxedRestScheduleHover
           match={match}
           allMatches={allMatches}
@@ -691,7 +699,10 @@ export function KampprogramWorkspace({
       if (m.isOrphan) return false;
       if (matchFilter === "unscheduled" && m.isScheduled) return false;
       if (matchFilter === "outside-period" && !m.scheduledOutsidePoolPeriod) return false;
-      if (matchFilter === "missing-team-rest" && !matchHasPauseIssue(m, conflictHintsByMatchId)) {
+      if (
+        matchFilter === "missing-team-rest" &&
+        !matchHasPauseIssue(m, initial.matches, initial.levelTimingByLevel, conflictHintsByMatchId)
+      ) {
         return false;
       }
       if (levelFilter && m.levelKey !== levelFilter) return false;
