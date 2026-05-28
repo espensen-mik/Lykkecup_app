@@ -11,7 +11,7 @@ type Props = {
 };
 
 export function CoachPublicView({ data, currentCoachId }: Props) {
-  const { coach, teams, matches, error } = data;
+  const { coach, teams, teamDetails, matches, error } = data;
 
   if (error) {
     return (
@@ -33,6 +33,8 @@ export function CoachPublicView({ data, currentCoachId }: Props) {
     if (venue) return venue;
     return null;
   }
+
+  const teamDetailsById = new Map(teamDetails.map((t) => [t.teamId, t] as const));
 
   return (
     <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
@@ -82,6 +84,79 @@ export function CoachPublicView({ data, currentCoachId }: Props) {
           </ul>
         )}
       </section>
+
+      {teams.length > 0 ? (
+        <section className="mb-10">
+          <h3 className="text-base font-semibold tracking-[-0.02em] text-lc26-navy">Spillere og trænere på dine hold</h3>
+          <div className="mt-4 space-y-5">
+            {teams.map((team) => {
+              const details = teamDetailsById.get(team.id);
+              const players = details?.players ?? [];
+              const coaches = details?.coaches ?? [];
+              return (
+                <article key={team.id} className="rounded-2xl border border-lc26-teal/20 bg-white p-4 shadow-sm sm:p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lc26-teal">
+                    {team.name}
+                  </p>
+
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold tracking-[-0.01em] text-lc26-navy">Spillere</p>
+                    {players.length === 0 ? (
+                      <p className="mt-2 text-sm text-lc26-navy/55">Ingen spillere registreret endnu.</p>
+                    ) : (
+                      <ul className="mt-2 space-y-2">
+                        {players.map((p) => (
+                          <li key={p.id} className="rounded-xl border border-stone-200/90 bg-white px-4 py-3 shadow-sm">
+                            <span className="font-medium text-lc26-navy">{p.name}</span>
+                            <p className="mt-1 text-sm text-lc26-navy/50">
+                              {p.home_club?.trim() || "—"} · {p.age != null && !Number.isNaN(p.age) ? `${p.age} år` : "Alder —"}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="mt-4 border-t border-stone-100 pt-4">
+                    <p className="text-sm font-semibold tracking-[-0.01em] text-lc26-navy">Trænere</p>
+                    {coaches.length === 0 ? (
+                      <p className="mt-2 text-sm text-lc26-navy/55">Ingen trænere registreret endnu.</p>
+                    ) : (
+                      <ul className="mt-2 space-y-2">
+                        {coaches.map((c) => {
+                          const isSelf = c.id === currentCoachId;
+                          return (
+                            <li
+                              key={c.id}
+                              className={`rounded-xl border px-4 py-3 ${
+                                isSelf
+                                  ? "border-lc26-teal/40 bg-lc26-teal/[0.06]"
+                                  : "border-stone-200/90 bg-white shadow-sm"
+                              }`}
+                            >
+                              <span className="font-medium text-lc26-navy">
+                                {c.name}
+                                {isSelf ? (
+                                  <span className="ml-2 rounded-full bg-lc26-teal/15 px-2 py-0.5 text-xs font-semibold text-lc26-teal">
+                                    Dig
+                                  </span>
+                                ) : null}
+                              </span>
+                              {c.home_club?.trim() ? (
+                                <p className="mt-1 text-sm text-lc26-navy/50">{c.home_club.trim()}</p>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mb-8">
         <h2 className="text-lg font-semibold tracking-[-0.02em] text-lc26-navy">Dit kampprogram</h2>
