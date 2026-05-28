@@ -78,7 +78,7 @@ function CourtUsageIssueLine({ issue }: { issue: string }) {
   if (!parsed) return <li className="leading-snug">{issue}</li>;
   const over = parsed.freeRounds < 0;
   const barPct = parsed.capacityRounds > 0 ? Math.max(0, Math.min(100, (parsed.usedRounds / parsed.capacityRounds) * 100)) : 0;
-  const barColor = over ? "bg-red-500" : barPct >= 90 ? "bg-amber-500" : "bg-emerald-500";
+  const barColor = parsed.freeRounds <= 0 ? "bg-red-500" : barPct >= 90 ? "bg-amber-500" : "bg-emerald-500";
   return (
     <li className={`rounded-md border px-2 py-2 ${over ? "border-red-200 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/25" : "border-gray-200 bg-white/70 dark:border-gray-700 dark:bg-gray-900/40"}`}>
       <div className="flex items-baseline justify-between gap-2">
