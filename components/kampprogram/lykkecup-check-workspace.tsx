@@ -50,24 +50,53 @@ function formatRanAt(iso: string) {
   }
 }
 
-function courtUsageLineStatus(line: string): CheckStatus {
-  const m = line.match(/: (-?\d+) ledige runder/);
-  if (!m) return "ok";
-  return Number(m[1]) <= 0 ? "error" : "ok";
+function parseCourtUsageLine(line: string): {
+  courtName: string;
+  usedRounds: number;
+  capacityRounds: number;
+  freeRounds: number;
+  pctUsed: number;
+} | null {
+  const [courtName, usedRaw, capRaw, freeRaw, pctRaw] = line.split("|");
+  if (!courtName) return null;
+  const usedRounds = Number(usedRaw);
+  const capacityRounds = Number(capRaw);
+  const freeRounds = Number(freeRaw);
+  const pctUsed = Number(pctRaw);
+  if (!Number.isFinite(usedRounds) || !Number.isFinite(capacityRounds) || !Number.isFinite(freeRounds)) return null;
+  return {
+    courtName,
+    usedRounds,
+    capacityRounds,
+    freeRounds,
+    pctUsed: Number.isFinite(pctUsed) ? Math.max(0, Math.min(100, pctUsed)) : 0,
+  };
+}
+
+function CourtUsageIssueLine({ issue }: { issue: string }) {
+  const parsed = parseCourtUsageLine(issue);
+  if (!parsed) return <li className="leading-snug">{issue}</li>;
+  const over = parsed.freeRounds < 0;
+  const barPct = parsed.capacityRounds > 0 ? Math.max(0, Math.min(100, (parsed.usedRounds / parsed.capacityRounds) * 100)) : 0;
+  const barColor = over ? "bg-red-500" : barPct >= 90 ? "bg-amber-500" : "bg-emerald-500";
+  return (
+    <li className={`rounded-md border px-2 py-2 ${over ? "border-red-200 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/25" : "border-gray-200 bg-white/70 dark:border-gray-700 dark:bg-gray-900/40"}`}>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm font-medium text-gray-900 dark:text-white">{parsed.courtName}</span>
+        <span className={`text-xs font-semibold tabular-nums ${over ? "text-red-700 dark:text-red-300" : "text-gray-600 dark:text-gray-300"}`}>
+          {parsed.usedRounds}/{parsed.capacityRounds} · {parsed.freeRounds} ledige
+        </span>
+      </div>
+      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(100, barPct)}%` }} />
+      </div>
+    </li>
+  );
 }
 
 function IssueLine({ itemId, issue }: { itemId: string; issue: string }) {
-  if (itemId !== "court-usage") {
-    return <li className="leading-snug">{issue}</li>;
-  }
-  const lineStatus = courtUsageLineStatus(issue);
-  const styles = statusStyles(lineStatus);
-  return (
-    <li className={`leading-snug rounded px-1.5 py-0.5 ${lineStatus === "error" ? "bg-red-50/80 dark:bg-red-950/30" : "text-gray-700 dark:text-gray-300"}`}>
-      <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${lineStatus === "error" ? "bg-red-500" : "bg-emerald-500"}`} aria-hidden />
-      <span className={lineStatus === "error" ? styles.icon : undefined}>{issue}</span>
-    </li>
-  );
+  if (itemId === "court-usage") return <CourtUsageIssueLine issue={issue} />;
+  return <li className="leading-snug">{issue}</li>;
 }
 
 function CheckRow({ item }: { item: LykkecupCheckItem }) {

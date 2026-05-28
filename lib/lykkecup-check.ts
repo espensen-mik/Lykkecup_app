@@ -6,10 +6,11 @@ import {
   roundRobinMatchesPerTeam,
   type LevelSchedulePlanningRow,
 } from "@/lib/puljer";
-import { resolvePlanMatchesPerTeam } from "@/lib/lykkecup-regnemaskine";
+import { resolvePlanMatchesPerTeam, roundLengthMinutes } from "@/lib/lykkecup-regnemaskine";
 import { isAllDayPeriod, periodWindowMinutes } from "@/lib/tournament-periods";
 import { analyzePoolMatchSync, plannedLevelMatchCount } from "@/lib/turnering";
 import { findCourtOverlapIssues } from "@/lib/turneringsplan-status";
+import { teamRestMinutesBetweenMatches, teamRestViolatingTeamIdsByMatchId } from "@/lib/turnering-scheduler";
 
 export type CheckStatus = "ok" | "warn" | "error";
 
@@ -52,7 +53,10 @@ export type LykkecupCheckInput = {
     schedule_relaxed_team_rest?: boolean;
   }[];
   planMatchesByLevel: Record<string, number>;
-  scheduleRows: LevelSchedulePlanningRow[];
+  scheduleRows: (LevelSchedulePlanningRow & {
+    match_duration_minutes?: number | null;
+    break_between_matches_minutes?: number | null;
+  })[];
   periods?: { id: string; name: string; start_time: string; end_time: string; is_all_day?: boolean }[];
   courtNamesById?: Record<string, string>;
   courtUsage?: LykkecupCheckCourtUsageRow[];
@@ -84,6 +88,47 @@ function finalizeItem(
 function truncateIssues(issues: string[]): string[] {
   if (issues.length <= MAX_ISSUES_SHOWN) return issues;
   return [...issues.slice(0, MAX_ISSUES_SHOWN), `… og ${issues.length - MAX_ISSUES_SHOWN} mere`];
+}
+
+function timingForLevel(
+  levelKey: string,
+  scheduleRows: readonly {
+    level: string;
+    match_duration_minutes?: number | null;
+    break_between_matches_minutes?: number | null;
+  }[],
+) {
+  const row = scheduleRows.find((r) => canonicalBanerLevelLabel(r.level) === canonicalBanerLevelLabel(levelKey));
+  return {
+    matchDurationMinutes: row?.match_duration_minutes ?? 9,
+    breakBetweenMatchesMinutes: row?.break_between_matches_minutes ?? 1,
+  };
+}
+
+function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+function hasLunchBreak(
+  intervals: readonly { start: number; end: number }[],
+  lunchStart: number,
+  lunchEnd: number,
+  minBreakMinutes: number,
+): boolean {
+  if (lunchEnd - lunchStart < minBreakMinutes) return false;
+  if (intervals.length === 0) return true;
+
+  let cursor = lunchStart;
+  const sorted = [...intervals].sort((a, b) => a.start - b.start || a.end - b.end);
+  for (const seg of sorted) {
+    if (seg.end <= lunchStart || seg.start >= lunchEnd) continue;
+    const clampedStart = Math.max(seg.start, lunchStart);
+    const clampedEnd = Math.min(seg.end, lunchEnd);
+    if (clampedStart > cursor && clampedStart - cursor >= minBreakMinutes) return true;
+    cursor = Math.max(cursor, clampedEnd);
+    if (cursor >= lunchEnd) return false;
+  }
+  return lunchEnd - cursor >= minBreakMinutes;
 }
 
 export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult {
@@ -359,51 +404,12 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     issues: courtOverlapIssues,
   });
 
-  const outsidePoolIssues: string[] = [];
-  if (input.periods?.length) {
-    const periodById = new Map(input.periods.map((p) => [p.id, p]));
-    const poolById = new Map(input.pools.map((p) => [p.id, p]));
-    for (const m of input.matches) {
-      if (
-        isOrphanKampprogramMatch(
-          { teamAId: m.team_a_id, teamBId: m.team_b_id, poolId: m.pool_id },
-          teamIds,
-          poolIds,
-        )
-      ) {
-        continue;
-      }
-      if (!m.court_id || !m.start_time) continue;
-      const pool = poolById.get(m.pool_id);
-      const periodId = pool?.period_id;
-      if (!periodId) continue;
-      const period = periodById.get(periodId);
-      if (!period || isAllDayPeriod({ name: period.name, is_all_day: period.is_all_day ?? false })) continue;
-      const matchStart = timeToMinutes(m.start_time);
-      const win = periodWindowMinutes(period);
-      if (matchStart == null || !win) continue;
-      if (matchStart < win.startMinutes || matchStart >= win.endMinutes) {
-        const a = teamNamesById[m.team_a_id] ?? "Hold";
-        const b = teamNamesById[m.team_b_id] ?? "Hold";
-        outsidePoolIssues.push(`${a} vs ${b} (${pool?.name ?? "Pulje"}) — uden for ${period.name}`);
-      }
-    }
-  }
-
-  const checkOutsidePoolPeriod = finalizeItem(
-    {
-      id: "outside-pool-period",
-      title: "Kampe inden for pulje-periode",
-      description: "Planlagte kampe bør ligge inden for puljens tildelte periode (Formiddag, Eftermiddag osv.).",
-      metrics: [{ label: "Uden for periode", value: outsidePoolIssues.length }],
-      issues: outsidePoolIssues,
-    },
-    "warn",
-  );
-
   const manglerPauseMatches: string[] = [];
   const teamsManglerPause = new Set<string>();
-  for (const m of input.matches) {
+  const poolLevel = new Map(input.pools.map((p) => [p.id, canonicalBanerLevelLabel(p.level)]));
+  const teamLevel = new Map(input.teams.map((t) => [t.id, canonicalBanerLevelLabel(t.level)]));
+  const byLevel = new Map<string, typeof schedulingMatches>();
+  for (const m of schedulingMatches) {
     if (
       isOrphanKampprogramMatch(
         { teamAId: m.team_a_id, teamBId: m.team_b_id, poolId: m.pool_id },
@@ -413,15 +419,28 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     ) {
       continue;
     }
-    if (!m.schedule_relaxed_team_rest) continue;
-    teamsManglerPause.add(m.team_a_id);
-    teamsManglerPause.add(m.team_b_id);
-    const a = teamNamesById[m.team_a_id] ?? "Hold";
-    const b = teamNamesById[m.team_b_id] ?? "Hold";
-    const court = m.court_id ? (input.courtNamesById?.[m.court_id] ?? "Bane") : "Ikke planlagt";
-    const time =
-      m.start_time != null ? formatTimeForInput(m.start_time) : "—";
-    manglerPauseMatches.push(`${a} vs ${b} — ${time} (${court})`);
+    const levelKey =
+      poolLevel.get(m.pool_id) ?? teamLevel.get(m.team_a_id) ?? teamLevel.get(m.team_b_id) ?? "Ukendt niveau";
+    const list = byLevel.get(levelKey) ?? [];
+    list.push(m);
+    byLevel.set(levelKey, list);
+  }
+
+  for (const [levelKey, levelMatches] of byLevel) {
+    const rest = teamRestMinutesBetweenMatches(roundLengthMinutes(timingForLevel(levelKey, input.scheduleRows)));
+    const violations = teamRestViolatingTeamIdsByMatchId(levelMatches, rest);
+    for (const [matchId, teamIdsInViolation] of violations) {
+      const m = levelMatches.find((row) => row.id === matchId);
+      if (!m) continue;
+      teamsManglerPause.add(m.team_a_id);
+      teamsManglerPause.add(m.team_b_id);
+      const a = teamNamesById[m.team_a_id] ?? "Hold";
+      const b = teamNamesById[m.team_b_id] ?? "Hold";
+      const court = m.court_id ? (input.courtNamesById?.[m.court_id] ?? "Bane") : "Ikke planlagt";
+      const time = m.start_time != null ? formatTimeForInput(m.start_time) : "—";
+      const names = teamIdsInViolation.map((id) => teamNamesById[id] ?? "Hold").join(", ");
+      manglerPauseMatches.push(`${a} vs ${b} — ${time} (${court}) · ${names} mangler pause (min. ${rest} min)`);
+    }
   }
 
   const checkManglerPause = finalizeItem(
@@ -440,17 +459,22 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
   );
 
   const courtUsageRows = input.courtUsage ?? [];
-  const courtsOverCapacity = courtUsageRows.filter((r) => r.freeRounds <= 0);
+  const courtsOverCapacity = courtUsageRows.filter((r) => r.freeRounds < 0);
   const courtUsageLines = courtUsageRows.map(
-    (r) =>
-      `${r.courtName}: ${r.freeRounds} ledige runder (kapacitet ${r.capacityRounds}, brugt ${r.usedRounds})`,
+    (r) => {
+      const pct =
+        r.capacityRounds > 0
+          ? Math.max(0, Math.round((Math.max(0, r.usedRounds) / r.capacityRounds) * 100))
+          : 0;
+      return `${r.courtName}|${r.usedRounds}|${r.capacityRounds}|${r.freeRounds}|${pct}`;
+    },
   );
 
   const checkCourtUsage: LykkecupCheckItem = {
     id: "court-usage",
     title: "Baneforbrug",
     description:
-      "Aktive baner skal have ledig kapacitet. Rød markering når en bane har 0 eller færre ledige runder.",
+      "Barometer pr. bane. Kun negativ ledig kapacitet er et problem (0 ledige er OK).",
     metrics: [
       { label: "Baner", value: courtUsageRows.length },
       { label: "Over kapacitet", value: courtsOverCapacity.length },
@@ -459,11 +483,58 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
         value: courtUsageRows.reduce((s, r) => s + Math.max(0, r.freeRounds), 0),
       },
     ],
-    issues: truncateIssues(courtUsageLines),
+    issues: courtUsageLines,
     issueCount: courtsOverCapacity.length,
     status: courtsOverCapacity.length > 0 ? "error" : "ok",
     ok: courtsOverCapacity.length === 0,
   };
+
+  const lunchWindowStart = 11 * 60;
+  const lunchWindowEnd = 13 * 60;
+  const lunchBreakMin = 30;
+  const lunchIssues: string[] = [];
+  const teamIntervals = new Map<string, Array<{ start: number; end: number }>>();
+  for (const m of schedulingMatches) {
+    if (
+      isOrphanKampprogramMatch(
+        { teamAId: m.team_a_id, teamBId: m.team_b_id, poolId: m.pool_id },
+        teamIds,
+        poolIds,
+      )
+    ) {
+      continue;
+    }
+    if (!m.court_id || !m.start_time || !m.end_time) continue;
+    const start = timeToMinutes(m.start_time);
+    const end = timeToMinutes(m.end_time);
+    if (start == null || end == null || end <= start) continue;
+    for (const teamId of [m.team_a_id, m.team_b_id]) {
+      const list = teamIntervals.get(teamId) ?? [];
+      list.push({ start, end });
+      teamIntervals.set(teamId, list);
+    }
+  }
+  for (const team of input.teams) {
+    const intervals = teamIntervals.get(team.id) ?? [];
+    if (!hasLunchBreak(intervals, lunchWindowStart, lunchWindowEnd, lunchBreakMin)) {
+      lunchIssues.push(`${team.name} (${canonicalBanerLevelLabel(team.level)})`);
+    }
+  }
+  const checkLunch = finalizeItem(
+    {
+      id: "lunch-check",
+      title: "Frokost Check",
+      description:
+        "Alle hold skal have mindst 30 minutters pause mellem kl. 11:00 og 13:00 for at kunne spise frokost.",
+      metrics: [
+        { label: "Hold i alt", value: input.teams.length },
+        { label: "Mangler frokostpause", value: lunchIssues.length },
+        { label: "Krav", value: "30 min i 11:00–13:00" },
+      ],
+      issues: lunchIssues.map((t) => `${t} — ingen 30 min sammenhængende frokostpause`),
+    },
+    "warn",
+  );
 
   const assignedCoachIds = new Set((input.teamCoaches ?? []).map((tc) => tc.coach_id));
   const coachesWithoutTeam = (input.coaches ?? []).filter((c) => !assignedCoachIds.has(c.id));
@@ -592,15 +663,15 @@ export function runLykkecupCheck(input: LykkecupCheckInput): LykkecupCheckResult
     checkOrphans,
     checkScheduled,
     checkCourtConflicts,
-    checkOutsidePoolPeriod,
     checkCourtUsage,
     checkManglerPause,
+    checkLunch,
     checkCoaches,
   ];
 
   const items = rawItems.map((i) => ({
     ...i,
-    issues: truncateIssues([...new Set(i.issues)]),
+    issues: i.id === "court-usage" ? [...new Set(i.issues)] : truncateIssues([...new Set(i.issues)]),
   }));
 
   const summary = { ok: 0, warn: 0, error: 0, total: items.length };
