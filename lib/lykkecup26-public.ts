@@ -146,7 +146,18 @@ export type Lc26PlayerPageData = {
 export type Lc26CoachPageData = {
   coach: Lc26Coach | null;
   teams: TeamRow[];
+  matches: Lc26CoachScheduledMatch[];
   error: string | null;
+};
+
+export type Lc26CoachScheduledMatch = {
+  id: string;
+  ownTeamName: string;
+  opponentTeamName: string;
+  startTime: string | null;
+  endTime: string | null;
+  venueName: string | null;
+  courtName: string | null;
 };
 
 export async function fetchLykkecup26CoachPage(coachId: string): Promise<Lc26CoachPageData> {
@@ -158,8 +169,8 @@ export async function fetchLykkecup26CoachPage(coachId: string): Promise<Lc26Coa
     .eq("id", coachId)
     .maybeSingle();
 
-  if (cErr) return { coach: null, teams: [], error: cErr.message };
-  if (!coachRow) return { coach: null, teams: [], error: null };
+  if (cErr) return { coach: null, teams: [], matches: [], error: cErr.message };
+  if (!coachRow) return { coach: null, teams: [], matches: [], error: null };
   const coach = coachRow as Lc26Coach;
 
   const { data: links, error: lErr } = await supabase
@@ -167,10 +178,10 @@ export async function fetchLykkecup26CoachPage(coachId: string): Promise<Lc26Coa
     .select("team_id")
     .eq("event_id", eventId)
     .eq("coach_id", coachId);
-  if (lErr) return { coach, teams: [], error: lErr.message };
+  if (lErr) return { coach, teams: [], matches: [], error: lErr.message };
 
   const teamIds = [...new Set((links ?? []).map((r: { team_id: string }) => r.team_id))];
-  if (teamIds.length === 0) return { coach, teams: [], error: null };
+  if (teamIds.length === 0) return { coach, teams: [], matches: [], error: null };
 
   const { data: teamRows, error: tErr } = await supabase
     .from("teams")
@@ -179,11 +190,111 @@ export async function fetchLykkecup26CoachPage(coachId: string): Promise<Lc26Coa
     .in("id", teamIds)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
-  if (tErr) return { coach, teams: [], error: tErr.message };
+  if (tErr) return { coach, teams: [], matches: [], error: tErr.message };
+
+  const teams = ((teamRows ?? []) as TeamRow[]).map((t) => ({ ...t, name: publicTeamDisplayName(t) }));
+  const ownTeamNameById = new Map(teams.map((t) => [t.id, t.name]));
+
+  const { data: matchRows, error: matchErr } = await supabase
+    .from("matches")
+    .select("id, team_a_id, team_b_id, court_id, start_time, end_time")
+    .eq("event_id", eventId)
+    .or(teamIds.map((id) => `team_a_id.eq.${id},team_b_id.eq.${id}`).join(","))
+    .not("court_id", "is", null)
+    .not("start_time", "is", null);
+  if (matchErr) return { coach, teams, matches: [], error: matchErr.message };
+
+  const allTeamIds = new Set<string>(teamIds);
+  for (const row of (matchRows ?? []) as { team_a_id: string; team_b_id: string }[]) {
+    allTeamIds.add(row.team_a_id);
+    allTeamIds.add(row.team_b_id);
+  }
+
+  const allIds = [...allTeamIds];
+  const nameById = new Map<string, string>();
+  if (allIds.length > 0) {
+    const { data: allTeams } = await supabase
+      .from("teams")
+      .select("id, name, nickname")
+      .eq("event_id", eventId)
+      .in("id", allIds);
+    for (const t of (allTeams ?? []) as { id: string; name: string; nickname?: string | null }[]) {
+      nameById.set(t.id, publicTeamDisplayName(t));
+    }
+  }
+
+  const courtIds = [...new Set((matchRows ?? []).map((m: { court_id: string | null }) => m.court_id).filter(Boolean))] as string[];
+  const courtMap = new Map<string, { name: string; venue_id: string }>();
+  const venueMap = new Map<string, string>();
+
+  if (courtIds.length > 0) {
+    const { data: courts, error: courtsErr } = await supabase
+      .from("courts")
+      .select("id, name, venue_id, event_id")
+      .in("id", courtIds);
+    if (!courtsErr && courts) {
+      const vids = [...new Set(courts.map((c: { venue_id: string }) => c.venue_id))];
+      for (const c of courts as { id: string; name: string; venue_id: string; event_id?: string | null }[]) {
+        if (c.event_id && c.event_id !== eventId) continue;
+        courtMap.set(c.id, { name: c.name, venue_id: c.venue_id });
+      }
+      if (vids.length > 0) {
+        const { data: venues } = await supabase
+          .from("venues")
+          .select("id, name")
+          .eq("event_id", eventId)
+          .in("id", vids);
+        for (const v of (venues ?? []) as { id: string; name: string }[]) {
+          venueMap.set(v.id, v.name);
+        }
+      }
+    }
+  }
+
+  const teamIdSet = new Set(teamIds);
+  const matches = ((matchRows ?? []) as {
+    id: string;
+    team_a_id: string;
+    team_b_id: string;
+    court_id: string | null;
+    start_time: string | null;
+    end_time: string | null;
+  }[])
+    .map((row) => {
+      const ownTeamId = teamIdSet.has(row.team_a_id) ? row.team_a_id : teamIdSet.has(row.team_b_id) ? row.team_b_id : null;
+      if (!ownTeamId) return null;
+      const oppId = ownTeamId === row.team_a_id ? row.team_b_id : row.team_a_id;
+      const ownTeamName = ownTeamNameById.get(ownTeamId) ?? nameById.get(ownTeamId);
+      const opponentTeamName = nameById.get(oppId);
+      if (!ownTeamName || !opponentTeamName) return null;
+      let courtName: string | null = null;
+      let venueName: string | null = null;
+      if (row.court_id && courtMap.has(row.court_id)) {
+        const c = courtMap.get(row.court_id)!;
+        courtName = c.name;
+        venueName = venueMap.get(c.venue_id) ?? null;
+      }
+      return {
+        id: row.id,
+        ownTeamName,
+        opponentTeamName,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        venueName,
+        courtName,
+      } satisfies Lc26CoachScheduledMatch;
+    })
+    .filter((m): m is Lc26CoachScheduledMatch => m !== null)
+    .sort((a, b) => {
+      const ta = a.startTime ? new Date(a.startTime).getTime() : 0;
+      const tb = b.startTime ? new Date(b.startTime).getTime() : 0;
+      return ta - tb || a.ownTeamName.localeCompare(b.ownTeamName, "da", { sensitivity: "base" });
+    });
 
   return {
     coach,
-    teams: ((teamRows ?? []) as TeamRow[]).map((t) => ({ ...t, name: publicTeamDisplayName(t) })),
+    teams,
+    matches,
     error: null,
   };
 }
