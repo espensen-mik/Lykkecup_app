@@ -19,7 +19,7 @@ import {
   type TournamentPeriodRow,
   validatePeriodTimes,
 } from "@/lib/tournament-periods";
-import { canonicalBanerLevelLabel } from "@/lib/holddannelse";
+import { canonicalBanerLevelLabel, formatLevelShortLabel } from "@/lib/holddannelse";
 import { normalizePoolLevelLabelsAction } from "@/lib/turnering-actions";
 
 type PeriodDraft = {
@@ -532,7 +532,7 @@ export function PerioderPanel({
             {poolsByLevel.map(([level, levelPools]) => (
               <div key={level}>
                 <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  {level}
+                  {formatLevelShortLabel(level)}
                 </h3>
                 <ul className="space-y-2">
                   {levelPools.map((pool) => (

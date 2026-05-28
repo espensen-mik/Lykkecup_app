@@ -2,6 +2,7 @@ import { ArrowLeft, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-player-controls";
 import { formatDaTimeOnly } from "@/lib/datetime";
+import { formatLevelShortLabel } from "@/lib/holddannelse";
 import type { Lc26PlayerPageData, Lc26PublicMatch } from "@/lib/lykkecup26-public";
 
 type Props = {
@@ -124,7 +125,7 @@ export function PlayerPublicView({ data, currentPlayerId }: Props) {
                 {team.name}
               </p>
               {team.level?.trim() ? (
-                <p className="mt-3 border-t border-white/15 pt-3 text-sm leading-snug text-white/75">{team.level.trim()}</p>
+                <p className="mt-3 border-t border-white/15 pt-3 text-sm leading-snug text-white/75">{formatLevelShortLabel(team.level)}</p>
               ) : null}
             </div>
           </section>

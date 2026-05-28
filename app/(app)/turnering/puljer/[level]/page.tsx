@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PoolAssignmentWorkspace } from "@/components/turnering/puljer-workspace";
-import { canonicalBanerLevelLabel, normalizeLevelKey } from "@/lib/holddannelse";
+import { canonicalBanerLevelLabel, formatLevelShortLabel, normalizeLevelKey } from "@/lib/holddannelse";
 import { fetchTurneringLevelData } from "@/lib/turnering-server";
 
 export const dynamic = "force-dynamic";
@@ -23,15 +23,17 @@ function decodeLevelParam(segment: string): string {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { level } = await params;
   const levelKey = canonicalBanerLevelLabel(normalizeLevelKey(decodeLevelParam(level)));
+  const levelLabel = formatLevelShortLabel(levelKey);
   return {
-    title: `${levelKey} — Puljer`,
-    description: `Fordel hold på puljer for niveau ${levelKey}`,
+    title: `${levelLabel} — Puljer`,
+    description: `Fordel hold på puljer for niveau ${levelLabel}`,
   };
 }
 
 export default async function TurneringPuljerLevelPage({ params }: PageProps) {
   const { level } = await params;
   const levelKey = canonicalBanerLevelLabel(normalizeLevelKey(decodeLevelParam(level)));
+  const levelLabel = formatLevelShortLabel(levelKey);
   const bundle = await fetchTurneringLevelData(levelKey);
 
   if (bundle.error) {
@@ -57,7 +59,7 @@ export default async function TurneringPuljerLevelPage({ params }: PageProps) {
             Turnering · Puljer
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-[2rem] dark:text-white">
-            {levelKey}
+            {levelLabel}
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             Vælg en aktiv pulje til højre og klik på hold til venstre for at tilføje dem — som i Holddannelse.

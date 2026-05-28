@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AllTeamsExport } from "@/components/all-teams-export";
 import { AllTeamsOverviewList } from "@/components/holddannelse/all-teams-overview-list";
-import { fetchTeamsPrintData, sortLevelKeysForNav } from "@/lib/holddannelse";
+import { fetchTeamsPrintData, formatLevelShortLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { fetchListerExportData } from "@/lib/lister";
 
 export const dynamic = "force-dynamic";
@@ -116,7 +116,7 @@ export default async function AlleHoldPage() {
             className="rounded-xl border border-lc-border bg-white px-4 py-3 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35"
           >
             <p className="truncate text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              {row.levelKey}
+              {formatLevelShortLabel(row.levelKey)}
             </p>
             <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
               Hold: <span className="font-semibold tabular-nums">{row.teamCount}</span>

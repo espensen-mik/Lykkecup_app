@@ -27,6 +27,7 @@ import {
   conservativeRoundTimingFromSchedule,
   courtsRowsToRegnemaskineCourts,
 } from "@/lib/lykkecup-regnemaskine";
+import { formatLevelShortLabel } from "@/lib/holddannelse";
 import { courtTypeForLevel, defaultRoundsPerMatchForLevel } from "@/lib/level-court-settings";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 import {
@@ -838,7 +839,7 @@ export function BanerTiderWorkspace({
                     const courtVal = courtPickFor(level);
                     return (
                       <tr key={level}>
-                        <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900 dark:text-white">{level}</td>
+                        <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900 dark:text-white">{formatLevelShortLabel(level)}</td>
                         <td className="px-4 py-3">
                           <select
                             className="min-w-[10rem] rounded-md border border-gray-200 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-900"

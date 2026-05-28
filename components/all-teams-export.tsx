@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
-import { sortLevelKeysForNav } from "@/lib/holddannelse";
+import { formatLevelShortLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
 import type { ListerPlayerRow, ListerTeamRow } from "@/lib/lister";
 
 type Props = {
@@ -103,11 +103,11 @@ export function AllTeamsExport({
     for (const g of levelGroups) {
       for (const t of g.teams) {
         if (t.members.length === 0) {
-          rows.push([g.levelKey, t.officialName, t.nickname ?? "", t.averageAge ?? "", t.playerCount, "", ""]);
+          rows.push([formatLevelShortLabel(g.levelKey), t.officialName, t.nickname ?? "", t.averageAge ?? "", t.playerCount, "", ""]);
           continue;
         }
         for (const m of t.members) {
-          rows.push([g.levelKey, t.officialName, t.nickname ?? "", t.averageAge ?? "", t.playerCount, m.club, m.name]);
+          rows.push([formatLevelShortLabel(g.levelKey), t.officialName, t.nickname ?? "", t.averageAge ?? "", t.playerCount, m.club, m.name]);
         }
       }
     }
@@ -139,7 +139,7 @@ export function AllTeamsExport({
             <div className="space-y-8">
               {levelGroups.map((group) => (
                 <section key={group.levelKey} className="break-inside-avoid">
-                  <h2 className="mb-2 border-b-2 border-black pb-1 text-base font-bold">{group.levelKey}</h2>
+                  <h2 className="mb-2 border-b-2 border-black pb-1 text-base font-bold">{formatLevelShortLabel(group.levelKey)}</h2>
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>

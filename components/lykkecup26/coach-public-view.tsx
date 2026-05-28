@@ -2,6 +2,7 @@ import { ArrowLeft, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-player-controls";
 import { formatDaTimeOnly } from "@/lib/datetime";
+import { formatLevelShortLabel } from "@/lib/holddannelse";
 import type { Lc26CoachPageData, Lc26CoachScheduledMatch } from "@/lib/lykkecup26-public";
 
 type Props = {
@@ -73,7 +74,7 @@ export function CoachPublicView({ data, currentCoachId }: Props) {
                 </p>
                 {team.level?.trim() ? (
                   <p className="mt-2.5 border-t border-white/15 pt-2.5 text-sm leading-snug text-white/72">
-                    {team.level.trim()}
+                    {formatLevelShortLabel(team.level)}
                   </p>
                 ) : null}
               </li>

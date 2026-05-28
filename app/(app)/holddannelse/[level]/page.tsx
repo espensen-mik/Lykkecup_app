@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrintTeamsLinkIcon } from "@/components/holddannelse/print-teams-link-icon";
 import { TeamBuilder } from "@/components/holddannelse/team-builder";
-import { fetchHoldLevelData, normalizeLevelKey } from "@/lib/holddannelse";
+import { fetchHoldLevelData, formatLevelShortLabel, normalizeLevelKey } from "@/lib/holddannelse";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +24,10 @@ function decodeLevelParam(segment: string): string {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { level } = await params;
   const levelKey = normalizeLevelKey(decodeLevelParam(level));
+  const levelLabel = formatLevelShortLabel(levelKey);
   return {
-    title: `${levelKey} — Holddannelse`,
-    description: `Fordel spillere på hold for niveau ${levelKey}`,
+    title: `${levelLabel} — Holddannelse`,
+    description: `Fordel spillere på hold for niveau ${levelLabel}`,
   };
 }
 
@@ -35,6 +36,7 @@ export default async function HoldLevelPage({ params, searchParams }: PageProps)
   const qp = searchParams ? await searchParams : undefined;
   const requestedTeamId = qp?.team?.trim() || null;
   const levelKey = normalizeLevelKey(decodeLevelParam(level));
+  const levelLabel = formatLevelShortLabel(levelKey);
 
   const bundle = await fetchHoldLevelData(levelKey);
 
@@ -66,7 +68,7 @@ export default async function HoldLevelPage({ params, searchParams }: PageProps)
               Holddannelse
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-[2rem] dark:text-white">
-              {levelKey}
+              {levelLabel}
             </h1>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               Vælg et aktivt hold til højre og klik på spillere til venstre for at tilføje dem. Fjern spillere
@@ -75,7 +77,7 @@ export default async function HoldLevelPage({ params, searchParams }: PageProps)
           </header>
           <PrintTeamsLinkIcon
             href={`/print/teams?level=${encodeURIComponent(levelKey)}`}
-            title={`Print hold for ${levelKey}`}
+            title={`Print hold for ${levelLabel}`}
           />
         </div>
       </div>

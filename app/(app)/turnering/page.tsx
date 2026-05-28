@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { levelPathSegment } from "@/lib/holddannelse";
+import { formatLevelShortLabel, levelPathSegment } from "@/lib/holddannelse";
 import { fetchTurneringDashboardOverview } from "@/lib/turnering-server";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +90,7 @@ export default async function TurneringDashboardPage() {
             {levels.map((level) => (
               <li key={level.levelKey}>
                 <article className="h-full rounded-xl border border-lc-border bg-white p-5 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">{level.levelKey}</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">{formatLevelShortLabel(level.levelKey)}</h3>
                   <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                     <Stat label="Hold i alt" value={level.teamCount} />
                     <Stat label="Hold i pulje" value={level.pooledTeams} />

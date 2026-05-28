@@ -9,6 +9,7 @@ import {
   playersPerLevel,
   topClubs,
 } from "@/lib/dashboard-compute";
+import { formatLevelShortLabel } from "@/lib/holddannelse";
 import { fetchPlayersForDashboard } from "@/lib/players";
 import { fetchTurneringDashboardOverview } from "@/lib/turnering-server";
 
@@ -112,7 +113,7 @@ export default async function DashboardPage() {
             {kampprogramLevelRows.map((level) => (
               <li key={level.levelKey}>
                 <article className="h-full rounded-xl border border-lc-border bg-white p-4 shadow-lc-card dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none">
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">{level.levelKey}</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">{formatLevelShortLabel(level.levelKey)}</h3>
                   <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                     <Stat label="Hold" value={level.teamCount} />
                     <Stat label="Puljer" value={level.poolCount} />

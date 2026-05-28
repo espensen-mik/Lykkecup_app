@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { PrintTeamsButton } from "@/components/print/print-teams-button";
-import { fetchTeamsPrintData } from "@/lib/holddannelse";
+import { fetchTeamsPrintData, formatLevelShortLabel } from "@/lib/holddannelse";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ export default async function PrintTeamsPage({ searchParams }: PageProps) {
       <header className="mb-8 border-b border-black pb-4">
         <h1 className="text-2xl font-semibold tracking-tight">Hold</h1>
         <p className="print:hidden mt-2 text-sm text-neutral-600">
-          {levelFilter ? `Niveau: ${levelFilter}` : "Alle niveauer"}
+          {levelFilter ? `Niveau: ${formatLevelShortLabel(levelFilter)}` : "Alle niveauer"}
         </p>
       </header>
 
@@ -44,7 +44,7 @@ export default async function PrintTeamsPage({ searchParams }: PageProps) {
         groups.map((g) => (
           <section key={g.levelKey} className="mb-12 last:mb-0">
             <h2 className="mb-8 border-b-2 border-black pb-2 text-lg font-bold uppercase tracking-wide">
-              {g.levelKey}
+              {formatLevelShortLabel(g.levelKey)}
             </h2>
             <div className="space-y-0">
               {g.teams.map((entry) => (

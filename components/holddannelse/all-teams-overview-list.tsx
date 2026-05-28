@@ -3,6 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePlayerModal } from "@/components/player-modal-context";
+import { formatLevelShortLabel } from "@/lib/holddannelse";
 import { subscribePlayerUpdated } from "@/lib/player-updates";
 
 type PlayerListItem = {
@@ -136,7 +137,7 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
               <option value="all">Alle niveauer</option>
               {liveGroups.map((group) => (
                 <option key={group.levelKey} value={group.levelKey}>
-                  {group.levelKey}
+                  {formatLevelShortLabel(group.levelKey)}
                 </option>
               ))}
             </select>
@@ -179,7 +180,7 @@ export function AllTeamsOverviewList({ groups }: { groups: LevelGroup[] }) {
         >
           <div className="mb-3 flex items-center gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[#0d9488] dark:text-teal-300">
-              {group.levelKey}
+              {formatLevelShortLabel(group.levelKey)}
             </h2>
             <span className="h-px flex-1 bg-gradient-to-r from-teal-300/70 to-transparent dark:from-teal-700/70" />
           </div>

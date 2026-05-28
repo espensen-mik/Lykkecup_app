@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { levelPathSegment } from "@/lib/holddannelse";
+import { formatLevelShortLabel, levelPathSegment } from "@/lib/holddannelse";
 import { formatPoolSizePlanLabel } from "@/lib/puljer";
 import { fetchPuljerOverview } from "@/lib/turnering-server";
 
@@ -54,7 +54,7 @@ export default async function TurneringPuljerPage() {
                   href={`/turnering/puljer/${levelPathSegment(level.levelKey)}`}
                   className="block h-full rounded-xl border border-lc-border bg-white p-5 shadow-lc-card transition-colors hover:border-sky-300/80 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none dark:hover:border-sky-700/60"
                 >
-                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">{level.levelKey}</h2>
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">{formatLevelShortLabel(level.levelKey)}</h2>
                   <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                     <Stat label="Hold i alt" value={level.totalTeams} accent />
                     <Stat label="Puljer" value={level.poolCount} />

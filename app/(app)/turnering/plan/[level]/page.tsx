@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TurneringPlanWorkspace } from "@/components/turnering/plan-workspace";
-import { canonicalBanerLevelLabel, normalizeLevelKey } from "@/lib/holddannelse";
+import { canonicalBanerLevelLabel, formatLevelShortLabel, normalizeLevelKey } from "@/lib/holddannelse";
 import { fetchTurneringPlanLevelData } from "@/lib/turnering-server";
 
 export const dynamic = "force-dynamic";
@@ -23,15 +23,17 @@ function decodeLevelParam(segment: string): string {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { level } = await params;
   const levelKey = canonicalBanerLevelLabel(normalizeLevelKey(decodeLevelParam(level)));
+  const levelLabel = formatLevelShortLabel(levelKey);
   return {
-    title: `${levelKey} — Turneringsplan`,
-    description: `Kampplanlægning for niveau ${levelKey}`,
+    title: `${levelLabel} — Turneringsplan`,
+    description: `Kampplanlægning for niveau ${levelLabel}`,
   };
 }
 
 export default async function TurneringPlanLevelPage({ params }: PageProps) {
   const { level } = await params;
   const levelKey = canonicalBanerLevelLabel(normalizeLevelKey(decodeLevelParam(level)));
+  const levelLabel = formatLevelShortLabel(levelKey);
   const bundle = await fetchTurneringPlanLevelData(levelKey);
 
   if (bundle.error) {
@@ -57,7 +59,7 @@ export default async function TurneringPlanLevelPage({ params }: PageProps) {
             Turnering · Turneringsplan
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-[2rem] dark:text-white">
-            {levelKey}
+            {levelLabel}
           </h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             Puljer oprettes under Puljer. Her genererer du kampe og tildeler bane og tid automatisk.

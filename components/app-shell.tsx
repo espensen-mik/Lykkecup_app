@@ -39,6 +39,7 @@ import {
   LOCKDOWN_RING_OFFSET_CLASS,
 } from "@/lib/kontrolcenter-lockdown-shared";
 import {
+  formatLevelShortLabel,
   mergeTurneringLevelDisplayLabel,
   normalizeLevelKey,
   sortLevelKeysForNav,
@@ -495,7 +496,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                   <li key={`hold-${levelKey}`}>
                     <Link
                       href={href}
-                      title={levelKey}
+                      title={formatLevelShortLabel(levelKey)}
                       onClick={() => setMobileOpen(false)}
                       className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
                         subActive
@@ -503,7 +504,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
                       }`}
                     >
-                      {levelKey}
+                      {formatLevelShortLabel(levelKey)}
                     </Link>
                   </li>
                 );
@@ -624,7 +625,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                         <li key={`puljer-${levelKey}`}>
                           <Link
                             href={href}
-                            title={levelKey}
+                            title={formatLevelShortLabel(levelKey)}
                             onClick={() => setMobileOpen(false)}
                             className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
                               subActive
@@ -632,7 +633,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                                 : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
                             }`}
                           >
-                            {levelKey}
+                            {formatLevelShortLabel(levelKey)}
                           </Link>
                         </li>
                       );
@@ -677,7 +678,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                         <li key={`plan-${levelKey}`}>
                           <Link
                             href={href}
-                            title={levelKey}
+                            title={formatLevelShortLabel(levelKey)}
                             onClick={() => setMobileOpen(false)}
                             className={`block max-w-[13rem] truncate rounded-md py-1.5 pl-2 pr-2 text-[0.8125rem] font-medium transition-colors ${
                               subActive
@@ -685,7 +686,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
                                 : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-gray-200"
                             }`}
                           >
-                            {levelKey}
+                            {formatLevelShortLabel(levelKey)}
                           </Link>
                         </li>
                       );

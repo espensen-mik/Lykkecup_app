@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { levelPathSegment } from "@/lib/holddannelse";
+import { formatLevelShortLabel, levelPathSegment } from "@/lib/holddannelse";
 import { PlanOverviewActions } from "@/components/turnering/plan-overview-actions";
 import { PlanOverviewStatus } from "@/components/turnering/plan-overview-status";
 import { fetchTurneringsplanMatchStatus } from "@/lib/turneringsplan-status-server";
@@ -70,7 +70,7 @@ export default async function TurneringPlanPage() {
                 href={`/turnering/plan/${levelPathSegment(level.levelKey)}`}
                 className="block h-full rounded-xl border border-lc-border bg-white p-5 shadow-lc-card transition-colors hover:border-sky-300/80 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none dark:hover:border-sky-700/60"
               >
-                <h2 className="text-base font-semibold text-gray-900 dark:text-white">{level.levelKey}</h2>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">{formatLevelShortLabel(level.levelKey)}</h2>
                 <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                   <Stat label="Puljer" value={level.poolCount} />
                   <Stat label="Hold" value={level.teamCount} accent />

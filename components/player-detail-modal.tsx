@@ -8,7 +8,7 @@ import {
   type PlayerAssignedTeamSummary,
 } from "@/lib/players";
 import { derivePreferenceBadge } from "@/lib/player-preferences";
-import { sortLevelKeysForNav } from "@/lib/holddannelse";
+import { formatLevelShortLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import type { PlayerDetail } from "@/types/player";
 import { PlayerDetailContent } from "@/components/player-detail-content";
@@ -581,7 +581,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
                           <option value="">Ingen niveau</option>
                           {levelOptions.map((level) => (
                             <option key={level} value={level}>
-                              {level}
+                              {formatLevelShortLabel(level)}
                             </option>
                           ))}
                         </select>

@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
 import type { CheckStatus } from "@/lib/lykkecup-check";
+import { formatLevelShortLabel } from "@/lib/holddannelse";
 import type { TurneringsplanMatchStatus } from "@/lib/turneringsplan-status";
 
 function statusIcon(status: CheckStatus) {
@@ -113,7 +114,7 @@ export function PlanOverviewStatus({ status, loadError }: Props) {
             <tbody>
               {status.levelBreakdown.map((row) => (
                 <tr key={row.levelKey} className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{row.levelKey}</td>
+                  <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{formatLevelShortLabel(row.levelKey)}</td>
                   <td className="px-3 py-2 tabular-nums text-gray-700 dark:text-gray-300">{row.expected}</td>
                   <td className="px-3 py-2 tabular-nums text-gray-700 dark:text-gray-300">{row.generated}</td>
                   <td className="px-3 py-2 tabular-nums text-gray-700 dark:text-gray-300">{row.scheduled}</td>

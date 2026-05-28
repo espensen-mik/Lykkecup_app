@@ -26,8 +26,16 @@ export function formatLevelShortLabel(level: string | null | undefined): string 
   const n = normalizeLevelKey(level);
   if (n === "Ukendt niveau") return n;
   const cleaned = n.replace(/\*+/g, "").replace(/\s+/g, " ").trim();
-  const first = cleaned.match(/^([^\s(]+)/)?.[1];
-  return first ?? cleaned;
+  const first = cleaned.match(/^([^\s(]+)/)?.[1] ?? cleaned;
+  const token = first.toLowerCase();
+  if (token === "coolstars") return "CoolStars";
+  if (token === "superstars") return "SuperStars";
+  if (token === "powerstars") return "PowerStars";
+  if (token === "turbostars") return "TurboStars";
+  if (token === "jazz") return "JAZZ";
+  if (token === "funk") return "FUNK";
+  if (token === "rock") return "ROCK";
+  return first;
 }
 
 /** Stabil sammenlægningsnøgle (fx «TurboStars» og «TurboStars (4-17 år) ****» → samme niveau). */

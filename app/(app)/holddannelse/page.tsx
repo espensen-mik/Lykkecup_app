@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight, MessagesSquare } from "lucide-react";
 import Link from "next/link";
 import { PrintTeamsLinkIcon } from "@/components/holddannelse/print-teams-link-icon";
-import { fetchHolddannelseOverview, levelPathSegment } from "@/lib/holddannelse";
+import { fetchHolddannelseOverview, formatLevelShortLabel, levelPathSegment } from "@/lib/holddannelse";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +71,7 @@ export default async function HolddannelsePage() {
                   className="block h-full rounded-xl border border-lc-border bg-white p-5 shadow-lc-card transition-colors hover:border-teal-300/80 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/35 dark:shadow-none dark:hover:border-teal-700/60"
                 >
                   <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                    {L.levelKey}
+                    {formatLevelShortLabel(L.levelKey)}
                   </h2>
                   <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                     <div>
