@@ -676,6 +676,9 @@ export async function fetchManualScheduleSlotsAction(
     return { ok: false, message: "Du skal være logget ind." };
   }
 
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
+
   const result = await listManualScheduleSlotsForMatch(supabase, matchId);
   if (!result.ok) {
     return { ok: false, message: result.error ?? "Kunne ikke hente ledige tider." };

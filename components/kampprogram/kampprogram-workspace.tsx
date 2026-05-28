@@ -29,6 +29,7 @@ import {
 import { RelaxedRestScheduleHover } from "@/components/kampprogram/relaxed-rest-schedule-hover";
 import { matchHasCurrentPauseIssue } from "@/lib/team-match-schedule";
 import { kontrolCenterTeamDisplayName, type TeamDetailView } from "@/lib/team-detail";
+import { useKontrolcenterLockdown } from "@/components/kontrolcenter-lockdown-context";
 import { ManualScheduleDialog } from "@/components/turnering/manual-schedule-dialog";
 import { teamRestMinutesBetweenMatches, teamRestViolatingTeamIdsByMatchId } from "@/lib/turnering-scheduler";
 
@@ -220,9 +221,11 @@ function MatchStatusBadges({
 function MatchActionButtons({
   match,
   onManualSchedule,
+  planningLockdown,
 }: {
   match: KampprogramMatch;
   onManualSchedule?: (match: KampprogramMatch) => void;
+  planningLockdown: boolean;
 }) {
   if (match.isOrphan || !onManualSchedule) return null;
 
@@ -230,6 +233,17 @@ function MatchActionButtons({
   const buttonClass = match.isScheduled
     ? "inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-200 dark:hover:bg-gray-800"
     : "inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50/80 px-2 py-1 text-xs font-medium text-teal-900 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200 dark:hover:bg-teal-950/70";
+  const lockedClass =
+    "inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-xs font-medium text-gray-400 opacity-60 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-500";
+
+  if (planningLockdown) {
+    return (
+      <button type="button" disabled className={lockedClass} title="Lockdown er aktiv — kampe kan ikke redigeres">
+        <CalendarClock className="h-3 w-3" aria-hidden />
+        {label}
+      </button>
+    );
+  }
 
   return (
     <button type="button" onClick={() => onManualSchedule(match)} className={buttonClass}>
@@ -365,6 +379,7 @@ function MatchTable({
   rows,
   showCourt,
   showManualSchedule,
+  planningLockdown,
   allMatches,
   teamDetails,
   levelTimingByLevel,
@@ -375,6 +390,7 @@ function MatchTable({
   rows: KampprogramMatch[];
   showCourt: boolean;
   showManualSchedule?: boolean;
+  planningLockdown: boolean;
   allMatches: readonly KampprogramMatch[];
   teamDetails: Record<string, TeamDetailView>;
   levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>;
@@ -454,7 +470,11 @@ function MatchTable({
                       conflictHints={conflictHintsByMatchId.get(m.id)}
                     />
                     {showManualSchedule ? (
-                      <MatchActionButtons match={m} onManualSchedule={onManualSchedule} />
+                      <MatchActionButtons
+                        match={m}
+                        onManualSchedule={onManualSchedule}
+                        planningLockdown={planningLockdown}
+                      />
                     ) : null}
                   </div>
                 </td>
@@ -471,6 +491,7 @@ function KampprogramTimelineTable({
   rows,
   showCourt,
   showManualSchedule,
+  planningLockdown,
   allMatches,
   teamDetails,
   levelTimingByLevel,
@@ -481,6 +502,7 @@ function KampprogramTimelineTable({
   rows: KampprogramTableRow[];
   showCourt: boolean;
   showManualSchedule?: boolean;
+  planningLockdown: boolean;
   allMatches: readonly KampprogramMatch[];
   teamDetails: Record<string, TeamDetailView>;
   levelTimingByLevel: Readonly<Record<string, KampprogramLevelTiming>>;
@@ -604,7 +626,11 @@ function KampprogramTimelineTable({
                       conflictHints={conflictHintsByMatchId.get(m.id)}
                     />
                     {showActions ? (
-                      <MatchActionButtons match={m} onManualSchedule={onManualSchedule} />
+                      <MatchActionButtons
+                        match={m}
+                        onManualSchedule={onManualSchedule}
+                        planningLockdown={planningLockdown}
+                      />
                     ) : null}
                   </div>
                 </td>
@@ -625,6 +651,7 @@ function UnscheduledSection({
   conflictHintsByMatchId,
   onOpenTeam,
   onManualSchedule,
+  planningLockdown,
   id,
 }: {
   rows: KampprogramMatch[];
@@ -634,6 +661,7 @@ function UnscheduledSection({
   conflictHintsByMatchId: ReadonlyMap<string, KampprogramMatchConflictHints>;
   onOpenTeam: (teamId: string) => void;
   onManualSchedule: (match: KampprogramMatch) => void;
+  planningLockdown: boolean;
   id?: string;
 }) {
   if (rows.length === 0) return null;
@@ -652,6 +680,7 @@ function UnscheduledSection({
           rows={rows}
           showCourt={false}
           showManualSchedule
+          planningLockdown={planningLockdown}
           allMatches={allMatches}
           teamDetails={teamDetails}
           levelTimingByLevel={levelTimingByLevel}
@@ -678,6 +707,7 @@ export function KampprogramWorkspace({
   initialMatchFilter = "all",
 }: Props) {
   const router = useRouter();
+  const { planningLockdown } = useKontrolcenterLockdown();
   const [view, setView] = useState<ViewMode>("court");
   const [levelFilter, setLevelFilter] = useState("");
   const [periodFilter, setPeriodFilter] = useState("");
@@ -698,6 +728,10 @@ export function KampprogramWorkspace({
       document.getElementById("ikke-planlagt")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [initialMatchFilter, unscheduledValidCount]);
+
+  useEffect(() => {
+    if (planningLockdown) setManualScheduleMatch(null);
+  }, [planningLockdown]);
   const conflictHintsByMatchId = useMemo(
     () => buildKampprogramMatchConflictHints(initial.matches, initial.levelTimingByLevel),
     [initial.matches, initial.levelTimingByLevel],
@@ -1069,8 +1103,9 @@ export function KampprogramWorkspace({
             <button
               type="button"
               onClick={() => void handleDeleteOrphans()}
-              disabled={deletingOrphans}
-              className="inline-flex items-center gap-2 rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-800 shadow-sm hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100 dark:hover:bg-red-950/60"
+              disabled={deletingOrphans || planningLockdown}
+              title={planningLockdown ? "Lockdown er aktiv — kampe kan ikke slettes" : undefined}
+              className="inline-flex items-center gap-2 rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-800 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100 dark:hover:bg-red-950/60"
             >
               {deletingOrphans ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -1087,6 +1122,7 @@ export function KampprogramWorkspace({
             <MatchTable
               rows={orphanMatches}
               showCourt={false}
+              planningLockdown={planningLockdown}
               allMatches={initial.matches}
               teamDetails={teamDetails}
               levelTimingByLevel={initial.levelTimingByLevel}
@@ -1232,6 +1268,7 @@ export function KampprogramWorkspace({
                     rows={rows}
                     showCourt={false}
                     showManualSchedule
+                    planningLockdown={planningLockdown}
                     allMatches={initial.matches}
                     teamDetails={teamDetails}
                     levelTimingByLevel={initial.levelTimingByLevel}
@@ -1255,6 +1292,7 @@ export function KampprogramWorkspace({
             <UnscheduledSection
               id="ikke-planlagt"
               rows={unscheduledFiltered}
+              planningLockdown={planningLockdown}
               allMatches={initial.matches}
               teamDetails={teamDetails}
               levelTimingByLevel={initial.levelTimingByLevel}
@@ -1296,6 +1334,7 @@ export function KampprogramWorkspace({
                       rows={round.rows}
                       showCourt
                       showManualSchedule
+                      planningLockdown={planningLockdown}
                       allMatches={initial.matches}
                       teamDetails={teamDetails}
                       levelTimingByLevel={initial.levelTimingByLevel}
@@ -1312,6 +1351,7 @@ export function KampprogramWorkspace({
             <UnscheduledSection
               id="ikke-planlagt"
               rows={unscheduledFiltered}
+              planningLockdown={planningLockdown}
               allMatches={initial.matches}
               teamDetails={teamDetails}
               levelTimingByLevel={initial.levelTimingByLevel}
@@ -1330,7 +1370,7 @@ export function KampprogramWorkspace({
         playerCount={previewDetail?.playerCount ?? 0}
       />
 
-      {manualScheduleMatch ? (
+      {manualScheduleMatch && !planningLockdown ? (
         <ManualScheduleDialog
           key={manualScheduleMatch.id}
           open

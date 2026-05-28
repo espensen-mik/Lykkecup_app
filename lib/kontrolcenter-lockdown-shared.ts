@@ -26,5 +26,9 @@ export const LOCKDOWN_TOGGLE_LABEL_CLASS =
 
 /** Stier hvor skrivebeskyttelse gælder når Lockdown er aktiv. */
 export function isPlanningLockdownPath(pathname: string): boolean {
-  return pathname.startsWith("/holddannelse") || pathname.startsWith("/turnering");
+  return (
+    pathname.startsWith("/holddannelse") ||
+    pathname.startsWith("/turnering") ||
+    pathname.startsWith("/kampprogram")
+  );
 }

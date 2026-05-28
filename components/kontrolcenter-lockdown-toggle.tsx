@@ -21,8 +21,8 @@ export function KontrolcenterLockdownToggle() {
       } ${toggleBusy ? "pointer-events-none opacity-60" : ""}`}
       title={
         planningLockdown
-          ? "Lockdown er aktiv — Holddannelse og Turnering er låst. Klik for at låse op."
-          : "Slå Lockdown til — låser Holddannelse og Turnering"
+          ? "Lockdown er aktiv — Holddannelse, Turnering og Kampprogram er låst. Klik for at låse op."
+          : "Slå Lockdown til — låser Holddannelse, Turnering og Kampprogram"
       }
     >
       {planningLockdown ? (

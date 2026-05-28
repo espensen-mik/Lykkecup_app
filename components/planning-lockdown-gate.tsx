@@ -4,12 +4,50 @@ import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { useKontrolcenterLockdown } from "@/components/kontrolcenter-lockdown-context";
 
-/** Skjuler interaktion på Holddannelse/Turnering-sider når Lockdown er aktiv. */
-export function PlanningLockdownGate({ children }: { children: ReactNode }) {
+function PlanningLockdownBanner({ message, viewOnly }: { message: string; viewOnly: boolean }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center p-4 pt-8 sm:pt-12">
+      <div
+        role="status"
+        className="pointer-events-auto max-w-lg rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-center shadow-lg dark:border-amber-800 dark:bg-amber-950/90"
+      >
+        <Lock className="mx-auto h-8 w-8 text-amber-700 dark:text-amber-300" strokeWidth={2} aria-hidden />
+        <p className="mt-3 text-base font-semibold text-amber-950 dark:text-amber-50">Lockdown er aktiv</p>
+        <p className="mt-2 text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">{message}</p>
+        <p className="mt-2 text-xs text-amber-800/80 dark:text-amber-200/80">
+          {viewOnly
+            ? "Du kan stadig gennemse kampprogrammet og filtrere — men ikke redigere eller flytte kampe. App Indhold kan stadig redigeres."
+            : "App Indhold og øvrige dele af KontrolCenter kan stadig redigeres. Kun administratorer kan slå Lockdown fra i menuen øverst."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Skjuler interaktion på Holddannelse/Turnering når Lockdown er aktiv.
+ * `viewOnly` (Kampprogram): vis lockdown-banner, men lad filtre og visning virke — redigering håndteres lokalt.
+ */
+export function PlanningLockdownGate({
+  children,
+  viewOnly = false,
+}: {
+  children: ReactNode;
+  viewOnly?: boolean;
+}) {
   const { planningLockdown, message } = useKontrolcenterLockdown();
 
   if (!planningLockdown) {
     return <>{children}</>;
+  }
+
+  if (viewOnly) {
+    return (
+      <div className="relative min-h-[12rem]">
+        {children}
+        <PlanningLockdownBanner message={message} viewOnly />
+      </div>
+    );
   }
 
   return (
@@ -28,20 +66,7 @@ export function PlanningLockdownGate({ children }: { children: ReactNode }) {
       >
         {children}
       </div>
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center p-4 pt-8 sm:pt-12">
-        <div
-          role="status"
-          className="pointer-events-auto max-w-lg rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-center shadow-lg dark:border-amber-800 dark:bg-amber-950/90"
-        >
-          <Lock className="mx-auto h-8 w-8 text-amber-700 dark:text-amber-300" strokeWidth={2} aria-hidden />
-          <p className="mt-3 text-base font-semibold text-amber-950 dark:text-amber-50">Lockdown er aktiv</p>
-          <p className="mt-2 text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">{message}</p>
-          <p className="mt-2 text-xs text-amber-800/80 dark:text-amber-200/80">
-            App Indhold og øvrige dele af KontrolCenter kan stadig redigeres. Kun administratorer kan slå Lockdown fra i
-            menuen øverst.
-          </p>
-        </div>
-      </div>
+      <PlanningLockdownBanner message={message} viewOnly={false} />
     </div>
   );
 }

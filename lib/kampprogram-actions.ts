@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/auth-server";
+import { planningLockdownBlock } from "@/lib/kontrolcenter-lockdown-server";
 import { isOrphanKampprogramMatch } from "@/lib/kampprogram";
 import { TURNERING_EVENT_ID } from "@/lib/turnering";
 import type { TurneringActionResult } from "@/lib/turnering-actions";
@@ -16,6 +17,9 @@ export async function deleteOrphanMatchesAction(): Promise<
   if (!user) {
     return { ok: false, message: "Du skal være logget ind." };
   }
+
+  const locked = await planningLockdownBlock();
+  if (locked) return locked;
 
   const eventId = TURNERING_EVENT_ID;
   const [matchesRes, teamsRes, poolsRes] = await Promise.all([
