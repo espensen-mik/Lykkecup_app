@@ -1,6 +1,6 @@
 import { ArrowLeft, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
-import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-player-controls";
+import { Lc26ProfileHeroCard } from "@/components/lykkecup26/lc26-profile-hero-card";
 import { formatDaTimeOnly } from "@/lib/datetime";
 import { formatLevelShortLabel } from "@/lib/holddannelse";
 import type { Lc26CoachPageData, Lc26CoachScheduledMatch } from "@/lib/lykkecup26-public";
@@ -38,21 +38,15 @@ export function CoachPublicView({ data, currentCoachId }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
-      <div className="mb-10 rounded-2xl border border-lc26-navy/75 bg-lc26-navy p-5 shadow-[0_14px_34px_-18px_rgb(22_51_88/0.9)] sm:p-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90">LykkeCup 26</p>
-        <h1 className="mt-2 text-balance text-3xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">{coach.name}</h1>
-        <p className="mt-2 text-sm font-semibold uppercase tracking-[0.08em] text-white/90">Cheftræner</p>
-        <p className="mt-1 text-base leading-snug text-white/85">{coach.home_club?.trim() || "Træner"}</p>
-        <div className="mt-6">
-          <Lc26SavedPlayerControls
-            kind="coach"
-            entityId={currentCoachId}
-            entityName={coach.name}
-            tone="inverse"
-            accent="navy"
-          />
-        </div>
-      </div>
+      <Lc26ProfileHeroCard
+        title={coach.name}
+        subtitle="Cheftræner"
+        detail={coach.home_club?.trim() || "Træner"}
+        saveKind="coach"
+        entityId={currentCoachId}
+        entityName={coach.name}
+        accent="navy"
+      />
 
       <section className="mb-8">
         <h2 className="text-lg font-semibold tracking-[-0.02em] text-lc26-navy">Dine hold i LykkeCup 26</h2>
