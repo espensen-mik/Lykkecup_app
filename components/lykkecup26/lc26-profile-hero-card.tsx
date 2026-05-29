@@ -7,7 +7,7 @@ import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-play
  * **Variants**
  * - `"original"` — solid teal (player) or navy (coach)
  * - `"ocean-mint"` — subtle CSS teal gradient (player only; coach falls back to navy original)
- * - `"wave"` — Illustrator wave in two navy tones
+ * - `"wave"` — Illustrator wave (teal on players, navy on coaches)
  *
  * **Revert to Original:** set `LC26_PROFILE_HERO_VARIANT` below to `"original"`.
  */
@@ -40,8 +40,12 @@ function originalShell(accent: "teal" | "navy"): string {
   return "mb-10 rounded-2xl border border-lc26-navy/75 bg-lc26-navy p-5 shadow-[0_14px_34px_-18px_rgb(22_51_88/0.9)] sm:p-6";
 }
 
-const WAVE_SHELL =
-  "mb-10 relative overflow-hidden rounded-2xl border border-white/12 shadow-[0_14px_34px_-18px_rgb(22_51_88/0.55)]";
+function waveShell(accent: "teal" | "navy"): string {
+  if (accent === "teal") {
+    return "mb-10 relative overflow-hidden rounded-2xl border border-white/15 shadow-[0_14px_34px_-18px_rgb(0_182_165/0.55)]";
+  }
+  return "mb-10 relative overflow-hidden rounded-2xl border border-white/12 shadow-[0_14px_34px_-18px_rgb(22_51_88/0.55)]";
+}
 
 const OCEAN_MINT_SHELL =
   "mb-10 rounded-2xl border border-white/12 bg-[linear-gradient(135deg,#0c7a7b_0%,#055B5C_52%,#044f50_100%)] p-5 shadow-[0_14px_34px_-18px_rgb(5_91_92/0.5)] sm:p-6";
@@ -79,9 +83,10 @@ export function Lc26ProfileHeroCard({
   );
 
   if (resolvedVariant === "wave") {
+    const waveScheme = accent === "teal" ? "teal" : "navy";
     return (
-      <div className={WAVE_SHELL}>
-        <Lc26HeroWaveGraphic />
+      <div className={waveShell(accent)}>
+        <Lc26HeroWaveGraphic scheme={waveScheme} />
         <div className="relative z-10 p-5 sm:p-6">{body}</div>
       </div>
     );
