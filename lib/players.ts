@@ -1,5 +1,6 @@
 import type { DashboardPlayer, Player, PlayerDetail } from "@/types/player";
 import { supabase } from "@/lib/supabase";
+import { kontrolCenterTeamDisplayNameFromRow } from "@/lib/team-detail";
 
 export const LYKKECUP_EVENT_ID = "ae74ce1e-9793-48cd-bb1d-c4a248eaf4bf";
 
@@ -83,7 +84,10 @@ export async function fetchAssignedTeamForPlayer(
   const row = team as { id: string; name: string; nickname?: string | null; level: string | null };
   const officialName = row.name?.trim() ?? "";
   if (!officialName) return null;
-  const displayName = officialName;
+  const displayName = kontrolCenterTeamDisplayNameFromRow({
+    name: officialName,
+    nickname: row.nickname,
+  });
   const levelKey = row.level?.trim() || "Ukendt niveau";
   return { teamId: row.id, levelKey, displayName, officialName };
 }

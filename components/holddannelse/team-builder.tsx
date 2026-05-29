@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, ChevronDown, Plus, Search } from "lucide-react";
 import { HOLD_EVENT_ID, nextDefaultTeamName, normalizeLevelKey } from "@/lib/holddannelse";
+import { kontrolCenterTeamDisplayNameFromRow } from "@/lib/team-detail";
 import {
   derivePreferenceBadge,
   preferencesTooltipText,
@@ -149,7 +150,7 @@ export function TeamBuilder({
     [nicknameDrafts],
   );
   const activeTeam = activeTeamId ? teamById.get(activeTeamId) : null;
-  const activeTeamName = activeTeam?.name ?? "—";
+  const activeTeamName = activeTeam ? kontrolCenterTeamDisplayNameFromRow(activeTeam) : "—";
   const activeTeamNickname = teamNickname(activeTeam);
 
   const membersByTeam = useMemo(() => {
@@ -473,7 +474,7 @@ export function TeamBuilder({
         ? "\n\nHoldet er placeret i en pulje under Turnering — det fjernes derfra."
         : "";
       const ok = window.confirm(
-        `Slet «${team.name}»?${poolNote}\n\n` +
+        `Slet «${kontrolCenterTeamDisplayNameFromRow(team)}»?${poolNote}\n\n` +
           `${tMemberRows.length} ${tMemberRows.length === 1 ? "spiller" : "spillere"} og ` +
           `${tCoachRows.length} ${tCoachRows.length === 1 ? "træner" : "trænere"} fjernes fra holdet ` +
           `(kan tildeles andre hold bagefter). Genererede kampe med holdet slettes. ` +
@@ -762,10 +763,13 @@ export function TeamBuilder({
                           ) : null}
                           {assignedHere ? (
                             <span
-                              title={`Spilleren er allerede på ${teamById.get(teamIdHere!)?.name ?? "dette hold"}.`}
+                              title={`Spilleren er allerede på ${teamById.get(teamIdHere!) ? kontrolCenterTeamDisplayNameFromRow(teamById.get(teamIdHere!)!) : "dette hold"}.`}
                               className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.6875rem] font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
                             >
-                              På {teamById.get(teamIdHere!)?.name ?? "hold"}
+                              På{" "}
+                              {teamById.get(teamIdHere!)
+                                ? kontrolCenterTeamDisplayNameFromRow(teamById.get(teamIdHere!)!)
+                                : "hold"}
                             </span>
                           ) : null}
                           {assignedOther ? (
@@ -1026,7 +1030,7 @@ export function TeamBuilder({
                           />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-base font-semibold text-emerald-950 dark:text-emerald-50">
-                              {t.name}
+                              {kontrolCenterTeamDisplayNameFromRow(t)}
                             </span>
                             {nick ? (
                               <span className="mt-0.5 block truncate text-xs text-emerald-800/90 dark:text-emerald-200/90">
@@ -1126,7 +1130,7 @@ export function TeamBuilder({
                                     completed ? "text-emerald-950 dark:text-emerald-50" : "text-gray-900 dark:text-white"
                                   }`}
                                 >
-                                  {t.name}
+                                  {kontrolCenterTeamDisplayNameFromRow(t)}
                                 </h3>
                               </div>
                               {teamNickname(t) ? (

@@ -1,4 +1,5 @@
 import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
+import { kontrolCenterTeamDisplayNameFromRow } from "@/lib/team-detail";
 import { createServerSupabase } from "@/lib/auth-server";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 
@@ -80,7 +81,7 @@ export async function fetchListerExportData(): Promise<{
   const teams: ListerTeamRow[] = rawTeams.map((t) => {
     const officialName = t.name?.trim() ?? "";
     const nickname = t.nickname?.trim() ? t.nickname.trim() : null;
-    const displayName = officialName;
+    const displayName = kontrolCenterTeamDisplayNameFromRow({ name: officialName, nickname });
     return {
       id: t.id,
       levelKey: normalizeLevelKey(t.level),

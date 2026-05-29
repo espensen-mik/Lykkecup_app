@@ -87,19 +87,29 @@ export function teamDetailHasContent(detail: TeamDetailView): boolean {
   return detail.nickname != null || detail.players.length > 0 || detail.coaches.length > 0;
 }
 
-/** Fjern alders-parentes fra autogenererede holdnavne (fx «CoolStars (4-17 år) * Hold 2»). */
+/** Fjern stjerner og alders-parentes fra autogenererede holdnavne (fx «CoolStars (4-17 år) * Hold 2»). */
 export function stripParentheticalAgeRange(text: string): string {
   return text
+    .replace(/\*+/g, "")
     .replace(/\s*\(\s*\d{1,2}\s*[-–]\s*\d{1,2}\s*år\s*\)/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+/** Visningsnavn fra hold-række (kaldenavn ellers officielt navn uden stjerner/alders-parentes). */
+export function kontrolCenterTeamDisplayNameFromRow(team: {
+  name: string;
+  nickname?: string | null;
+}): string {
+  const nick = team.nickname?.trim();
+  if (nick) return nick;
+  const official = team.name?.trim() ?? "";
+  return stripParentheticalAgeRange(official) || official;
+}
+
 /** Primært visningsnavn i KontrolCenter: kaldenavn ellers officielt navn uden alders-parentes. */
 export function kontrolCenterTeamDisplayName(detail: TeamDetailView): string {
-  const nick = detail.nickname?.trim();
-  if (nick) return nick;
-  return stripParentheticalAgeRange(detail.teamName) || detail.teamName;
+  return kontrolCenterTeamDisplayNameFromRow({ name: detail.teamName, nickname: detail.nickname });
 }
 
 export function buildMembersByTeam(members: readonly TeamMemberRow[]): Map<string, TeamMemberRow[]> {
