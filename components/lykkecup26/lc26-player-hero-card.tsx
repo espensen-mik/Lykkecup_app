@@ -5,7 +5,7 @@ import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-play
  *
  * **Variants**
  * - `"original"` — solid teal card (legacy look)
- * - `"ocean-mint"` — horizontal gradient `#014871` → `#A0EBCF`
+ * - `"ocean-mint"` — subtle teal gradient (lighter top-left → `#055B5C` bottom-right)
  *
  * **Revert to Original:** set `LC26_PLAYER_HERO_VARIANT` below to `"original"`.
  */
@@ -33,14 +33,11 @@ const VARIANT_STYLES: Record<
   },
   "ocean-mint": {
     shell:
-      "mb-10 rounded-2xl border border-white/25 bg-[linear-gradient(90deg,#014871_0%,#A0EBCF_100%)] p-5 shadow-[0_18px_42px_-16px_rgb(1_72_113/0.55)] ring-1 ring-white/20 sm:p-6",
-    kicker:
-      "text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90 [text-shadow:0_1px_2px_rgb(1_72_113/0.35)]",
-    title:
-      "mt-2 text-balance text-3xl font-semibold tracking-[-0.03em] text-white [text-shadow:0_1px_3px_rgb(1_72_113/0.4)] sm:text-[2rem]",
-    subtitle:
-      "mt-2 text-sm font-semibold uppercase tracking-[0.08em] text-white/95 [text-shadow:0_1px_2px_rgb(1_72_113/0.3)]",
-    club: "mt-1 text-base leading-snug text-white/90 [text-shadow:0_1px_2px_rgb(1_72_113/0.25)]",
+      "mb-10 rounded-2xl border border-white/12 bg-[linear-gradient(135deg,#0c7a7b_0%,#055B5C_52%,#044f50_100%)] p-5 shadow-[0_14px_34px_-18px_rgb(5_91_92/0.5)] sm:p-6",
+    kicker: "text-[11px] font-semibold uppercase tracking-[0.14em] text-white/88",
+    title: "mt-2 text-balance text-3xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]",
+    subtitle: "mt-2 text-sm font-semibold uppercase tracking-[0.08em] text-white/90",
+    club: "mt-1 text-base leading-snug text-white/85",
   },
 };
 
