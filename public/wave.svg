@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Lag_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 1920 1080">
+  <!-- Generator: Adobe Illustrator 29.1.0, SVG Export Plug-In . SVG Version: 2.1.0 Build 142)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #00bfa4;
+      }
+
+      .st1 {
+        fill: #00b69b;
+      }
+
+      .st2 {
+        fill: #f1f5fb;
+        filter: url(#drop-shadow-1);
+      }
+
+      .st3 {
+        opacity: .4;
+      }
+    </style>
+    <filter id="drop-shadow-1" x="-53.2" y="-443.6" width="2139.4" height="2019.3" filterUnits="userSpaceOnUse">
+      <feOffset dx="3.8" dy="0"/>
+      <feGaussianBlur result="blur" stdDeviation="2.8"/>
+      <feFlood flood-color="#000" flood-opacity="0"/>
+      <feComposite in2="blur" operator="in"/>
+      <feComposite in="SourceGraphic"/>
+    </filter>
+  </defs>
+  <rect class="st2" x="6.8" y="-503.7" width="2019.3" height="2139.4" rx="23.7" ry="23.7" transform="translate(1582.5 -450.5) rotate(90)"/>
+  <g>
+    <g>
+      <g class="st3">
+        <image width="2497" height="2149" transform="translate(-344 -517)" xlink:href="wave-1.png"/>
+      </g>
+      <rect class="st0" x="-361.2" y="-483.2" width="2524.8" height="2075.7" rx="10" ry="10"/>
+    </g>
+    <path class="st1" d="M1089.3,493.8C838,885.4,423,1091.1,44.9,882.5c-378.2-208.6-522.1-84.3-522.1-84.3v217.7c0,114.2,92.5,206.7,206.7,206.7h2370c114.2,0,206.7-92.5,206.7-206.7V-53.2c-194.2,550.6-822-68.3-1216.9,547Z"/>
+  </g>
+</svg>
