@@ -9,7 +9,7 @@ import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-play
  *
  * **Revert to Original:** set `LC26_PLAYER_HERO_VARIANT` below to `"original"`.
  */
-export const LC26_PLAYER_HERO_VARIANT = "ocean-mint" as const;
+export const LC26_PLAYER_HERO_VARIANT = "original" as const;
 
 export type Lc26PlayerHeroVariant = "original" | "ocean-mint";
 
