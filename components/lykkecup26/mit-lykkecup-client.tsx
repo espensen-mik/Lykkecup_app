@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Lc26SavedProfileCard } from "@/components/lykkecup26/lc26-saved-profile-card";
 import {
   clearSavedProfile,
   getSavedProfile,
   getSavedProfileHref,
   LC26_SAVED_PLAYER_KEY,
+  LC26_SAVED_PROFILE_EVENT,
   type Lc26SavedProfile,
 } from "@/lib/lc26-saved-player";
 
@@ -16,12 +18,19 @@ export function MitLykkecupClient() {
   const [saved, setSaved] = useState<Lc26SavedProfile | null>(null);
 
   useEffect(() => {
-    setSaved(getSavedProfile());
+    function refreshSaved() {
+      setSaved(getSavedProfile());
+    }
+    refreshSaved();
+    window.addEventListener(LC26_SAVED_PROFILE_EVENT, refreshSaved);
     function onStorage(e: StorageEvent) {
-      if (e.key === LC26_SAVED_PLAYER_KEY || e.key === null) setSaved(getSavedProfile());
+      if (e.key === LC26_SAVED_PLAYER_KEY || e.key === null) refreshSaved();
     }
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(LC26_SAVED_PROFILE_EVENT, refreshSaved);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   return (
@@ -42,19 +51,11 @@ export function MitLykkecupClient() {
           </Link>
         </div>
       ) : (
-        <section className="mt-6 rounded-2xl border border-lc26-teal/30 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">
-            {saved.kind === "page"
-              ? "Mit gemte program"
-              : saved.kind === "coach"
-                ? "Min trænerprofil"
-                : "Min spillerprofil"}
-          </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-lc26-navy">{saved.name}</p>
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Lc26SavedProfileCard profile={saved} context="mit">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Link
               href={getSavedProfileHref(saved)}
-              className="inline-flex items-center justify-center rounded-xl bg-lc26-teal px-4 py-2.5 text-sm font-semibold text-white"
+              className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-lc26-navy shadow-sm transition hover:bg-stone-50"
             >
               Åbn min side
             </Link>
@@ -65,24 +66,24 @@ export function MitLykkecupClient() {
                 setSaved(null);
                 router.push("/lykkecup26");
               }}
-              className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-lc26-navy/75"
+              className="inline-flex items-center justify-center rounded-xl border border-white/35 bg-white/10 px-4 py-2.5 text-sm font-medium text-white/95 transition hover:bg-white/15"
             >
               Skift profil
             </button>
           </div>
-          <p className="mt-5 border-t border-stone-100 pt-4">
+          <p className="mt-5 border-t border-white/15 pt-4">
             <button
               type="button"
               onClick={() => {
                 clearSavedProfile();
                 setSaved(null);
               }}
-              className="text-sm font-medium text-lc26-navy/45 underline-offset-2 hover:text-lc26-navy/65 hover:underline"
+              className="text-sm font-medium text-white/70 underline-offset-2 transition hover:text-white/90 hover:underline"
             >
               Fjern fra Mit LykkeCup
             </button>
           </p>
-        </section>
+        </Lc26SavedProfileCard>
       )}
     </div>
   );

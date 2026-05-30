@@ -1,19 +1,15 @@
 import { Lc26HeroWaveGraphic } from "@/components/lykkecup26/lc26-hero-wave-graphic";
+import {
+  heroOceanMintShellClass,
+  heroOriginalShellClass,
+  heroWaveShellClass,
+  LC26_PROFILE_HERO_VARIANT,
+  resolveProfileHeroVariant,
+  type Lc26ProfileHeroVariant,
+} from "@/components/lykkecup26/lc26-hero-card-shell";
 import { Lc26SavedPlayerControls } from "@/components/lykkecup26/lc26-saved-player-controls";
 
-/**
- * Hero card on `/lykkecup26/spiller/[id]` and `/lykkecup26/coach/[id]`.
- *
- * **Variants**
- * - `"original"` — solid teal (player) or navy (coach)
- * - `"ocean-mint"` — subtle CSS teal gradient (player only; coach falls back to navy original)
- * - `"wave"` — Illustrator wave (teal on players, navy on coaches)
- *
- * **Revert to Original:** set `LC26_PROFILE_HERO_VARIANT` below to `"original"`.
- */
-export type Lc26ProfileHeroVariant = "original" | "ocean-mint" | "wave";
-
-export const LC26_PROFILE_HERO_VARIANT: Lc26ProfileHeroVariant = "wave";
+export { LC26_PROFILE_HERO_VARIANT, type Lc26ProfileHeroVariant } from "@/components/lykkecup26/lc26-hero-card-shell";
 
 type Props = {
   title: string;
@@ -33,23 +29,6 @@ const TEXT_STYLES = {
   detail: "mt-1 text-base leading-snug text-white/85",
 } as const;
 
-function originalShell(accent: "teal" | "navy"): string {
-  if (accent === "teal") {
-    return "mb-10 rounded-2xl border border-lc26-teal/75 bg-lc26-teal p-5 shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)] sm:p-6";
-  }
-  return "mb-10 rounded-2xl border border-lc26-navy/75 bg-lc26-navy p-5 shadow-[0_14px_34px_-18px_rgb(22_51_88/0.9)] sm:p-6";
-}
-
-function waveShell(accent: "teal" | "navy"): string {
-  if (accent === "teal") {
-    return "mb-10 relative overflow-hidden rounded-2xl border border-white/15 shadow-[0_14px_34px_-18px_rgb(0_182_165/0.55)]";
-  }
-  return "mb-10 relative overflow-hidden rounded-2xl border border-white/12 shadow-[0_14px_34px_-18px_rgb(22_51_88/0.55)]";
-}
-
-const OCEAN_MINT_SHELL =
-  "mb-10 rounded-2xl border border-white/12 bg-[linear-gradient(135deg,#0c7a7b_0%,#055B5C_52%,#044f50_100%)] p-5 shadow-[0_14px_34px_-18px_rgb(5_91_92/0.5)] sm:p-6";
-
 export function Lc26ProfileHeroCard({
   title,
   subtitle,
@@ -59,10 +38,7 @@ export function Lc26ProfileHeroCard({
   entityName,
   accent,
 }: Props) {
-  const resolvedVariant: Lc26ProfileHeroVariant =
-    LC26_PROFILE_HERO_VARIANT === "ocean-mint" && accent === "navy"
-      ? "original"
-      : LC26_PROFILE_HERO_VARIANT;
+  const resolvedVariant = resolveProfileHeroVariant(accent);
 
   const body = (
     <>
@@ -85,7 +61,7 @@ export function Lc26ProfileHeroCard({
   if (resolvedVariant === "wave") {
     const waveScheme = accent === "teal" ? "teal" : "navy";
     return (
-      <div className={waveShell(accent)}>
+      <div className={heroWaveShellClass(accent, "mb-10")}>
         <Lc26HeroWaveGraphic scheme={waveScheme} />
         <div className="relative z-10 p-5 sm:p-6">{body}</div>
       </div>
@@ -93,8 +69,8 @@ export function Lc26ProfileHeroCard({
   }
 
   if (resolvedVariant === "ocean-mint") {
-    return <div className={OCEAN_MINT_SHELL}>{body}</div>;
+    return <div className={`${heroOceanMintShellClass()} mb-10 p-5 sm:p-6`}>{body}</div>;
   }
 
-  return <div className={originalShell(accent)}>{body}</div>;
+  return <div className={`${heroOriginalShellClass(accent, "mb-10")} p-5 sm:p-6`}>{body}</div>;
 }

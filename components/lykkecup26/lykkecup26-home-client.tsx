@@ -1,16 +1,18 @@
 "use client";
 
-import { ChevronRight, CircleUserRound } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Lc26HomeBundle } from "@/lib/lykkecup26-public";
 import { Lc26InboxToast } from "@/components/lykkecup26/lc26-inbox-toast";
+import { Lc26SavedProfileCard } from "@/components/lykkecup26/lc26-saved-profile-card";
 import {
   getSavedProfile,
   getSavedProfileHref,
   LC26_SAVED_PLAYER_KEY,
+  LC26_SAVED_PROFILE_EVENT,
   type Lc26SavedProfile,
 } from "@/lib/lc26-saved-player";
 
@@ -36,18 +38,20 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
   const [clubEntityPick, setClubEntityPick] = useState("");
 
   useEffect(() => {
-    setSavedProfile(getSavedProfile());
-  }, [pathname]);
-
-  useEffect(() => {
+    function refreshSaved() {
+      setSavedProfile(getSavedProfile());
+    }
+    refreshSaved();
+    window.addEventListener(LC26_SAVED_PROFILE_EVENT, refreshSaved);
     function onStorage(e: StorageEvent) {
-      if (e.key === LC26_SAVED_PLAYER_KEY || e.key === null) {
-        setSavedProfile(getSavedProfile());
-      }
+      if (e.key === LC26_SAVED_PLAYER_KEY || e.key === null) refreshSaved();
     }
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+    return () => {
+      window.removeEventListener(LC26_SAVED_PROFILE_EVENT, refreshSaved);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [pathname]);
 
   const clubOptions = useMemo(() => {
     const s = new Set<string>();
@@ -143,47 +147,19 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
       <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 sm:max-w-2xl sm:px-6 sm:pb-14">
       {savedProfile ? (
-        <section
-          className={`mb-8 rounded-2xl p-5 sm:mb-10 sm:p-6 ${
-            savedProfile.kind === "page"
-              ? "border border-lc26-gold/60 bg-gradient-to-br from-lc26-gold to-lc26-gold-dark shadow-[0_14px_34px_-18px_rgb(211_175_55/0.75)]"
-              : savedProfile.kind === "coach"
-                ? "border border-lc26-navy/80 bg-lc26-navy shadow-[0_14px_34px_-18px_rgb(22_51_88/0.9)]"
-                : "border border-lc26-teal/70 bg-lc26-teal shadow-[0_14px_34px_-18px_rgb(0_161_130/0.9)]"
-          }`}
-          aria-labelledby="lc26-saved-heading"
-        >
-          <p id="lc26-saved-heading" className="text-sm font-semibold uppercase tracking-[0.12em] text-white/90">
-            Mit LykkeCup
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <CircleUserRound className="h-5 w-5 shrink-0 text-white/90" strokeWidth={1.75} aria-hidden />
-            <p className="text-xl font-semibold tracking-tight text-white">{savedProfile.name}</p>
-          </div>
-          <p className="mt-1 text-sm font-semibold uppercase tracking-[0.08em] text-white/90">
-            {savedProfile.kind === "page"
-              ? "VIP-program"
-              : savedProfile.kind === "coach"
-                ? "Cheftræner"
-                : "Håndboldstjerne"}
-          </p>
-          <p className="mt-1 text-xs text-white/80">Vi husker kun på denne telefon eller browser — uden login.</p>
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <Lc26SavedProfileCard profile={savedProfile} context="home" showUserIcon showPrivacyNote>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={() => router.push(getSavedProfileHref(savedProfile))}
               className={`inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold shadow-sm transition hover:bg-stone-50 active:scale-[0.99] sm:w-auto ${
-                savedProfile.kind === "page"
-                  ? "text-lc26-navy"
-                  : savedProfile.kind === "coach"
-                    ? "text-lc26-navy"
-                    : "text-lc26-teal"
+                savedProfile.kind === "player" ? "text-lc26-teal" : "text-lc26-navy"
               }`}
             >
               Åbn Mit LykkeCup
             </button>
           </div>
-        </section>
+        </Lc26SavedProfileCard>
       ) : null}
 
       <p className="mx-auto mb-6 max-w-md text-balance text-center text-base leading-snug text-lc26-navy/55 sm:mb-8">
