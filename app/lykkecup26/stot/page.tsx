@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero";
-import { Lc26FundraisingEmbed } from "@/components/lykkecup26/lc26-fundraising-embed";
+import { Lc26FundraisingCta } from "@/components/lykkecup26/lc26-fundraising-cta";
 
 export const metadata: Metadata = {
   title: "Støt LykkeLiga · LykkeCup 26",
@@ -24,7 +24,7 @@ export default function StotLykkeLigaPage() {
         </header>
 
         <div className="mt-10">
-          <Lc26FundraisingEmbed />
+          <Lc26FundraisingCta />
         </div>
       </div>
     </div>
