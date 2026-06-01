@@ -205,10 +205,10 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
         </section>
 
         <section className={card}>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">Vælg hold</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal">SØG PÅ KLUB</h2>
           <p className="mt-1 text-xs text-lc26-navy/45">Find din hjemmeklub på listen</p>
           <label htmlFor="lc26-club" className="sr-only">
-            Vælg hold ud fra hjemmeklub
+            Søg på klub — vælg hjemmeklub
           </label>
           <select
             id="lc26-club"
