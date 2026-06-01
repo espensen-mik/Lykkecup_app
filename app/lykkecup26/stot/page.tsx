@@ -3,8 +3,9 @@ import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero
 import { Lc26FundraisingCta } from "@/components/lykkecup26/lc26-fundraising-cta";
 
 export const metadata: Metadata = {
-  title: "Støt LykkeLiga · LykkeCup 26",
-  description: "Giv et fast årligt bidrag til LykkeLiga via OnlineFundraising.",
+  title: "LykkeLiga Support · LykkeCup 26",
+  description:
+    "Meld dig ind i Danmarks lykkeligste FanKlub — LykkeLiga Support for 250 kr. om året.",
 };
 
 export default function StotLykkeLigaPage() {
@@ -13,17 +14,11 @@ export default function StotLykkeLigaPage() {
       <Lykkecup26PageHero imageSrc="/lykkecupheader1.webp" />
 
       <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-8 sm:max-w-2xl sm:px-6 sm:pb-14 sm:pt-10">
-        <header className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lc26-teal">LykkeCup 26</p>
-          <h1 className="mt-2 text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.65rem]">
-            Støt LykkeLiga
-          </h1>
-          <p className="mx-auto mt-3 max-w-lg text-sm leading-snug text-lc26-navy/55">
-            Din støtte gør en forskel for inkluderende håndbold og fællesskab i LykkeLiga.
-          </p>
-        </header>
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-lc26-teal">
+          LykkeCup 26
+        </p>
 
-        <div className="mt-10">
+        <div className="mt-6">
           <Lc26FundraisingCta />
         </div>
       </div>
