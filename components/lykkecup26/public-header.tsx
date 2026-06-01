@@ -8,6 +8,7 @@ import {
   Info,
   LayoutGrid,
   Mail,
+  Heart,
   MapPinned,
   Newspaper,
   Trophy,
@@ -34,6 +35,7 @@ const NAV_BASE = [
   { href: "/lykkecup26/side-2", label: "Find rundt i MCH" },
   { href: "/lykkecup26/side-3", label: "Praktisk info" },
   { href: "/lykkecup26/nyt-fra-lykkeliga", label: "Nyt fra LykkeLiga" },
+  { href: "/lykkecup26/stot", label: "Støt LykkeLiga" },
   { href: INBOX_HREF, label: "Beskeder" },
 ] as const;
 
@@ -44,6 +46,7 @@ const NAV_ICON: Partial<Record<(typeof NAV_BASE)[number]["href"], typeof Home>> 
   "/lykkecup26/side-2": MapPinned,
   "/lykkecup26/side-3": Info,
   "/lykkecup26/nyt-fra-lykkeliga": Newspaper,
+  "/lykkecup26/stot": Heart,
 };
 
 function NavMenuIcon({ href, active }: { href: string; active: boolean }) {
