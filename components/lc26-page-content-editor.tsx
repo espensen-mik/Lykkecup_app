@@ -161,6 +161,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
           ...article,
           ...(imageUrl ? { imageUrl } : { imageUrl: undefined }),
           imageCaption: article.imageCaption?.trim() || undefined,
+          paragraphs: (article.paragraphs ?? []).map((p) => p.trim()).filter(Boolean),
         };
       });
       parsed = { articles: nextArticles };
@@ -832,16 +833,14 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                     const next = [...c.articles];
                     next[idx] = {
                       ...next[idx],
-                      paragraphs: e.target.value
-                        .split(/\n{2,}/)
-                        .map((x) => x.trim())
-                        .filter(Boolean),
+                      // Ingen .trim() under redigering — ellers forsvinder mellemrum ved hvert tastetryk.
+                      paragraphs: e.target.value.split(/\n{2,}/),
                     };
                     return { ...c, articles: next };
                   })
                 }
                 rows={6}
-                placeholder="Afsnit (adskil med tom linje)"
+                placeholder="Afsnit (adskil med tom linje mellem afsnit)"
                 className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
