@@ -1,4 +1,5 @@
 import { MapPin } from "lucide-react";
+import { Lc26ZoomableMapImage } from "@/components/lykkecup26/lc26-zoomable-map-image";
 import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero";
 import type { Lc26FindRundtContent } from "@/lib/lc26-page-content";
 
@@ -51,7 +52,7 @@ export function Lykkecup26FindMchWithContent({
             <li key={item.title}>
               <div className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm">
                 {item.imageUrl ? (
-                  <img src={item.imageUrl} alt={item.title} className="aspect-[16/10] w-full object-cover sm:aspect-[2/1]" />
+                  <Lc26ZoomableMapImage src={item.imageUrl} alt={item.title} caption={item.title} />
                 ) : (
                   <div className="flex aspect-[16/10] flex-col items-center justify-center gap-3 bg-gradient-to-br from-stone-100/95 to-stone-50 px-6 text-center sm:aspect-[2/1]">
                     <MapPin className="h-10 w-10 text-lc26-teal/45" strokeWidth={1.5} aria-hidden />

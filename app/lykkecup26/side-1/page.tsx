@@ -10,7 +10,7 @@ export default async function Side1Page() {
       title={row.title}
       intro={row.intro}
       heroImageUrl={row.heroImageUrl}
-      content={row.content as { caption: string; schedule: { time: string; title: string; note?: string; highlight?: boolean }[] }}
+      content={row.content as { caption: string; schedule: { time: string; title: string; note?: string }[] }}
     />
   );
 }

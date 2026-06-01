@@ -350,20 +350,24 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                 className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
               <div className="flex items-center justify-between">
-                <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(item.highlight)}
-                    onChange={(e) =>
-                      setProgramContent((c) => {
-                        const next = [...c.schedule];
-                        next[idx] = { ...next[idx], highlight: e.target.checked };
-                        return { ...c, schedule: next };
-                      })
-                    }
-                  />
-                  Fremhæv
-                </label>
+                {pageKey === "lykke-og-lagkage" ? (
+                  <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(item.highlight)}
+                      onChange={(e) =>
+                        setProgramContent((c) => {
+                          const next = [...c.schedule];
+                          next[idx] = { ...next[idx], highlight: e.target.checked };
+                          return { ...c, schedule: next };
+                        })
+                      }
+                    />
+                    Fremhæv
+                  </label>
+                ) : (
+                  <span />
+                )}
                 <button
                   type="button"
                   onClick={() => setProgramContent((c) => ({ ...c, schedule: c.schedule.filter((_, i) => i !== idx) }))}

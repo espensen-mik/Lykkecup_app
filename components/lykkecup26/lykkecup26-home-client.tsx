@@ -280,7 +280,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
         <p className="text-center text-xs text-lc26-navy/42">
           Har du brug for hjælp?{" "}
-          <Link href="/lykkecup26/side-1" className="font-medium text-lc26-teal underline-offset-2 hover:underline">
+          <Link href="/lykkecup26/side-3" className="font-medium text-lc26-teal underline-offset-2 hover:underline">
             Se mere her
           </Link>
         </p>

@@ -5,22 +5,23 @@ import type { Lc26ProgramContent } from "@/lib/lc26-page-content";
 const CAPTION =
   "Glæd dig til at Mumle spiller medaljekoncert kl. 16.30 i Boxen";
 
-const SCHEDULE: { time: string; title: string; note?: string; highlight?: boolean }[] = [
+const SCHEDULE: { time: string; title: string; note?: string }[] = [
   { time: "09.00", title: "Velkommen — hallen åbner", note: "Kaffe og morgenhygge ved indgangen" },
   { time: "10.00", title: "Håndboldkampene starter", note: "Første fløjt på alle baner" },
   { time: "11.30", title: "Pause", note: "Forfriskninger ved sidelinjen" },
   { time: "12.30", title: "Frokost", note: "Caféen er åben — se menu på opslag" },
   { time: "14.00", title: "Puljer og semifinaler", note: "Opdateret kampprogram på storskærm" },
-  {
-    time: "16.30",
-    title: "Medaljekoncert med Mumle",
-    note: "I Boxen — find plads i god tid",
-    highlight: true,
-  },
+  { time: "16.30", title: "Medaljekoncert med Mumle", note: "I Boxen — find plads i god tid" },
   { time: "18.00", title: "Middag og hygge", note: "Fælles spisning for holdene" },
   { time: "19.30", title: "Præmieoverrækkelse", note: "Hæder til dagens helte" },
   { time: "21.00", title: "Tak for i dag", note: "Vi ses i morgen" },
 ];
+
+/** Skiftende hvid og lys teal. */
+const PROGRAM_CARD_STYLES = [
+  "border-stone-200/90 bg-white",
+  "border-lc26-teal/25 bg-lc26-teal/[0.07]",
+] as const;
 
 export function Lykkecup26ProgramDag() {
   return <Lykkecup26ProgramDagWithContent />;
@@ -75,29 +76,15 @@ export function Lykkecup26ProgramDagWithContent({
 
         <div className="mt-10">
           <ol className="space-y-3 sm:space-y-4">
-            {schedule.map((item) => (
+            {schedule.map((item, index) => (
               <li key={item.time + item.title}>
                 <div
-                  className={`relative flex gap-3 rounded-2xl border p-4 shadow-sm transition sm:gap-5 sm:p-5 ${
-                    item.highlight
-                      ? "border-lc26-teal/45 bg-gradient-to-br from-lc26-teal/[0.07] to-white ring-1 ring-lc26-teal/15"
-                      : "border-stone-200/90 bg-white"
-                  }`}
+                  className={`relative flex gap-3 rounded-2xl border p-4 shadow-sm sm:gap-5 sm:p-5 ${PROGRAM_CARD_STYLES[index % PROGRAM_CARD_STYLES.length]}`}
                 >
-                  <div className="flex shrink-0 flex-col items-center gap-1 pt-0.5 sm:w-[4.5rem]">
-                    <span
-                      className={`font-semibold tabular-nums tracking-tight ${
-                        item.highlight ? "text-lc26-teal" : "text-lc26-navy/85"
-                      }`}
-                    >
+                  <div className="flex w-[4.25rem] shrink-0 items-start justify-center pt-0.5 sm:w-[4.5rem]">
+                    <span className="font-semibold tabular-nums tracking-tight text-lc26-navy/90">
                       {item.time}
                     </span>
-                    <span
-                      className={`h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5 ${
-                        item.highlight ? "bg-lc26-teal shadow-[0_0_0_3px_rgb(0_161_130/0.2)]" : "bg-stone-300"
-                      }`}
-                      aria-hidden
-                    />
                   </div>
                   <div className="min-w-0 flex-1 border-l border-stone-100 pl-3 sm:pl-4">
                     <p className="text-base font-semibold leading-snug text-lc26-navy">{item.title}</p>

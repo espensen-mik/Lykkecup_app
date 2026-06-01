@@ -4,7 +4,7 @@ import { LC26_LYKKE_LAGKAGE_HREF, type Lc26ProgramContent } from "@/lib/lc26-pag
 export function LykkeLagkageProgram({
   title = "Lykke & Lagkage",
   intro = "Kære gæst til LykkeCup. Velkommen til en særlig dag med håndbold i verdensklasse, musik og Danmarks lykkeligste VIP-event.",
-  heroImageUrl = "/Lykkeoglagkage.jpg",
+  heroImageUrl = "/lykkecupheader4.webp",
   content,
 }: {
   title?: string;
@@ -13,7 +13,9 @@ export function LykkeLagkageProgram({
   content?: Lc26ProgramContent;
 }) {
   const schedule = content?.schedule?.length ? content.schedule : [];
-  const heroSrc = heroImageUrl || "/Lykkeoglagkage.jpg";
+  const trimmedHero = heroImageUrl?.trim();
+  const heroSrc =
+    !trimmedHero || trimmedHero === "/Lykkeoglagkage.jpg" ? "/lykkecupheader4.webp" : trimmedHero;
 
   return (
     <div className="lc26-vip flex w-full flex-col">

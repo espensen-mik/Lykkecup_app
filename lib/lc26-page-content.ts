@@ -71,7 +71,7 @@ const defaults: Record<
         { time: "11.30", title: "Pause", note: "Forfriskninger ved sidelinjen" },
         { time: "12.30", title: "Frokost", note: "Caféen er åben — se menu på opslag" },
         { time: "14.00", title: "Puljer og semifinaler", note: "Opdateret kampprogram på storskærm" },
-        { time: "16.30", title: "Medaljekoncert med Mumle", note: "I Boxen — find plads i god tid", highlight: true },
+        { time: "16.30", title: "Medaljekoncert med Mumle", note: "I Boxen — find plads i god tid" },
         { time: "18.00", title: "Middag og hygge", note: "Fælles spisning for holdene" },
         { time: "19.30", title: "Præmieoverrækkelse", note: "Hæder til dagens helte" },
         { time: "21.00", title: "Tak for i dag", note: "Vi ses i morgen" },
@@ -121,7 +121,7 @@ const defaults: Record<
     title: "Lykke & Lagkage",
     intro:
       "Kære gæst til LykkeCup. Velkommen til en særlig dag med håndbold i verdensklasse, musik og Danmarks lykkeligste VIP-event. Her finder du dit personlige program for dagen.",
-    heroImageUrl: "/Lykkeoglagkage.jpg",
+    heroImageUrl: "/lykkecupheader4.webp",
     content: {
       caption: "",
       schedule: [
