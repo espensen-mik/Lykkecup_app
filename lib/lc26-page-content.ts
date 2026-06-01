@@ -31,16 +31,62 @@ export type Lc26PraktiskInfoContent = {
   faq: { q: string; a: string }[];
 };
 
+/** Tag-farve på nyhedsbilleder — kun LykkeCup 26-paletten. */
+export type Lc26NytTagTone = "teal" | "navy" | "gold";
+
+export const LC26_NYT_TAG_TONE_OPTIONS: { value: Lc26NytTagTone; label: string }[] = [
+  { value: "teal", label: "Teal" },
+  { value: "navy", label: "Navy" },
+  { value: "gold", label: "Guld" },
+];
+
+export const LC26_NYT_TAG_TONE_CLASS: Record<Lc26NytTagTone, string> = {
+  teal: "bg-lc26-teal text-white shadow-sm",
+  navy: "bg-lc26-navy text-white shadow-sm",
+  gold: "bg-lc26-gold-dark text-white shadow-sm",
+};
+
 export type Lc26NytArticle = {
   tag: string;
-  tagClass: string;
+  /** @deprecated Brug `tagTone`. Beholdes for ældre rækker i databasen. */
+  tagClass?: string;
+  tagTone?: Lc26NytTagTone;
   date: string;
   dateIso: string;
   title: string;
   paragraphs: string[];
   imageUrl?: string;
   imageCaption?: string;
+  /** Valgfrit link nederst i artiklen (åbner i ny fane). */
+  linkUrl?: string;
+  linkLabel?: string;
 };
+
+/** Normaliserer sti til fil i `public/` (fx `Nyhed1_kongeligt.webp` → `/Nyhed1_kongeligt.webp`). */
+export function normalizeLc26ImageUrl(raw: string | null | undefined): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  if (trimmed.startsWith("/")) return trimmed;
+  return `/${trimmed}`;
+}
+
+export function isLc26RemoteImageUrl(src: string): boolean {
+  return src.startsWith("http://") || src.startsWith("https://");
+}
+
+/** Vælger palet-tag ud fra `tagTone` eller falder tilbage for ældre `tagClass`/rækkefølge. */
+export function resolveLc26NytTagTone(article: Pick<Lc26NytArticle, "tagTone" | "tagClass">, index: number): Lc26NytTagTone {
+  if (article.tagTone === "teal" || article.tagTone === "navy" || article.tagTone === "gold") {
+    return article.tagTone;
+  }
+  const legacy = (article.tagClass ?? "").toLowerCase();
+  if (legacy.includes("navy")) return "navy";
+  if (legacy.includes("gold") || legacy.includes("amber")) return "gold";
+  if (legacy.includes("teal") || legacy.includes("emerald")) return "teal";
+  const cycle: Lc26NytTagTone[] = ["teal", "navy", "gold"];
+  return cycle[index % cycle.length]!;
+}
 
 export type Lc26NytContent = {
   articles: Lc26NytArticle[];
@@ -168,12 +214,13 @@ const defaults: Record<
       articles: [
         {
           tag: "Musik",
-          tagClass: "bg-lc26-teal text-white shadow-sm",
+          tagTone: "teal",
           date: "12. april 2026",
           dateIso: "2026-04-12",
           title: "LykkeLiga udgiver 10 nye musikhits",
           imageUrl: "/musik.jpg",
-          imageCaption: "Spillere fra Vordingborg i koncentreret process med at lave lykkelig musik i efteråret 2025.",
+          imageCaption:
+            "Spillere fra Vordingborg i koncentreret process med at lave lykkelig musik i efteråret 2025.",
           paragraphs: [
             "Så kan du godt skrue op, for der er ny LykkeLiga-musik til din håndboldtræning.",
             "Find alle sangene i vores helt nye webapp: LykkeMusik",

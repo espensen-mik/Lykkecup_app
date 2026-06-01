@@ -4,13 +4,16 @@ import { useMemo, useState } from "react";
 import { CalendarClock, ImageIcon, Info, LayoutTemplate, MapPinned, Newspaper, Save, Sparkles } from "lucide-react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { LYKKECUP26_EVENT_ID } from "@/lib/lykkecup26-public";
-import type {
-  Lc26FindRundtContent,
-  Lc26NytContent,
-  Lc26PageContentRow,
-  Lc26PageKey,
-  Lc26PraktiskInfoContent,
-  Lc26ProgramContent,
+import {
+  LC26_NYT_TAG_TONE_OPTIONS,
+  normalizeLc26ImageUrl,
+  type Lc26FindRundtContent,
+  type Lc26NytContent,
+  type Lc26NytTagTone,
+  type Lc26PageContentRow,
+  type Lc26PageKey,
+  type Lc26PraktiskInfoContent,
+  type Lc26ProgramContent,
 } from "@/lib/lc26-page-content";
 import { LC26_PAGE_CONTENT_IMAGE_BUCKET as CONTENT_IMG_BUCKET } from "@/lib/lc26-page-content";
 
@@ -152,7 +155,15 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
         setNytContent((c) => ({ ...c, articles: nextArticles }));
         setPendingArticleFiles({});
       }
-      parsed = { ...nytContent, articles: nextArticles };
+      nextArticles = nextArticles.map((article) => {
+        const imageUrl = normalizeLc26ImageUrl(article.imageUrl);
+        return {
+          ...article,
+          ...(imageUrl ? { imageUrl } : { imageUrl: undefined }),
+          imageCaption: article.imageCaption?.trim() || undefined,
+        };
+      });
+      parsed = { articles: nextArticles };
     }
 
     let nextHeroImage = heroImageUrl.trim() || null;
@@ -692,7 +703,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
           </p>
           {nytContent.articles.map((article, idx) => (
             <div key={`nyt-article-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <input
                   value={article.tag}
                   onChange={(e) =>
@@ -703,8 +714,32 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                     })
                   }
                   placeholder="Tag"
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white sm:col-span-1"
                 />
+                <label className="block sm:col-span-1">
+                  <span className="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">Tag-farve</span>
+                  <select
+                    value={
+                      article.tagTone === "teal" || article.tagTone === "navy" || article.tagTone === "gold"
+                        ? article.tagTone
+                        : "teal"
+                    }
+                    onChange={(e) =>
+                      setNytContent((c) => {
+                        const next = [...c.articles];
+                        next[idx] = { ...next[idx], tagTone: e.target.value as Lc26NytTagTone };
+                        return { ...c, articles: next };
+                      })
+                    }
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  >
+                    {LC26_NYT_TAG_TONE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <input
                   value={article.date}
                   onChange={(e) =>
@@ -715,7 +750,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                     })
                   }
                   placeholder="Dato (fx 12. april 2026)"
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white sm:col-span-1"
                 />
               </div>
               <input
@@ -739,9 +774,32 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                     return { ...c, articles: next };
                   })
                 }
-                placeholder="Billede URL (for denne artikel)"
+                placeholder="/Nyhed1_kongeligt.webp eller https://…"
                 className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
+              <p className="text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                Fil i mappen <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">public/</code>: skriv stien med
+                skråstreg foran, fx <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">/Nyhed1_kongeligt.webp</code>.
+                Upload er kun nødvendig for nye billeder udenfor <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">public/</code>.
+              </p>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Billedtekst (valgfri)
+                </span>
+                <textarea
+                  value={article.imageCaption ?? ""}
+                  onChange={(e) =>
+                    setNytContent((c) => {
+                      const next = [...c.articles];
+                      next[idx] = { ...next[idx], imageCaption: e.target.value };
+                      return { ...c, articles: next };
+                    })
+                  }
+                  rows={2}
+                  placeholder="Vises under billedet på artiklen"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+              </label>
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="file"
@@ -760,11 +818,11 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                   </span>
                 ) : null}
               </div>
-              {article.imageUrl ? (
+              {normalizeLc26ImageUrl(article.imageUrl) ? (
                 <img
-                  src={article.imageUrl}
+                  src={normalizeLc26ImageUrl(article.imageUrl)!}
                   alt=""
-                  className="h-20 w-auto rounded-lg border border-gray-200 object-cover dark:border-gray-700"
+                  className="h-20 w-auto max-w-full rounded-lg border border-gray-200 object-contain dark:border-gray-700"
                 />
               ) : null}
               <textarea
@@ -786,6 +844,32 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                 placeholder="Afsnit (adskil med tom linje)"
                 className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <input
+                  value={article.linkUrl ?? ""}
+                  onChange={(e) =>
+                    setNytContent((c) => {
+                      const next = [...c.articles];
+                      next[idx] = { ...next[idx], linkUrl: e.target.value };
+                      return { ...c, articles: next };
+                    })
+                  }
+                  placeholder="Link URL (valgfri, åbner i ny fane)"
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+                <input
+                  value={article.linkLabel ?? ""}
+                  onChange={(e) =>
+                    setNytContent((c) => {
+                      const next = [...c.articles];
+                      next[idx] = { ...next[idx], linkLabel: e.target.value };
+                      return { ...c, articles: next };
+                    })
+                  }
+                  placeholder="Linktekst (valgfri, fx Læs mere)"
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setNytContent((c) => ({ ...c, articles: c.articles.filter((_, i) => i !== idx) }))}
@@ -830,7 +914,18 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                 ...c,
                 articles: [
                   ...c.articles,
-                  { tag: "", tagClass: "bg-lc26-teal text-white shadow-sm", date: "", dateIso: "", title: "", imageUrl: "", paragraphs: [] },
+                  {
+                    tag: "",
+                    tagTone: "teal",
+                    date: "",
+                    dateIso: "",
+                    title: "",
+                    imageUrl: "",
+                    imageCaption: "",
+                    paragraphs: [],
+                    linkUrl: "",
+                    linkLabel: "",
+                  },
                 ],
               }))
             }

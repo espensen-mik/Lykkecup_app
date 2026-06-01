@@ -1,22 +1,16 @@
-import Image from "next/image";
-import type { Lc26NytContent } from "@/lib/lc26-page-content";
+import { ExternalLink } from "lucide-react";
+import {
+  LC26_NYT_TAG_TONE_CLASS,
+  normalizeLc26ImageUrl,
+  resolveLc26NytTagTone,
+  type Lc26NytArticle,
+  type Lc26NytContent,
+} from "@/lib/lc26-page-content";
 
-type Article = {
-  tag: string;
-  tagClass: string;
-  date: string;
-  dateIso: string;
-  title: string;
-  paragraphs: string[];
-  imageUrl?: string;
-  /** Vises under hero-billedet, typisk til første artikel. */
-  imageCaption?: string;
-};
-
-const ARTICLES: Article[] = [
+const ARTICLES: Lc26NytArticle[] = [
   {
     tag: "Musik",
-    tagClass: "bg-lc26-teal text-white shadow-sm",
+    tagTone: "teal",
     date: "12. april 2026",
     dateIso: "2026-04-12",
     title: "LykkeLiga udgiver 10 nye musikhits",
@@ -30,7 +24,7 @@ const ARTICLES: Article[] = [
   },
   {
     tag: "Turnering",
-    tagClass: "bg-lc26-navy text-white shadow-sm",
+    tagTone: "navy",
     date: "10. april 2026",
     dateIso: "2026-04-10",
     title: "Sådan forbereder vi os på en tryg og fair LykkeCup",
@@ -42,7 +36,7 @@ const ARTICLES: Article[] = [
   },
   {
     tag: "Fællesskab",
-    tagClass: "bg-emerald-800 text-white shadow-sm",
+    tagTone: "gold",
     date: "8. april 2026",
     dateIso: "2026-04-08",
     title: "«Vi vinder sammen» — når hele hallen hepper",
@@ -53,7 +47,7 @@ const ARTICLES: Article[] = [
   },
   {
     tag: "Interview",
-    tagClass: "bg-violet-800 text-white shadow-sm",
+    tagTone: "teal",
     date: "5. april 2026",
     dateIso: "2026-04-05",
     title: "Tre spørgsmål til årets værtsklub før dørene åbner",
@@ -64,7 +58,7 @@ const ARTICLES: Article[] = [
   },
   {
     tag: "Arrangement",
-    tagClass: "bg-amber-800 text-white shadow-sm",
+    tagTone: "navy",
     date: "1. april 2026",
     dateIso: "2026-04-01",
     title: "Åbningsceremoni og fælles foto — tider og mødested",
@@ -91,6 +85,7 @@ export function Lykkecup26NytFraLykkeligaWithContent({
   content?: Lc26NytContent;
 }) {
   const articles = content?.articles?.length ? content.articles : ARTICLES;
+
   return (
     <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-12 pt-8 sm:max-w-2xl sm:px-6 sm:pb-16 sm:pt-10">
       <header className="border-b border-stone-200/90 pb-8 text-center">
@@ -98,57 +93,81 @@ export function Lykkecup26NytFraLykkeligaWithContent({
         <h1 className="mt-2 text-balance text-2xl font-semibold tracking-[-0.03em] text-lc26-navy sm:text-[1.75rem]">
           {title}
         </h1>
-        <p className="mx-auto mt-3 max-w-lg text-sm leading-snug text-lc26-navy/55">
-          {intro}
-        </p>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-snug text-lc26-navy/55">{intro}</p>
       </header>
 
       <div className="mt-10 space-y-12 sm:space-y-14">
-        {articles.map((article) => (
-          <article
-            key={article.title}
-            className="overflow-hidden border border-stone-200/90 bg-white shadow-[0_16px_48px_-28px_rgb(22_51_88/0.22)]"
-          >
-            <figure className="m-0">
-              <div className="relative aspect-[16/10] w-full sm:aspect-[2/1]">
-                <Image
-                  src={article.imageUrl || heroImageUrl || "/musik.jpg"}
-                  alt=""
-                  fill
-                  className="object-cover object-center"
-                  sizes="(max-width: 640px) 100vw, 42rem"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-lc26-navy/35 via-transparent to-lc26-navy/10" aria-hidden />
-                <span
-                  className={`absolute left-3 top-3 z-10 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] sm:left-4 sm:top-4 sm:px-3 sm:py-1.5 sm:text-xs ${article.tagClass}`}
-                >
-                  {article.tag}
-                </span>
-              </div>
-              {article.imageCaption ? (
-                <figcaption className="border-b border-stone-100 bg-stone-50/95 px-4 py-2.5 text-center text-xs leading-snug text-lc26-navy/65 sm:px-5 sm:py-3 sm:text-[0.8125rem]">
-                  {article.imageCaption}
-                </figcaption>
-              ) : null}
-            </figure>
+        {articles.map((article, index) => {
+          const tagTone = resolveLc26NytTagTone(article, index);
+          const linkUrl = article.linkUrl?.trim();
+          const linkLabel = article.linkLabel?.trim() || "Læs mere";
+          const imageSrc =
+            normalizeLc26ImageUrl(article.imageUrl) ??
+            normalizeLc26ImageUrl(heroImageUrl) ??
+            "/musik.jpg";
+          return (
+            <article
+              key={article.title + article.dateIso}
+              className="overflow-hidden border border-stone-200/90 bg-white shadow-[0_16px_48px_-28px_rgb(22_51_88/0.22)]"
+            >
+              <figure className="m-0">
+                <div className="relative aspect-[16/10] w-full sm:aspect-[2/1]">
+                  <img
+                    src={imageSrc}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    decoding="async"
+                  />
+                  <div
+                    className="absolute inset-0 bg-gradient-to-t from-lc26-navy/35 via-transparent to-lc26-navy/10"
+                    aria-hidden
+                  />
+                  <span
+                    className={`absolute left-3 top-3 z-10 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] sm:left-4 sm:top-4 sm:px-3 sm:py-1.5 sm:text-xs ${LC26_NYT_TAG_TONE_CLASS[tagTone]}`}
+                  >
+                    {article.tag}
+                  </span>
+                </div>
+                {article.imageCaption ? (
+                  <figcaption className="border-b border-stone-100 bg-stone-50/95 px-4 py-2.5 text-center text-xs leading-snug text-lc26-navy/65 sm:px-5 sm:py-3 sm:text-[0.8125rem]">
+                    {article.imageCaption}
+                  </figcaption>
+                ) : null}
+              </figure>
 
-            <div className="px-5 py-6 sm:px-7 sm:py-8">
-              <time dateTime={article.dateIso} className="text-xs font-medium uppercase tracking-[0.06em] text-lc26-navy/45">
-                {article.date}
-              </time>
-              <h2 className="mt-2 text-pretty text-xl font-bold leading-[1.2] tracking-[-0.02em] text-lc26-navy sm:text-2xl sm:leading-tight">
-                {article.title}
-              </h2>
-              <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
-                {article.paragraphs.map((p, i) => (
-                  <p key={i} className="text-[0.9375rem] leading-relaxed text-lc26-navy/70">
-                    {p}
+              <div className="px-5 py-6 sm:px-7 sm:py-8">
+                <time dateTime={article.dateIso} className="text-xs font-medium uppercase tracking-[0.06em] text-lc26-navy/45">
+                  {article.date}
+                </time>
+                <h2 className="mt-2 text-pretty text-xl font-bold leading-[1.2] tracking-[-0.02em] text-lc26-navy sm:text-2xl sm:leading-tight">
+                  {article.title}
+                </h2>
+                <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
+                  {article.paragraphs.map((p, i) => (
+                    <p key={i} className="text-[0.9375rem] leading-relaxed text-lc26-navy/70">
+                      {p}
+                    </p>
+                  ))}
+                </div>
+
+                {linkUrl ? (
+                  <p className="mt-6 border-t border-stone-100 pt-5">
+                    <a
+                      href={linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-lc26-teal underline-offset-2 transition hover:text-[#008f72] hover:underline"
+                    >
+                      {linkLabel}
+                      <ExternalLink className="h-4 w-4 shrink-0 opacity-80" strokeWidth={2} aria-hidden />
+                      <span className="sr-only"> (åbner i ny fane)</span>
+                    </a>
                   </p>
-                ))}
+                ) : null}
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
     </div>
   );

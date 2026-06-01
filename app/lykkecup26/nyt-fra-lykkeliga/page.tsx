@@ -11,18 +11,7 @@ export default async function NytFraLykkeligaPage() {
       intro={row.intro}
       heroImageUrl={row.heroImageUrl}
       content={
-        row.content as {
-          articles: {
-            tag: string;
-            tagClass: string;
-            date: string;
-            dateIso: string;
-            title: string;
-            paragraphs: string[];
-            imageUrl?: string;
-            imageCaption?: string;
-          }[];
-        }
+        row.content as import("@/lib/lc26-page-content").Lc26NytContent
       }
     />
   );
