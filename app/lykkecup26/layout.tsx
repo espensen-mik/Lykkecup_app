@@ -16,7 +16,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  ...buildLc26PublicMetadata(),
+  ...buildLc26PublicMetadata({ canonicalPath: "/" }),
   manifest: "/lykkecup26.webmanifest",
 };
 

@@ -9,7 +9,8 @@ export const LC26_PUBLIC_SITE_DESCRIPTION =
 /** 16:9 — Open Graph / sociale medier. */
 export const LC26_PUBLIC_OG_IMAGE_PATH = "/lykkecup_thumb.jpg";
 
-const DEFAULT_SITE_URL = "https://lykkecup.dk";
+/** Vercel peger apex → www; OG-URL'er skal matche den kanoniske host. */
+const DEFAULT_SITE_URL = "https://www.lykkecup.dk";
 
 function publicSiteOrigin(): URL {
   const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_SITE_URL;
@@ -25,6 +26,8 @@ type Options = {
 export function buildLc26PublicMetadata(options?: Options): Metadata {
   const origin = publicSiteOrigin();
   const canonicalPath = options?.canonicalPath ?? "/lykkecup26";
+
+  const ogImageUrl = new URL(LC26_PUBLIC_OG_IMAGE_PATH, origin).toString();
 
   return {
     metadataBase: origin,
@@ -46,7 +49,7 @@ export function buildLc26PublicMetadata(options?: Options): Metadata {
       description: LC26_PUBLIC_SITE_DESCRIPTION,
       images: [
         {
-          url: LC26_PUBLIC_OG_IMAGE_PATH,
+          url: ogImageUrl,
           width: 1200,
           height: 675,
           alt: LC26_PUBLIC_SITE_NAME,
@@ -57,7 +60,7 @@ export function buildLc26PublicMetadata(options?: Options): Metadata {
       card: "summary_large_image",
       title: LC26_PUBLIC_SITE_NAME,
       description: LC26_PUBLIC_SITE_DESCRIPTION,
-      images: [LC26_PUBLIC_OG_IMAGE_PATH],
+      images: [ogImageUrl],
     },
     icons: {
       icon: [{ url: "/favicon.png", sizes: "512x512", type: "image/png" }],

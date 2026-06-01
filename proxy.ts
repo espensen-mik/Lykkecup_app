@@ -24,6 +24,16 @@ function isPublicPath(pathname: string): boolean {
 }
 
 export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+
+  /** Offentlig forside uden 307 — vigtigt for Facebook/LinkedIn (følger ikke altid redirect). */
+  if (pathname === "/") {
+    const rewriteUrl = request.nextUrl.clone();
+    rewriteUrl.pathname = "/lykkecup26";
+    rewriteUrl.search = search;
+    return NextResponse.rewrite(rewriteUrl);
+  }
+
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,7 +61,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname, search } = request.nextUrl;
   const publicPath = isPublicPath(pathname);
 
   if (!user && !publicPath) {
