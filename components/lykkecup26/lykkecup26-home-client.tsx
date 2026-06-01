@@ -123,7 +123,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
       <section className="relative mb-16 w-full shrink-0" aria-label="LykkeCup 26">
         <div className="relative h-44 w-full overflow-hidden sm:h-52">
           <Image
-            src="/lykkecupheader.jpg"
+            src="/lykkecupheader1.webp"
             alt=""
             fill
             className="object-cover object-[center_25%]"

@@ -33,7 +33,7 @@ export function Lykkecup26FindMchWithContent({
   const cards = content?.cards?.length ? content.cards : PLACEHOLDER_MAPS;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Lykkecup26PageHero />
+      <Lykkecup26PageHero imageSrc="/lykkecupheader2.webp" />
 
       <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-8 sm:max-w-2xl sm:px-6 sm:pb-14 sm:pt-10">
         <header className="text-center">
