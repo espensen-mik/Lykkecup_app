@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const LC26_PUBLIC_SITE_NAME = "LykkeCup 2026";
 export const LC26_PUBLIC_SITE_SHORT_NAME = "LykkeCup 2026";
 export const LC26_PUBLIC_SITE_DESCRIPTION =
-  "Find dit hold, holdkammerater og kampprogram til LykkeCup 2026 i Messecenter Herning.";
+  "Find dit hold, holdkammerater og kampprogram til LykkeCup 2026 i MCH.";
 
 /** 16:9 — Open Graph / sociale medier. */
 export const LC26_PUBLIC_OG_IMAGE_PATH = "/lykkecup_thumb.jpg";
@@ -28,6 +28,8 @@ export function buildLc26PublicMetadata(options?: Options): Metadata {
   const canonicalPath = options?.canonicalPath ?? "/lykkecup26";
 
   const ogImageUrl = new URL(LC26_PUBLIC_OG_IMAGE_PATH, origin).toString();
+  /** Valgfri — kun hvis I har en app på developers.facebook.com (fjerner debugger-advarsel). */
+  const fbAppId = process.env.NEXT_PUBLIC_FB_APP_ID?.trim();
 
   return {
     metadataBase: origin,
@@ -71,5 +73,6 @@ export function buildLc26PublicMetadata(options?: Options): Metadata {
       title: LC26_PUBLIC_SITE_SHORT_NAME,
       statusBarStyle: "black-translucent",
     },
+    ...(fbAppId ? { other: { "fb:app_id": fbAppId } } : {}),
   };
 }
