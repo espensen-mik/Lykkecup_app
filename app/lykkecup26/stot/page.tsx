@@ -5,7 +5,7 @@ import { Lc26FundraisingCta } from "@/components/lykkecup26/lc26-fundraising-cta
 import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero";
 
 export const metadata: Metadata = {
-  title: "Støt LykkeLiga · LykkeCup 26",
+  title: "Støt LykkeLiga",
   description:
     "Meld dig ind i LykkeLiga Support, giv en donation, eller kontakt os om erhvervssamarbejde.",
 };

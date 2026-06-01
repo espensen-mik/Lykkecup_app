@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { Lc26PwaBootstrap } from "@/components/lykkecup26/lc26-pwa-bootstrap";
 import { Lykkecup26Shell } from "@/components/lykkecup26/lykkecup26-shell";
+import { buildLc26PublicMetadata } from "@/lib/lc26-public-site-metadata";
 
 /** Egen CSS-chunk for offentlig app — reducer risiko for ustylet QR-førstebesøg. */
 import "../globals.css";
@@ -15,16 +16,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  applicationName: "LykkeCup 26",
-  title: "LykkeCup 26",
-  description: "Find dit hold, holdkammerater og kampprogram til LykkeCup 26.",
-  /** Egen manifest så «Tilføj til hjemmeskårm» får start_url + scope under /lykkecup26 (bedre standalone på iOS). */
+  ...buildLc26PublicMetadata(),
   manifest: "/lykkecup26.webmanifest",
-  appleWebApp: {
-    capable: true,
-    title: "LykkeCup 26",
-    statusBarStyle: "black-translucent",
-  },
 };
 
 /** Fastlås zoom/pinch som i en app (LykkeCup 26-offentlig del). */

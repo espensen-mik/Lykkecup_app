@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   return {
     title: data.player.name,
-    description: `Hold og kampprogram for ${data.player.name} — LykkeCup 26`,
+    description: `Hold og kampprogram for ${data.player.name} til LykkeCup 2026`,
   };
 }
 

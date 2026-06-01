@@ -5,8 +5,8 @@ import { fetchLc26PageContent, type Lc26ProgramContent } from "@/lib/lc26-page-c
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Lykke & Lagkage · LykkeCup 26",
-  description: "VIP-program for Lykke & Lagkage",
+  title: "Lykke & Lagkage",
+  description: "VIP-program for Lykke & Lagkage til LykkeCup 2026",
 };
 
 export default async function LykkeOgLagkagePage() {
