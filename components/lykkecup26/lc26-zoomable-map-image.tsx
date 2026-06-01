@@ -108,7 +108,7 @@ export function Lc26ZoomableMapImage({ src, alt, caption }: Props) {
           centerOnInit
           centerZoomedOut
           limitToBounds
-          alignmentAnimation={{ sizeX: 0, sizeY: 0, animationTime: 200 }}
+              autoAlignment={{ sizeX: 0, sizeY: 0, animationTime: 200 }}
           doubleClick={{ mode: "reset", animationTime: 200 }}
           wheel={{ step: 0.12, excluded: [MAP_CONTROL_CLASS] }}
           panning={{ velocityDisabled: true, excluded: [MAP_CONTROL_CLASS] }}

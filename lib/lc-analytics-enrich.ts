@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 
-/** Matcher navigation i `public-header.tsx` (LykkeCup 26). */
+/** Matcher navigation i `lc26-public-header.tsx` (LykkeCup 26). */
 export const LC26_STATIC_PAGE_TITLES: Record<string, string> = {
   "/lykkecup26": "Forside",
   "/lykkecup26/side-1": "Dagens program",

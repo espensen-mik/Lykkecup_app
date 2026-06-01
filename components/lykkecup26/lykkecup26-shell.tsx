@@ -1,5 +1,5 @@
 import { Lc26AddToHomeTip } from "@/components/lykkecup26/lc26-add-to-home-tip";
-import { PublicHeader } from "@/components/lykecup26/public-header";
+import { PublicHeader } from "@/components/lykkecup26/lc26-public-header";
 
 export function Lykkecup26Shell({ children }: { children: React.ReactNode }) {
   return (
