@@ -12,7 +12,12 @@ import { formatLevelShortLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import type { PlayerDetail } from "@/types/player";
 import { PlayerDetailContent } from "@/components/player-detail-content";
+import { ParticipantModalContextPanel } from "@/components/participant-modal-context-panel";
 import { formatPreferences } from "@/lib/format";
+import {
+  fetchPlayerParticipantContext,
+  type PlayerParticipantContext,
+} from "@/lib/participant-modal-context";
 import { emitPlayerUpdated } from "@/lib/player-updates";
 
 type Props = {
@@ -204,6 +209,12 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
   const supabase = getAuthBrowserClient();
   const [player, setPlayer] = useState<PlayerDetail | null>(null);
   const [assignedTeam, setAssignedTeam] = useState<PlayerAssignedTeamSummary | null>(null);
+  const [participantContext, setParticipantContext] = useState<PlayerParticipantContext>({
+    teammates: [],
+    coaches: [],
+    matches: [],
+    error: null,
+  });
   const [logs, setLogs] = useState<PlayerChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -221,6 +232,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
     if (!playerId) {
       setPlayer(null);
       setAssignedTeam(null);
+      setParticipantContext({ teammates: [], coaches: [], matches: [], error: null });
       setLogs([]);
       setDraft(emptyDraft);
       setEditingField(null);
@@ -236,6 +248,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
     setError(null);
     setPlayer(null);
     setAssignedTeam(null);
+    setParticipantContext({ teammates: [], coaches: [], matches: [], error: null });
     setLogs([]);
     setEditingField(null);
     setSaveError(null);
@@ -280,6 +293,9 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       setPlayer(detail);
       setDraft(toDraft(detail));
       setAssignedTeam(teamSummary);
+      const context = await fetchPlayerParticipantContext(supabase, playerId, teamSummary?.teamId ?? null);
+      if (cancelled) return;
+      setParticipantContext(context);
       setLogs(filterLegacyUnknownLogs((logsRes.data ?? []) as PlayerChangeLogRow[]));
       if (!metaRes.error) {
         const rows = (metaRes.data ?? []) as { home_club: string | null; gender: string | null; level: string | null }[];
@@ -497,14 +513,23 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
             <div className="space-y-4">
               <PlayerDetailContent
                 player={player}
-                assignedTeam={assignedTeam}
-                onAssignedTeamNavigate={onClose}
                 onEditField={(field) => {
                   setEditingField(field);
                   setSaveError(null);
                   setSaveNotice(null);
                   if (player) setDraft(toDraft(player));
                 }}
+              />
+
+              <ParticipantModalContextPanel
+                mode="player"
+                assignedTeam={assignedTeam}
+                teammates={participantContext.teammates}
+                coaches={participantContext.coaches}
+                matches={participantContext.matches}
+                currentPlayerId={player.id}
+                contextError={participantContext.error}
+                onTeamNavigate={onClose}
               />
 
               <section className="rounded-xl border border-lc-border/80 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/40">

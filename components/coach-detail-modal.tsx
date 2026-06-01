@@ -6,6 +6,11 @@ import type { Coach } from "@/types/coach";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { CoachDetailContent } from "@/components/coach-detail-content";
+import { ParticipantModalContextPanel } from "@/components/participant-modal-context-panel";
+import {
+  fetchCoachParticipantContext,
+  type CoachParticipantContext,
+} from "@/lib/participant-modal-context";
 
 type Props = {
   coachId: string | null;
@@ -94,6 +99,12 @@ function printValue(value: string | null): string {
 export function CoachDetailModal({ coachId, onClose }: Props) {
   const supabase = getAuthBrowserClient();
   const [coach, setCoach] = useState<Coach | null>(null);
+  const [participantContext, setParticipantContext] = useState<CoachParticipantContext>({
+    teams: [],
+    teamRosters: [],
+    matches: [],
+    error: null,
+  });
   const [logs, setLogs] = useState<CoachChangeLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -107,6 +118,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
   useEffect(() => {
     if (!coachId) {
       setCoach(null);
+      setParticipantContext({ teams: [], teamRosters: [], matches: [], error: null });
       setLogs([]);
       setDraft(emptyCoachDraft);
       setEditingField(null);
@@ -121,6 +133,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
     setLoading(true);
     setError(null);
     setCoach(null);
+    setParticipantContext({ teams: [], teamRosters: [], matches: [], error: null });
     setLogs([]);
     setDraft(emptyCoachDraft);
     setEditingField(null);
@@ -157,6 +170,9 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
       const detail = data as Coach;
       setCoach(detail);
       setDraft(toCoachDraft(detail));
+      const context = await fetchCoachParticipantContext(supabase, coachId);
+      if (cancelled) return;
+      setParticipantContext(context);
       setLogs(filterLegacyUnknownLogs((logsRes.data ?? []) as CoachChangeLogRow[]));
       setLoading(false);
     })();
@@ -329,6 +345,15 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
                   setSaveNotice(null);
                   if (coach) setDraft(toCoachDraft(coach));
                 }}
+              />
+
+              <ParticipantModalContextPanel
+                mode="coach"
+                teams={participantContext.teams}
+                teamRosters={participantContext.teamRosters}
+                matches={participantContext.matches}
+                currentCoachId={coach.id}
+                contextError={participantContext.error}
               />
 
               <section className="rounded-xl border border-lc-border/80 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/40">
