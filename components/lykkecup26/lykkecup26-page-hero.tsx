@@ -1,4 +1,9 @@
 import Image from "next/image";
+import {
+  LC26_PAGE_HERO_FRAME_CLASS,
+  LC26_PAGE_HERO_IMAGE_CLASS,
+  LC26_PAGE_HERO_IMAGE_SIZES,
+} from "@/components/lykkecup26/lc26-page-hero-styles";
 
 type Props = {
   /** Brug `true` kun på den side, der loades først, hvis du vil prioritere LCP. */
@@ -12,14 +17,14 @@ const DEFAULT_HEADER_SRC = "/lykkecupheader.jpg";
 /** Fuld-bredde header til undersider (forsiden har eget hero). */
 export function Lykkecup26PageHero({ priority = false, imageSrc = DEFAULT_HEADER_SRC }: Props) {
   return (
-    <div className="relative h-44 w-full shrink-0 overflow-hidden sm:h-52">
+    <div className={LC26_PAGE_HERO_FRAME_CLASS}>
       <Image
         src={imageSrc}
         alt=""
         fill
-        className="object-cover object-[center_25%]"
+        className={LC26_PAGE_HERO_IMAGE_CLASS}
         priority={priority}
-        sizes="100vw"
+        sizes={LC26_PAGE_HERO_IMAGE_SIZES}
       />
     </div>
   );

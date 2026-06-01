@@ -70,7 +70,12 @@ export function Lc26GuestMessageForm() {
         </label>
 
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-lc26-navy/55 dark:text-gray-400">Hvem er du?</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-lc26-navy/55 dark:text-gray-400">
+            Hvem er du?
+          </span>
+          <span className="mt-0.5 block text-[11px] font-normal normal-case tracking-normal text-lc26-navy/42 dark:text-gray-500">
+            Skriv også gerne klub eller by
+          </span>
           <input
             maxLength={200}
             value={roleHint}

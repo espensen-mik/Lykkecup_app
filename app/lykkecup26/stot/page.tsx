@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero";
+import { Lc26DonationCta } from "@/components/lykkecup26/lc26-donation-cta";
 import { Lc26FundraisingCta } from "@/components/lykkecup26/lc26-fundraising-cta";
+import { Lykkecup26PageHero } from "@/components/lykkecup26/lykkecup26-page-hero";
 
 export const metadata: Metadata = {
-  title: "LykkeLiga Support · LykkeCup 26",
+  title: "Støt LykkeLiga · LykkeCup 26",
   description:
-    "Meld dig ind i Danmarks lykkeligste FanKlub — LykkeLiga Support for 250 kr. om året.",
+    "Meld dig ind i LykkeLiga Support eller giv en valgfri donation til LykkeLigas aktiviteter.",
 };
 
 export default function StotLykkeLigaPage() {
@@ -18,8 +19,9 @@ export default function StotLykkeLigaPage() {
           LykkeCup 26
         </p>
 
-        <div className="mt-6">
+        <div className="mt-6 space-y-8 sm:space-y-10">
           <Lc26FundraisingCta />
+          <Lc26DonationCta />
         </div>
       </div>
     </div>

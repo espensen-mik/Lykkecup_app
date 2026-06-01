@@ -116,7 +116,7 @@ export function Lykkecup26PraktiskInfoWithContent({
             Spørgsmål og svar
           </h2>
           <p className="mt-2 text-sm leading-snug text-lc26-navy/50">
-            Tryk på et spørgsmål for at se et foreløbigt svar. Alt nedenfor er pladsholdertekst.
+            Trænger du til at blive endnu klogere på dagen? Så se mere her.
           </p>
 
           <div className="mt-8 space-y-3">

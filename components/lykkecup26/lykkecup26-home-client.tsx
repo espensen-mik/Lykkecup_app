@@ -7,6 +7,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Lc26HomeBundle } from "@/lib/lykkecup26-public";
 import { Lc26InboxToast } from "@/components/lykkecup26/lc26-inbox-toast";
+import {
+  LC26_PAGE_HERO_FRAME_CLASS,
+  LC26_PAGE_HERO_IMAGE_CLASS,
+  LC26_PAGE_HERO_IMAGE_SIZES,
+} from "@/components/lykkecup26/lc26-page-hero-styles";
 import { Lc26SavedProfileCard } from "@/components/lykkecup26/lc26-saved-profile-card";
 import {
   getSavedProfile,
@@ -121,14 +126,14 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <section className="relative mb-16 w-full shrink-0" aria-label="LykkeCup 26">
-        <div className="relative h-44 w-full overflow-hidden sm:h-52">
+        <div className={LC26_PAGE_HERO_FRAME_CLASS}>
           <Image
             src="/lykkecupheader1.webp"
             alt=""
             fill
-            className="object-cover object-[center_25%]"
+            className={LC26_PAGE_HERO_IMAGE_CLASS}
             priority
-            sizes="100vw"
+            sizes={LC26_PAGE_HERO_IMAGE_SIZES}
           />
         </div>
         <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2">

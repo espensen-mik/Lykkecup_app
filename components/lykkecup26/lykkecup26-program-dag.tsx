@@ -1,5 +1,10 @@
 import Image from "next/image";
 import { Lc26GuestExperienceCta } from "@/components/lykkecup26/lc26-guest-experience-cta";
+import {
+  LC26_PAGE_HERO_FRAME_CLASS,
+  LC26_PAGE_HERO_IMAGE_CENTER_CLASS,
+  LC26_PAGE_HERO_IMAGE_SIZES,
+} from "@/components/lykkecup26/lc26-page-hero-styles";
 import type { Lc26ProgramContent } from "@/lib/lc26-page-content";
 
 const CAPTION =
@@ -46,14 +51,14 @@ export function Lykkecup26ProgramDagWithContent({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <figure className="w-full shrink-0">
-        <div className="relative h-44 w-full overflow-hidden sm:h-52">
+        <div className={LC26_PAGE_HERO_FRAME_CLASS}>
           <Image
             src={heroSrc}
             alt=""
             fill
-            className="object-cover object-center"
+            className={LC26_PAGE_HERO_IMAGE_CENTER_CLASS}
             priority
-            sizes="100vw"
+            sizes={LC26_PAGE_HERO_IMAGE_SIZES}
           />
         </div>
         <figcaption className="border-b border-stone-200/90 bg-white px-4 py-4 text-center sm:px-6">
