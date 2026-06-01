@@ -29,7 +29,7 @@ export function Lykkecup26ProgramDag() {
 export function Lykkecup26ProgramDagWithContent({
   title = "Dagens program",
   intro = "Fra kl. 9.00 til 21.00 — tiderne kan justeres, når det endelige program foreligger.",
-  heroImageUrl = "/mumle.jpg",
+  heroImageUrl = "/mumle.webp",
   content,
 }: {
   title?: string;
@@ -39,13 +39,15 @@ export function Lykkecup26ProgramDagWithContent({
 }) {
   const schedule = content?.schedule?.length ? content.schedule : SCHEDULE;
   const caption = content?.caption ?? CAPTION;
+  const heroSrc =
+    !heroImageUrl?.trim() || heroImageUrl.trim() === "/mumle.jpg" ? "/mumle.webp" : heroImageUrl.trim();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <figure className="w-full shrink-0">
         <div className="relative h-44 w-full overflow-hidden sm:h-52">
           <Image
-            src={heroImageUrl || "/mumle.jpg"}
+            src={heroSrc}
             alt=""
             fill
             className="object-cover object-center"

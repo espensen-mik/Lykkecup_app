@@ -232,7 +232,7 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
         <input
           value={heroImageUrl}
           onChange={(e) => setHeroImageUrl(e.target.value)}
-          placeholder="/mumle.jpg"
+          placeholder="/mumle.webp"
           className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">

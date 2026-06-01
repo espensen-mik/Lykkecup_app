@@ -62,7 +62,7 @@ const defaults: Record<
   program: {
     title: "Dagens program",
     intro: "Fra kl. 9.00 til 21.00 — tiderne kan justeres, når det endelige program foreligger.",
-    heroImageUrl: "/mumle.jpg",
+    heroImageUrl: "/mumle.webp",
     content: {
       caption: "Glæd dig til at Mumle spiller medaljekoncert kl. 16.30 i Boxen",
       schedule: [
