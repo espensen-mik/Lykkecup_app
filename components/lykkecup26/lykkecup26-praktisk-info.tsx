@@ -88,12 +88,23 @@ export function Lykkecup26PraktiskInfoWithContent({
         </header>
 
         <div className="mt-10 space-y-8">
-          {sections.map((s) => (
-            <section key={s.title} className="scroll-mt-24">
-              <h2 className="text-lg font-semibold tracking-tight text-lc26-navy">{s.title}</h2>
-              <p className="mt-2 text-sm leading-snug text-lc26-navy/60">{s.body}</p>
-            </section>
-          ))}
+          {sections.map((s, sectionIdx) => {
+            const paragraphs = s.body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+            return (
+              <section key={`${sectionIdx}-${s.title}`} className="scroll-mt-24">
+                {s.title.trim() ? (
+                  <h2 className="text-lg font-semibold tracking-tight text-lc26-navy">{s.title}</h2>
+                ) : null}
+                <div className={s.title.trim() ? "mt-2 space-y-2.5" : "space-y-2.5"}>
+                  {paragraphs.map((paragraph, pIdx) => (
+                    <p key={pIdx} className="text-sm leading-snug text-lc26-navy/60">
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
 
         <div className="mt-12 border-t border-stone-200/90 pt-12 dark:border-gray-800">

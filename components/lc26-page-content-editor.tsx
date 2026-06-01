@@ -140,7 +140,25 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
         setPendingFindCardFiles({});
       }
       parsed = { ...findContent, cards: nextCards };
-    } else if (pageKey === "praktisk-info") parsed = praktiskContent;
+    } else if (pageKey === "praktisk-info") {
+      parsed = {
+        ...praktiskContent,
+        sections: praktiskContent.sections
+          .map((s) => ({
+            title: s.title.trim(),
+            body: s.body
+              .split(/\n{2,}/)
+              .map((p) => p.trim())
+              .filter(Boolean)
+              .join("\n\n"),
+          }))
+          .filter((s) => s.title || s.body),
+        faq: praktiskContent.faq.map((item) => ({
+          q: item.q.trim(),
+          a: item.a.trim(),
+        })),
+      };
+    }
     else {
       let nextArticles = [...nytContent.articles];
       const entries = Object.entries(pendingArticleFiles).filter(([, f]) => Boolean(f));
@@ -561,8 +579,15 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
             <Info className="h-3.5 w-3.5" aria-hidden />
             Praktiske sektioner
           </p>
+          <p className="text-[11px] leading-snug text-amber-900/80 dark:text-amber-200/80">
+            Hver boks er én sektion på siden. Tom linje i brødteksten = nyt afsnit. Brug «Opdel i sektioner» for at
+            lave hvert afsnit til sin egen sektion med overskrift.
+          </p>
           {praktiskContent.sections.map((section, idx) => (
             <div key={`praktisk-section-${idx}`} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Sektion {idx + 1}
+              </p>
               <input
                 value={section.title}
                 onChange={(e) =>
@@ -584,11 +609,32 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                     return { ...c, sections: next };
                   })
                 }
-                rows={3}
-                placeholder="Brødtekst"
+                rows={5}
+                placeholder="Brødtekst (tom linje = nyt afsnit i samme sektion)"
                 className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const parts = section.body.split(/\n{2,}/);
+                    if (parts.length < 2) return;
+                    setPraktiskContent((c) => {
+                      const next = [...c.sections];
+                      const splitSections = parts.map((body, partIdx) => ({
+                        title: partIdx === 0 ? section.title : "",
+                        body,
+                      }));
+                      next.splice(idx, 1, ...splitSections);
+                      return { ...c, sections: next };
+                    });
+                  }}
+                  disabled={section.body.split(/\n{2,}/).length < 2}
+                  className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-40 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+                  title="Opdel brødtekst ved tomme linjer til flere sektioner"
+                >
+                  Opdel i sektioner
+                </button>
                 <button
                   type="button"
                   onClick={() =>
@@ -614,6 +660,18 @@ export function Lc26PageContentEditor({ pageKey, initialRow }: Props) {
                   className="rounded border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-700 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
                 >
                   Ned
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPraktiskContent((c) => ({
+                      ...c,
+                      sections: c.sections.filter((_, i) => i !== idx),
+                    }))
+                  }
+                  className="ml-auto text-[11px] font-semibold text-red-600 hover:underline dark:text-red-400"
+                >
+                  Fjern sektion
                 </button>
               </div>
             </div>
