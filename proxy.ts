@@ -4,8 +4,6 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = new Set([
   "/",
   "/coach-feedback",
-  "/kontrolcenter-dashboard",
-  "/api/public-dashboard",
   "/login",
   "/glemt-kode",
   "/nulstil-kode",
@@ -19,7 +17,6 @@ const AUTH_ENTRY_PAGES = new Set(["/login", "/glemt-kode"]);
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   if (pathname === "/lykkecup26" || pathname.startsWith("/lykkecup26/")) return true;
-  if (pathname.startsWith("/api/public-dashboard")) return true;
   return false;
 }
 

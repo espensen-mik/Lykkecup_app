@@ -1,13 +1,6 @@
-import type { Metadata } from "next";
-import { PublicDashboardScreen } from "@/components/public-dashboard-screen";
+import { notFound } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export const metadata: Metadata = {
-  title: "LykkeCup 2026 - KontrolCenter Dashboard",
-  description: "Public skærmdashboard til kontoret",
-};
-
+/** Skærmdashboard er slået fra — undgår unødige DB-forespørgsler. */
 export default function KontrolcenterDashboardPage() {
-  return <PublicDashboardScreen />;
+  notFound();
 }

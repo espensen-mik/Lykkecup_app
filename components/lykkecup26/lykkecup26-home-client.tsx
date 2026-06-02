@@ -152,7 +152,7 @@ export function Lykkecup26HomeClient({ bundle }: Props) {
 
       <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 sm:max-w-2xl sm:px-6 sm:pb-14">
       {savedProfile ? (
-        <Lc26SavedProfileCard profile={savedProfile} context="home" showUserIcon showPrivacyNote>
+        <Lc26SavedProfileCard profile={savedProfile} context="home" showUserIcon>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="button"

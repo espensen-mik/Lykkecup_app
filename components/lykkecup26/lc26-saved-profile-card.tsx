@@ -24,7 +24,6 @@ type Props = {
   children: ReactNode;
   className?: string;
   showUserIcon?: boolean;
-  showPrivacyNote?: boolean;
   headingId?: string;
 };
 
@@ -54,40 +53,41 @@ export function Lc26SavedProfileCard({
   children,
   className = "",
   showUserIcon = false,
-  showPrivacyNote = false,
   headingId = "lc26-saved-heading",
 }: Props) {
   const accent = heroAccentForKind(profile.kind);
   const useWave = shouldUseHeroWave(profile.kind);
   const titleClass = context === "home" ? "text-xl font-semibold tracking-tight" : "text-2xl font-semibold tracking-tight";
+  const homeSizeClass = context === "home" ? "min-h-[14rem] sm:min-h-[15rem]" : "";
 
   return (
     <section
-      className={`${shellClassForProfile(profile, context)} ${className}`.trim()}
+      className={`${shellClassForProfile(profile, context)} ${homeSizeClass} ${className}`.trim()}
       aria-labelledby={headingId}
     >
       {useWave ? <Lc26HeroWaveGraphic scheme={accent} /> : null}
-      <div className="relative z-10 p-5 sm:p-6">
-        <p id={headingId} className="text-sm font-semibold uppercase tracking-[0.12em] text-white/90">
-          {savedProfileSectionKicker(profile.kind, context)}
-        </p>
-        <div className="mt-2 flex items-center gap-2">
-          {showUserIcon ? (
-            <>
-              <CircleUserRound className="h-5 w-5 shrink-0 text-white/90" strokeWidth={1.75} aria-hidden />
+      <div
+        className={`relative z-10 flex flex-col p-5 sm:p-6 ${context === "home" ? "min-h-[inherit] justify-between" : ""}`.trim()}
+      >
+        <div>
+          <p id={headingId} className="text-sm font-semibold uppercase tracking-[0.12em] text-white/90">
+            {savedProfileSectionKicker(profile.kind, context)}
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            {showUserIcon ? (
+              <>
+                <CircleUserRound className="h-5 w-5 shrink-0 text-white/90" strokeWidth={1.75} aria-hidden />
+                <p className={`${titleClass} text-white`}>{profile.name}</p>
+              </>
+            ) : (
               <p className={`${titleClass} text-white`}>{profile.name}</p>
-            </>
-          ) : (
-            <p className={`${titleClass} text-white`}>{profile.name}</p>
-          )}
+            )}
+          </div>
+          <p className="mt-1 text-sm font-semibold uppercase tracking-[0.08em] text-white/90">
+            {savedProfileRoleLabel(profile.kind)}
+          </p>
         </div>
-        <p className="mt-1 text-sm font-semibold uppercase tracking-[0.08em] text-white/90">
-          {savedProfileRoleLabel(profile.kind)}
-        </p>
-        {showPrivacyNote ? (
-          <p className="mt-1 text-xs text-white/80">Vi husker kun på denne telefon eller browser — uden login.</p>
-        ) : null}
-        <div className={context === "home" ? "mt-5" : "mt-6"}>{children}</div>
+        <div className={context === "home" ? "shrink-0" : "mt-6"}>{children}</div>
       </div>
     </section>
   );
