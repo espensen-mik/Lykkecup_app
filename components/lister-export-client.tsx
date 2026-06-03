@@ -239,13 +239,33 @@ export function ListerExportClient({
     [coaches],
   );
 
-  const downloadCoachTshirtByClub = useCallback(() => {
-    const rows: (string | number | null | undefined)[][] = [
-      ["Klub", "Træner navn", "T-shirt størrelse"],
-      ...sortedCoachTshirtRows.map((row) => [row.club, row.name, row.tshirt]),
-    ];
-    downloadCsv("lister-t-shirt-liste-traenere.csv", rows);
+  const coachTshirtByClubGroups = useMemo(() => {
+    const byClub = new Map<string, typeof sortedCoachTshirtRows>();
+    for (const row of sortedCoachTshirtRows) {
+      const list = byClub.get(row.club) ?? [];
+      list.push(row);
+      byClub.set(row.club, list);
+    }
+    const order: string[] = [];
+    const seen = new Set<string>();
+    for (const row of sortedCoachTshirtRows) {
+      if (seen.has(row.club)) continue;
+      seen.add(row.club);
+      order.push(row.club);
+    }
+    return order.map((club) => ({ club, rows: byClub.get(club) ?? [] }));
   }, [sortedCoachTshirtRows]);
+
+  const downloadCoachTshirtByClub = useCallback(() => {
+    const rows: (string | number | null | undefined)[][] = [["Klub", "Træner navn", "T-shirt størrelse"]];
+    for (const group of coachTshirtByClubGroups) {
+      if (rows.length > 1) rows.push([]);
+      for (const row of group.rows) {
+        rows.push([group.club, row.name, row.tshirt]);
+      }
+    }
+    downloadCsv("lister-t-shirt-liste-traenere.csv", rows);
+  }, [coachTshirtByClubGroups]);
 
   const playersForPrintClub = useCallback(
     (klub: string) =>
@@ -845,27 +865,32 @@ export function ListerExportClient({
         {printKind === "coachTshirtByClub" ? (
           <div className="text-black">
             <h1 className="mb-6 text-xl font-bold">T-shirt liste - trænere</h1>
-            {sortedCoachTshirtRows.length === 0 ? (
+            {coachTshirtByClubGroups.length === 0 ? (
               <p className="text-sm text-neutral-600">Ingen trænere i data.</p>
             ) : (
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className={th}>Klub</th>
-                    <th className={th}>Træner navn</th>
-                    <th className={th}>T-shirt størrelse</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedCoachTshirtRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className={td}>{row.club}</td>
-                      <td className={td}>{row.name}</td>
-                      <td className={td}>{row.tshirt || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div>
+                {coachTshirtByClubGroups.map((group) => (
+                  <section key={group.club} className="lister-print-club-page mb-8 break-inside-avoid">
+                    <h2 className="mb-2 border-b-2 border-black pb-1 text-base font-bold">{group.club}</h2>
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className={th}>Træner navn</th>
+                          <th className={th}>T-shirt størrelse</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((row) => (
+                          <tr key={row.id}>
+                            <td className={td}>{row.name}</td>
+                            <td className={td}>{row.tshirt || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                ))}
+              </div>
             )}
           </div>
         ) : null}

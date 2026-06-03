@@ -88,6 +88,17 @@ body {
     margin-bottom: 1rem;
   }
 
+  /* Lister: ny side efter hver klub (fx T-shirt liste trænere) */
+  .lister-print-club-page {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .lister-print-club-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
   body {
     background: #fff !important;
     color: #000 !important;
