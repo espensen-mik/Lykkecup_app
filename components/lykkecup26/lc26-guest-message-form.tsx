@@ -43,17 +43,24 @@ export function Lc26GuestMessageForm() {
     <section
       id="lc26-guest-book"
       className="mt-8 scroll-mt-24 border-t border-stone-200 pt-8 dark:border-gray-800"
-      aria-labelledby="lc26-guest-form-title"
+      aria-labelledby="lc26-guest-book-eyebrow lc26-guest-form-title"
     >
+      <p
+        id="lc26-guest-book-eyebrow"
+        className="text-sm font-semibold uppercase tracking-[0.12em] text-lc26-teal"
+      >
+        Gæstebog
+      </p>
       <h2
         id="lc26-guest-form-title"
-        className="flex items-center gap-2.5 text-lg font-bold tracking-tight text-lc26-navy dark:text-white sm:text-xl"
+        className="mt-2 flex items-center gap-2.5 text-lg font-bold tracking-tight text-lc26-navy dark:text-white sm:text-xl"
       >
         <Heart className="h-7 w-7 shrink-0 fill-[#df6763] text-[#df6763] sm:h-8 sm:w-8" strokeWidth={1.75} aria-hidden />
         Send en besked til LykkeLiga
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-lc26-navy/60 dark:text-gray-400">
-        Hvordan har du oplevet LykkeCup 2026? Send os en besked, hvor du fortæller om dit LykkeCup.
+        Hvordan har du oplevet LykkeCup 2026? Send os en besked, hvor du fortæller om dit LykkeCup. Vær opmærksom
+        på, at vi først læser disse beskeder efter LykkeCup.
       </p>
 
       <form onSubmit={(e) => void onSubmit(e)} className="mt-5 space-y-4">
