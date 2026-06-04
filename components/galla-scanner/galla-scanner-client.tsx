@@ -42,7 +42,6 @@ export function GallaScannerClient() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<import("@zxing/browser").BrowserMultiFormatReader | null>(null);
   const scanControlsRef = useRef<{ stop: () => void } | null>(null);
-  const deviceIdRef = useRef<string | undefined>(undefined);
   const cameraReadyRef = useRef(false);
   const processingRef = useRef(false);
   const lastScanRef = useRef<{ raw: string; at: number } | null>(null);
@@ -55,7 +54,7 @@ export function GallaScannerClient() {
     });
   }, []);
 
-  const pauseDecode = useCallback(() => {
+  const stopDecodeLoop = useCallback(() => {
     try {
       scanControlsRef.current?.stop();
     } catch {
@@ -65,28 +64,15 @@ export function GallaScannerClient() {
   }, []);
 
   const teardownCamera = useCallback(() => {
-    pauseDecode();
+    stopDecodeLoop();
     readerRef.current = null;
     cameraReadyRef.current = false;
     const stream = videoRef.current?.srcObject as MediaStream | null;
     stream?.getTracks().forEach((t) => t.stop());
     if (videoRef.current) videoRef.current.srcObject = null;
-  }, [pauseDecode]);
+  }, [stopDecodeLoop]);
 
   const handleScanRef = useRef<(raw: string) => void>(() => {});
-
-  const beginDecode = useCallback(async () => {
-    if (!videoRef.current || !readerRef.current || scanControlsRef.current) return;
-
-    const controls = await readerRef.current.decodeFromVideoDevice(
-      deviceIdRef.current,
-      videoRef.current,
-      (res) => {
-        if (res && !processingRef.current) void handleScanRef.current(res.getText());
-      },
-    );
-    scanControlsRef.current = controls;
-  }, []);
 
   const scheduleReset = useCallback(() => {
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
@@ -95,9 +81,8 @@ export function GallaScannerClient() {
       lastScanRef.current = null;
       setResult(null);
       setPhase("camera");
-      void beginDecode();
     }, GALLA_SCANNER_RESET_MS);
-  }, [beginDecode]);
+  }, []);
 
   const handleScan = useCallback(
     async (raw: string) => {
@@ -108,7 +93,6 @@ export function GallaScannerClient() {
 
       processingRef.current = true;
       lastScanRef.current = { raw, at: now };
-      pauseDecode();
       setPhase("processing");
 
       const parsed = parseGallaQrPayload(raw);
@@ -151,7 +135,7 @@ export function GallaScannerClient() {
       setPhase("result");
       scheduleReset();
     },
-    [checkedInBy, pauseDecode, scheduleReset],
+    [checkedInBy, scheduleReset],
   );
 
   handleScanRef.current = handleScan;
@@ -167,14 +151,8 @@ export function GallaScannerClient() {
       const reader = new BrowserMultiFormatReader();
       readerRef.current = reader;
 
-      const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-      deviceIdRef.current =
-        devices.find((d) => /back|rear|environment/i.test(d.label))?.deviceId ??
-        devices[devices.length - 1]?.deviceId;
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          deviceId: deviceIdRef.current ? { ideal: deviceIdRef.current } : undefined,
           facingMode: { ideal: "environment" },
           width: { ideal: 1280 },
           height: { ideal: 720 },
@@ -187,9 +165,15 @@ export function GallaScannerClient() {
       video.setAttribute("playsinline", "true");
       await video.play();
 
+      // Decode frames from our stream only — never decodeFromVideoDevice (that calls getUserMedia again).
+      const controls = await reader.decodeFromVideoElement(video, (res) => {
+        if (!res || processingRef.current) return;
+        void handleScanRef.current(res.getText());
+      });
+      scanControlsRef.current = controls;
+
       cameraReadyRef.current = true;
       setCameraStatus("ready");
-      await beginDecode();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Kamera kunne ikke startes";
       if (/denied|permission|notallowed/i.test(msg)) {
@@ -201,7 +185,7 @@ export function GallaScannerClient() {
       }
       processingRef.current = false;
     }
-  }, [beginDecode]);
+  }, []);
 
   useEffect(() => {
     if (!accessOk) return;
@@ -310,6 +294,17 @@ export function GallaScannerClient() {
             ) : null}
           </div>
         ) : null}
+      </div>
+
+      <div className="pointer-events-none flex shrink-0 justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+        {/* eslint-disable-next-line @next/next/no-img-element -- brand SVG */}
+        <img
+          src="/lykkeliga-logo.svg"
+          alt="LykkeLiga"
+          className="h-5 w-auto max-w-[6.5rem] object-contain opacity-80 brightness-0 invert"
+          loading="lazy"
+          decoding="async"
+        />
       </div>
     </div>
   );
