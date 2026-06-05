@@ -55,6 +55,20 @@ function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? "";
 }
 
+function kampprogramVenueLabel(venueName: string): string {
+  const lower = venueName.toLocaleLowerCase("da");
+  if (lower.includes("boxen")) return "BOXEN";
+  if (lower.includes("hal l")) return "Hal L";
+  return venueName;
+}
+
+function kampprogramVenueSortRank(venueName: string): number {
+  const lower = venueName.toLocaleLowerCase("da");
+  if (lower.includes("boxen")) return 0;
+  if (lower.includes("hal l")) return 1;
+  return 2;
+}
+
 function normalizeTshirtSize(value: string | null | undefined): string {
   const raw = (value ?? "").trim();
   if (!raw) return "";
@@ -317,6 +331,8 @@ export function ListerExportClient({
         .map((m) => ({
           id: m.id,
           time: formatTimeForInput(m.startTime) ?? "—",
+          venueName: m.venueName?.trim() || "Ukendt hal",
+          courtName: m.courtName?.trim() || "—",
           courtLabel: m.courtName ? formatCourtWithVenue(m.courtName, m.venueName) : "—",
           level: m.levelKey || "—",
           pool: m.poolName || "—",
@@ -326,6 +342,31 @@ export function ListerExportClient({
         .sort((a, b) => a.time.localeCompare(b.time, "da") || a.courtLabel.localeCompare(b.courtLabel, "da", { sensitivity: "base" })),
     [kampprogramMatches, kampprogramTeamDetails],
   );
+
+  const kampprogramChronologicalByVenue = useMemo(() => {
+    const groups = new Map<string, typeof kampprogramRows>();
+    for (const row of kampprogramRows) {
+      const list = groups.get(row.venueName) ?? [];
+      list.push(row);
+      groups.set(row.venueName, list);
+    }
+    return [...groups.entries()]
+      .sort((a, b) => {
+        const byVenue =
+          kampprogramVenueSortRank(a[0]) - kampprogramVenueSortRank(b[0]) ||
+          a[0].localeCompare(b[0], "da", { sensitivity: "base" });
+        return byVenue;
+      })
+      .map(([venueName, rows]) => ({
+        venueName,
+        venueTitle: kampprogramVenueLabel(venueName),
+        rows: [...rows].sort(
+          (a, b) =>
+            a.time.localeCompare(b.time, "da") ||
+            a.courtLabel.localeCompare(b.courtLabel, "da", { sensitivity: "base" }),
+        ),
+      }));
+  }, [kampprogramRows]);
 
   const kampprogramByCourt = useMemo(() => {
     const groups = new Map<string, typeof kampprogramRows>();
@@ -792,33 +833,40 @@ export function ListerExportClient({
         {printKind === "kampprogramChronological" ? (
           <div className="text-black">
             <h1 className="mb-6 text-xl font-bold">Kampprogram - kronologisk</h1>
-            {kampprogramRows.length === 0 ? (
+            {kampprogramChronologicalByVenue.length === 0 ? (
               <p className="text-sm text-neutral-600">Ingen kampe i kampprogrammet.</p>
             ) : (
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className={th}>Tid</th>
-                    <th className={th}>Bane</th>
-                    <th className={th}>Kamp</th>
-                    <th className={th}>Niveau</th>
-                    <th className={th}>Pulje</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {kampprogramRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className={td}>{row.time}</td>
-                      <td className={td}>{row.courtLabel}</td>
-                      <td className={td}>
-                        {row.teamA} vs. {row.teamB}
-                      </td>
-                      <td className={td}>{row.level}</td>
-                      <td className={td}>{row.pool}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-8">
+                {kampprogramChronologicalByVenue.map((group) => (
+                  <section key={group.venueName} className="break-inside-avoid">
+                    <h2 className="mb-2 border-b-2 border-black pb-1 text-base font-bold">{group.venueTitle}</h2>
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className={th}>Tid</th>
+                          <th className={th}>Bane</th>
+                          <th className={th}>Kamp</th>
+                          <th className={th}>Niveau</th>
+                          <th className={th}>Pulje</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((row) => (
+                          <tr key={row.id}>
+                            <td className={td}>{row.time}</td>
+                            <td className={td}>{row.courtName}</td>
+                            <td className={td}>
+                              {row.teamA} vs. {row.teamB}
+                            </td>
+                            <td className={td}>{row.level}</td>
+                            <td className={td}>{row.pool}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                ))}
+              </div>
             )}
           </div>
         ) : null}
