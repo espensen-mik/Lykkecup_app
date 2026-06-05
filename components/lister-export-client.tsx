@@ -838,7 +838,7 @@ export function ListerExportClient({
             ) : (
               <div className="space-y-8">
                 {kampprogramChronologicalByVenue.map((group) => (
-                  <section key={group.venueName} className="break-inside-avoid">
+                  <section key={group.venueName} className="lister-print-club-page mb-8 break-inside-avoid">
                     <h2 className="mb-2 border-b-2 border-black pb-1 text-base font-bold">{group.venueTitle}</h2>
                     <table className="w-full border-collapse">
                       <thead>
