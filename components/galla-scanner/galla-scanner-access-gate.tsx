@@ -38,7 +38,7 @@ export function GallaScannerAccessGate({ onUnlocked }: Props) {
       <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal-300">LykkeCup Galla</p>
       <h1 className="mt-3 text-center text-xl font-semibold">Scanner — adgangskode</h1>
       <p className="mt-2 max-w-sm text-center text-sm text-neutral-400">
-        Log ind i KontrolCenter og indtast adgangskoden for at åbne check-in.
+        Indtast adgangskoden for at åbne check-in.
       </p>
       <form onSubmit={submit} className="mt-8 w-full max-w-xs space-y-3">
         <input

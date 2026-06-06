@@ -18,7 +18,6 @@ import {
   invalidReasonLabel,
   type GallaCheckInResult,
 } from "@/lib/galla-scanner";
-import { supabase } from "@/lib/supabase";
 
 type ScanPhase = "camera" | "processing" | "result";
 
@@ -46,13 +45,6 @@ export function GallaScannerClient() {
   const processingRef = useRef(false);
   const lastScanRef = useRef<{ raw: string; at: number } | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    void supabase.auth.getUser().then(({ data }) => {
-      const email = data.user?.email?.trim();
-      if (email) setCheckedInBy(email);
-    });
-  }, []);
 
   const stopDecodeLoop = useCallback(() => {
     try {

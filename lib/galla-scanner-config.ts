@@ -1,7 +1,7 @@
 /** WordPress Event Tickets event_id for LykkeCup Galla. */
 export const GALLA_EVENT_ID = 16899;
 
-/** Session key efter korrekt adgangskode (kun UI-gate; Supabase kræver stadig login). */
+/** Session key efter korrekt adgangskode (valgfri UI-gate; login kræves ikke). */
 export const GALLA_SCANNER_ACCESS_SESSION_KEY = "galla-scanner-access-v1";
 
 /** Sekunder før næste scan efter resultatskærm. */

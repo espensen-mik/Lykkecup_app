@@ -8,6 +8,7 @@ const PUBLIC_PATHS = new Set([
   "/glemt-kode",
   "/nulstil-kode",
   "/status",
+  "/hemmeliglykkescanner",
   "/lykkecup26.webmanifest",
   "/lykkecup26-sw.js",
   "/lykkecup26-sw-v3.js",

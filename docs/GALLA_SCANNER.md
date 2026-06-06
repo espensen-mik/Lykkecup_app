@@ -5,9 +5,10 @@ Skjult check-in-side: **`/hemmeliglykkescanner`**
 ## Forudsætninger
 
 1. Kør migration: `supabase/migrations/20260602120000_galla_tickets.sql`
-2. Importér CSV til `galla_tickets` (se nedenfor)
-3. Staff skal være **logget ind** i KontrolCenter (Supabase `authenticated`)
-4. Valgfrit: sæt `NEXT_PUBLIC_GALLA_SCANNER_ACCESS_CODE` i Vercel/.env.local for ekstra adgangskode-gate
+2. Kør migration: `supabase/migrations/20260603120000_galla_scanner_anon_check_in.sql` (anon check-in)
+3. Importér CSV til `galla_tickets` (se nedenfor)
+4. Del kun **`/hemmeliglykkescanner`** (og evt. adgangskode) med entrance-staff — **login er ikke påkrævet**
+5. Valgfrit: sæt `NEXT_PUBLIC_GALLA_SCANNER_ACCESS_CODE` i Vercel/.env.local for ekstra adgangskode-gate
 
 ## CSV-import i Supabase
 
@@ -79,15 +80,14 @@ URL fra WordPress/Event Tickets, fx:
 npm run dev
 ```
 
-1. Log ind på `/login`
-2. Åbn `/hemmeliglykkescanner` på mobil (eller Chrome device mode)
-3. Tillad kamera
-4. Scan en test-QR fra CSV-export
+1. Åbn `/hemmeliglykkescanner` på mobil (eller Chrome device mode) — **uden login**
+2. Tillad kamera
+3. Scan en test-QR fra CSV-export
 
 ## Deploy
 
 1. `git push` → Vercel deploy
-2. Kør migration på produktion-Supabase (CLI eller SQL Editor)
+2. Kør migrationer på produktion-Supabase (CLI eller SQL Editor), inkl. anon check-in
 3. Importér produktions-CSV
 4. Sæt evt. `NEXT_PUBLIC_GALLA_SCANNER_ACCESS_CODE` i Vercel env
 5. Del kun URL + adgangskode med entrance-staff
@@ -95,5 +95,6 @@ npm run dev
 ## Sikkerhed
 
 - Ingen service role i browser
-- Check-in kun via RPC `galla_check_in_ticket` (SECURITY DEFINER, kun `authenticated`)
-- Rute kræver login via eksisterende `proxy.ts`
+- Check-in kun via RPC `galla_check_in_ticket` (SECURITY DEFINER; `anon` + `authenticated`)
+- Ruten er offentlig i `proxy.ts`; adgang styres via hemmelig URL og evt. `NEXT_PUBLIC_GALLA_SCANNER_ACCESS_CODE`
+- QR skal indeholde gyldigt `ticket_id` + `security_code` + `event_id=16899`
