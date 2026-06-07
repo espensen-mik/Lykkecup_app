@@ -4,17 +4,13 @@ import { redirect } from "next/navigation";
 import {
   ScanalyticsCheckInPie,
   ScanalyticsDeviceBars,
-  ScanalyticsHourlyLine,
+  ScanalyticsDeviceOverview,
+  ScanalyticsMinuteLine,
   ScanalyticsStatCard,
 } from "@/components/galla-scanner/scanalytics-charts";
 import { createServerSupabase, getCurrentAuthAppUser } from "@/lib/auth-server";
+import { fetchGallaScanalytics, pickDefaultScanDay } from "@/lib/galla-scanalytics-server";
 import {
-  fetchGallaScanalytics,
-  formatScanPeakLabel,
-  pickDefaultScanDay,
-} from "@/lib/galla-scanalytics-server";
-import {
-  addCalendarDaysIso,
   formatAnalyticsDayTitle,
   parseAnalyticsDayParam,
   todayIsoInCopenhagen,
@@ -55,7 +51,6 @@ export default async function ScanalyticsPage({ searchParams }: PageProps) {
   const dayIndex = scanDays.findIndex((d) => d.day === selectedDay);
   const prevDay = dayIndex >= 0 && dayIndex < scanDays.length - 1 ? scanDays[dayIndex + 1]?.day : null;
   const nextDay = dayIndex > 0 ? scanDays[dayIndex - 1]?.day : null;
-  const peakLabel = payload?.peakHour ? formatScanPeakLabel(payload.peakHour.hour) : null;
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -109,7 +104,7 @@ export default async function ScanalyticsPage({ searchParams }: PageProps) {
         </div>
       ) : payload ? (
         <>
-          <dl className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <dl className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <ScanalyticsStatCard label="Scannet ind" value={payload.summary.checkedIn} />
             <ScanalyticsStatCard label="Mangler check-in" value={payload.summary.remaining} />
             <ScanalyticsStatCard
@@ -118,19 +113,36 @@ export default async function ScanalyticsPage({ searchParams }: PageProps) {
               hint={`${payload.summary.checkedIn} af ${payload.summary.total} billetter`}
             />
             <ScanalyticsStatCard
-              label="Valgt dag"
+              label="Scanner-enheder"
+              value={payload.summary.deviceCount}
+              hint={
+                payload.byDevice.length === 0
+                  ? "Ingen enheder endnu"
+                  : payload.byDevice.map((d) => d.device).join(", ")
+              }
+            />
+            <ScanalyticsStatCard
+              label="Scans valgt dag"
               value={payload.summary.checkedIn > 0 ? (scanDays.find((d) => d.day === selectedDay)?.count ?? 0) : 0}
               hint={dayTitle}
               accent
             />
           </dl>
 
+          <section className="mt-8">
+            <ScanalyticsDeviceOverview
+              deviceCount={payload.summary.deviceCount}
+              deviceCountForDay={payload.deviceCountForDay}
+              devices={payload.byDevice}
+              devicesForDay={payload.devicesForDay}
+            />
+          </section>
+
           <section className="mt-10">
-            <ScanalyticsHourlyLine
-              points={payload.hourlyForDay}
+            <ScanalyticsMinuteLine
+              points={payload.minuteForDay}
               dayTitle={dayTitle}
-              peakHour={payload.peakHour?.hour ?? null}
-              peakLabel={peakLabel}
+              peakMinute={payload.peakMinute}
             />
           </section>
 

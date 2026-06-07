@@ -6,8 +6,8 @@ import type { DefaultSeries, PointTooltipProps } from "@nivo/line";
 import { ResponsivePie } from "@nivo/pie";
 import { ChartPlotWell } from "@/components/dashboard/analytics-chart-card";
 import { SlimHorizontalBarChart } from "@/components/dashboard/slim-horizontal-bars";
-import type { GallaDeviceScanCount } from "@/lib/galla-scanalytics-server";
-import { normalizeHourlyPoints, type HourlyViewPoint } from "@/lib/lc-analytics-display";
+import type { GallaDeviceScanCount, MinuteViewPoint, ScanPeakMinute } from "@/lib/galla-scanalytics-server";
+import { pickMinuteAxisTicks } from "@/lib/galla-scanalytics-server";
 
 const ACCENT = "#14b8a6";
 const ACCENT_LEAD = "#0d9488";
@@ -42,10 +42,10 @@ const lineTheme = {
 
 type PieDatum = { id: string; label: string; value: number; color: string };
 
-function ScanHourTooltip({ point }: PointTooltipProps<DefaultSeries>) {
+function ScanMinuteTooltip({ point }: PointTooltipProps<DefaultSeries>) {
   return (
     <div className="px-2 py-1.5">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Time</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Minut</div>
       <div className="mt-0.5 tabular-nums text-sm font-semibold text-white">{String(point.data.xFormatted)}</div>
       <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Scannet</div>
       <div className="tabular-nums text-sm font-semibold text-teal-300">{point.data.yFormatted}</div>
@@ -138,6 +138,76 @@ export function ScanalyticsCheckInPie({ checkedIn, remaining }: { checkedIn: num
   );
 }
 
+export function ScanalyticsDeviceOverview({
+  deviceCount,
+  deviceCountForDay,
+  devices,
+  devicesForDay,
+}: {
+  deviceCount: number;
+  deviceCountForDay: number;
+  devices: GallaDeviceScanCount[];
+  devicesForDay: GallaDeviceScanCount[];
+}) {
+  const deviceNames = devices.map((d) => d.device).join(", ");
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-lc-border bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <div className="border-b border-gray-100 px-5 pb-4 pt-5 dark:border-gray-700 sm:px-6 sm:pt-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">Registrerede scanner-enheder</h3>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Unikke enheder fundet via <code className="text-[11px]">checked_in_by</code>
+        </p>
+      </div>
+      <div className="grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6">
+        <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-4 dark:border-gray-700 dark:bg-gray-800/50">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">I alt</p>
+          <p className="mt-2 text-4xl font-semibold tabular-nums text-gray-900 dark:text-gray-50">{deviceCount}</p>
+          <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+            {deviceCount === 0
+              ? "Ingen enheder registreret endnu"
+              : deviceCount === 1
+                ? "1 unik scanner-enhed"
+                : `${deviceCount} unikke scanner-enheder`}
+          </p>
+        </div>
+        <div className="rounded-xl border border-teal-100 bg-teal-50/60 px-4 py-4 dark:border-teal-900/40 dark:bg-teal-950/30">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#0f766e] dark:text-teal-300">Valgt dag</p>
+          <p className="mt-2 text-4xl font-semibold tabular-nums text-gray-900 dark:text-gray-50">
+            {deviceCountForDay}
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+            {deviceCountForDay === 0
+              ? "Ingen enheder aktiv denne dag"
+              : devicesForDay.map((d) => d.device).join(", ")}
+          </p>
+        </div>
+      </div>
+      {devices.length > 0 ? (
+        <div className="border-t border-gray-100 px-5 py-4 dark:border-gray-700 sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Alle enheder
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {devices.map((d) => (
+              <li
+                key={d.device}
+                className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-sm dark:bg-gray-800"
+              >
+                <span className="font-medium text-gray-900 dark:text-gray-100">{d.device}</span>
+                <span className="tabular-nums text-gray-500 dark:text-gray-400">{d.count}</span>
+              </li>
+            ))}
+          </ul>
+          {deviceNames ? (
+            <p className="sr-only">Registrerede enheder: {deviceNames}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ScanalyticsDeviceBars({ rows }: { rows: GallaDeviceScanCount[] }) {
   const barRows = rows.map((r, i) => ({
     key: r.device,
@@ -173,91 +243,103 @@ export function ScanalyticsDeviceBars({ rows }: { rows: GallaDeviceScanCount[] }
   );
 }
 
-export function ScanalyticsHourlyLine({
+export function ScanalyticsMinuteLine({
   points,
   dayTitle,
-  peakHour,
-  peakLabel,
+  peakMinute,
 }: {
-  points: HourlyViewPoint[];
+  points: MinuteViewPoint[];
   dayTitle: string;
-  peakHour: number | null;
-  peakLabel: string | null;
+  peakMinute: ScanPeakMinute | null;
 }) {
-  const series = normalizeHourlyPoints(points);
+  const tickValues = pickMinuteAxisTicks(points);
   const data = [
     {
       id: "Scannet",
-      data: series.map((p) => ({
-        x: `${String(p.hour).padStart(2, "0")}:00`,
-        y: p.views,
+      data: points.map((p) => ({
+        x: p.label,
+        y: p.count,
       })),
     },
   ];
 
-  const maxViews = Math.max(1, ...series.map((p) => p.views));
+  const maxCount = Math.max(1, ...points.map((p) => p.count));
+  const chartMinWidth = Math.max(640, points.length * 6);
+
+  if (points.length === 0) {
+    return (
+      <div className="overflow-hidden rounded-2xl border border-slate-700/90 bg-slate-900 px-5 py-10 text-center text-sm text-slate-400">
+        Ingen scans registreret for {dayTitle}
+      </div>
+    );
+  }
 
   return (
     <div
       className="overflow-hidden rounded-2xl border border-slate-700/90 bg-slate-900 shadow-[0_12px_40px_-12px_rgb(0_0_0/0.45)]"
       role="img"
-      aria-label={`Scans per time for ${dayTitle}`}
+      aria-label={`Scans per minut for ${dayTitle}`}
     >
       <div className="border-b border-slate-700/80 px-5 py-4 sm:px-6 sm:py-5">
         <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-teal-300/90">Tidsforløb</p>
-        <h2 className="mt-1 text-lg font-semibold tracking-tight text-white sm:text-xl">Scans per time</h2>
-        <p className="mt-1 text-sm text-slate-400">{dayTitle} · Europe/Copenhagen</p>
-        {peakLabel && peakHour != null ? (
+        <h2 className="mt-1 text-lg font-semibold tracking-tight text-white sm:text-xl">Scans per minut</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          {dayTitle} · Europe/Copenhagen · {points.length} minutter med aktivitet
+        </p>
+        {peakMinute ? (
           <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-teal-500/15 px-3 py-1.5 text-sm text-teal-200 ring-1 ring-teal-400/25">
             <span className="font-semibold">Peak:</span>
             <span>
-              {peakLabel} ({series[peakHour]?.views ?? 0} billetter)
+              kl. {peakMinute.label} ({peakMinute.count} billet{peakMinute.count === 1 ? "" : "ter"})
             </span>
           </p>
         ) : null}
       </div>
-      <div className="h-[min(22rem,55vw)] w-full min-h-[260px] px-2 pb-4 pt-2 sm:min-h-[300px] sm:px-3 sm:pb-5">
-        <ResponsiveLine
-          data={data}
-          theme={lineTheme}
-          margin={{ top: 16, right: 28, bottom: 52, left: 52 }}
-          xScale={{ type: "point" }}
-          yScale={{ type: "linear", min: 0, max: maxViews, stacked: false }}
-          curve="monotoneX"
-          axisTop={null}
-          axisRight={null}
-          axisBottom={{
-            tickSize: 0,
-            tickPadding: 10,
-            tickRotation: -35,
-            legend: "Time",
-            legendOffset: 44,
-            legendPosition: "middle",
-          }}
-          axisLeft={{
-            tickSize: 0,
-            tickPadding: 10,
-            tickValues: 5,
-            legend: "Antal scans",
-            legendOffset: -44,
-            legendPosition: "middle",
-          }}
-          colors={[ACCENT]}
-          lineWidth={3}
-          pointSize={10}
-          pointColor={ACCENT}
-          pointBorderWidth={2}
-          pointBorderColor="#ffffff"
-          enableGridX={false}
-          enableGridY
-          enableSlices={false}
-          enableArea
-          areaOpacity={0.12}
-          areaBaselineValue={0}
-          useMesh
-          motionConfig="gentle"
-          tooltip={ScanHourTooltip}
-        />
+      <div className="overflow-x-auto px-2 pb-4 pt-2 sm:px-3 sm:pb-5">
+        <div className="h-[min(22rem,55vw)] min-h-[260px] sm:min-h-[300px]" style={{ minWidth: chartMinWidth }}>
+          <ResponsiveLine
+            data={data}
+            theme={lineTheme}
+            margin={{ top: 16, right: 28, bottom: 52, left: 52 }}
+            xScale={{ type: "point" }}
+            yScale={{ type: "linear", min: 0, max: maxCount, stacked: false }}
+            curve="monotoneX"
+            axisTop={null}
+            axisRight={null}
+            axisBottom={{
+              tickSize: 0,
+              tickPadding: 10,
+              tickRotation: -45,
+              tickValues,
+              legend: "Tidspunkt",
+              legendOffset: 44,
+              legendPosition: "middle",
+            }}
+            axisLeft={{
+              tickSize: 0,
+              tickPadding: 10,
+              tickValues: 5,
+              legend: "Antal scans",
+              legendOffset: -44,
+              legendPosition: "middle",
+            }}
+            colors={[ACCENT]}
+            lineWidth={2}
+            pointSize={points.length > 120 ? 0 : 6}
+            pointColor={ACCENT}
+            pointBorderWidth={2}
+            pointBorderColor="#ffffff"
+            enableGridX={false}
+            enableGridY
+            enableSlices="x"
+            enableArea
+            areaOpacity={0.12}
+            areaBaselineValue={0}
+            useMesh
+            motionConfig="gentle"
+            tooltip={ScanMinuteTooltip}
+          />
+        </div>
       </div>
     </div>
   );

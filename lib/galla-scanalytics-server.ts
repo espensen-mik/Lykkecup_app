@@ -1,11 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { HourlyViewPoint } from "@/lib/lc-analytics-display";
 
 export type GallaScanalyticsSummary = {
   total: number;
   checkedIn: number;
   remaining: number;
   checkedInPct: number;
+  deviceCount: number;
+};
+
+export type MinuteViewPoint = {
+  minuteOfDay: number;
+  label: string;
+  count: number;
+};
+
+export type ScanPeakMinute = {
+  minuteOfDay: number;
+  label: string;
+  count: number;
 };
 
 export type GallaDeviceScanCount = {
@@ -21,8 +33,10 @@ export type GallaScanDayOption = {
 export type GallaScanalyticsPayload = {
   summary: GallaScanalyticsSummary;
   byDevice: GallaDeviceScanCount[];
-  hourlyForDay: HourlyViewPoint[];
-  peakHour: { hour: number; count: number } | null;
+  devicesForDay: GallaDeviceScanCount[];
+  deviceCountForDay: number;
+  minuteForDay: MinuteViewPoint[];
+  peakMinute: ScanPeakMinute | null;
   scanDays: GallaScanDayOption[];
   selectedDay: string;
 };
@@ -43,13 +57,22 @@ function cphDayIso(iso: string): string {
   }).format(new Date(iso));
 }
 
-function cphHour(iso: string): number {
-  const h = new Intl.DateTimeFormat("en-GB", {
+function cphMinuteOfDay(iso: string): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: CPH,
     hour: "numeric",
+    minute: "numeric",
     hour12: false,
-  }).format(new Date(iso));
-  return Number.parseInt(h, 10);
+  }).formatToParts(new Date(iso));
+  const hour = Number.parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const minute = Number.parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  return hour * 60 + minute;
+}
+
+export function formatMinuteOfDay(minuteOfDay: number): string {
+  const hour = Math.floor(minuteOfDay / 60);
+  const minute = minuteOfDay % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 async function fetchAllCheckedInRows(supabase: SupabaseClient): Promise<CheckedInRow[]> {
@@ -99,29 +122,60 @@ function aggregateScanDays(rows: CheckedInRow[]): GallaScanDayOption[] {
     .sort((a, b) => b.day.localeCompare(a.day));
 }
 
-function aggregateHourlyForDay(rows: CheckedInRow[], day: string): HourlyViewPoint[] {
-  const byHour = new Map<number, number>();
-  for (const row of rows) {
-    if (!row.checked_in_at) continue;
-    if (cphDayIso(row.checked_in_at) !== day) continue;
-    const hour = cphHour(row.checked_in_at);
-    if (!Number.isFinite(hour) || hour < 0 || hour > 23) continue;
-    byHour.set(hour, (byHour.get(hour) ?? 0) + 1);
-  }
-  return Array.from({ length: 24 }, (_, hour) => ({
-    hour,
-    views: byHour.get(hour) ?? 0,
-  }));
+function rowsForDay(rows: CheckedInRow[], day: string): CheckedInRow[] {
+  return rows.filter((row) => row.checked_in_at && cphDayIso(row.checked_in_at) === day);
 }
 
-function findPeakHour(hourly: HourlyViewPoint[]): { hour: number; count: number } | null {
-  let peak: { hour: number; count: number } | null = null;
-  for (const point of hourly) {
-    if (!peak || point.views > peak.count) {
-      peak = { hour: point.hour, count: point.views };
+function aggregateMinutelyForDay(rows: CheckedInRow[], day: string): MinuteViewPoint[] {
+  const byMinute = new Map<number, number>();
+  for (const row of rowsForDay(rows, day)) {
+    if (!row.checked_in_at) continue;
+    const minuteOfDay = cphMinuteOfDay(row.checked_in_at);
+    if (!Number.isFinite(minuteOfDay) || minuteOfDay < 0 || minuteOfDay > 1439) continue;
+    byMinute.set(minuteOfDay, (byMinute.get(minuteOfDay) ?? 0) + 1);
+  }
+
+  if (byMinute.size === 0) return [];
+
+  const sortedMinutes = [...byMinute.keys()].sort((a, b) => a - b);
+  const start = sortedMinutes[0]!;
+  const end = sortedMinutes[sortedMinutes.length - 1]!;
+  const points: MinuteViewPoint[] = [];
+
+  for (let minuteOfDay = start; minuteOfDay <= end; minuteOfDay += 1) {
+    points.push({
+      minuteOfDay,
+      label: formatMinuteOfDay(minuteOfDay),
+      count: byMinute.get(minuteOfDay) ?? 0,
+    });
+  }
+
+  return points;
+}
+
+function findPeakMinute(points: MinuteViewPoint[]): ScanPeakMinute | null {
+  let peak: ScanPeakMinute | null = null;
+  for (const point of points) {
+    if (!peak || point.count > peak.count) {
+      peak = { minuteOfDay: point.minuteOfDay, label: point.label, count: point.count };
     }
   }
   return peak && peak.count > 0 ? peak : null;
+}
+
+export function pickMinuteAxisTicks(points: MinuteViewPoint[]): string[] {
+  if (points.length === 0) return [];
+  const start = points[0]!.minuteOfDay;
+  const end = points[points.length - 1]!.minuteOfDay;
+  const span = end - start + 1;
+  const step = span <= 30 ? 5 : span <= 90 ? 10 : span <= 240 ? 15 : span <= 480 ? 30 : 60;
+  const ticks: string[] = [];
+  for (let minuteOfDay = start; minuteOfDay <= end; minuteOfDay += step) {
+    ticks.push(formatMinuteOfDay(minuteOfDay));
+  }
+  const lastLabel = formatMinuteOfDay(end);
+  if (ticks[ticks.length - 1] !== lastLabel) ticks.push(lastLabel);
+  return ticks;
 }
 
 export function pickDefaultScanDay(scanDays: GallaScanDayOption[], todayCph: string): string {
@@ -149,21 +203,25 @@ export async function fetchGallaScanalytics(
 
   const scanDays = aggregateScanDays(checkedInRows);
   const day = scanDays.some((d) => d.day === selectedDay) ? selectedDay : pickDefaultScanDay(scanDays, selectedDay);
-  const hourlyForDay = aggregateHourlyForDay(checkedInRows, day);
-  const peakHour = findPeakHour(hourlyForDay);
+  const byDevice = aggregateByDevice(checkedInRows);
+  const devicesForDay = aggregateByDevice(rowsForDay(checkedInRows, day));
+  const minuteForDay = aggregateMinutelyForDay(checkedInRows, day);
+  const peakMinute = findPeakMinute(minuteForDay);
 
   return {
-    summary: { total, checkedIn, remaining, checkedInPct },
-    byDevice: aggregateByDevice(checkedInRows),
-    hourlyForDay,
-    peakHour,
+    summary: {
+      total,
+      checkedIn,
+      remaining,
+      checkedInPct,
+      deviceCount: byDevice.length,
+    },
+    byDevice,
+    devicesForDay,
+    deviceCountForDay: devicesForDay.length,
+    minuteForDay,
+    peakMinute,
     scanDays,
     selectedDay: day,
   };
-}
-
-export function formatScanPeakLabel(hour: number): string {
-  const start = `${String(hour).padStart(2, "0")}:00`;
-  const end = `${String((hour + 1) % 24).padStart(2, "0")}:00`;
-  return `${start}–${end}`;
 }
