@@ -113,12 +113,14 @@ export default async function ScanalyticsPage({ searchParams }: PageProps) {
               hint={`${payload.summary.checkedIn} af ${payload.summary.total} billetter`}
             />
             <ScanalyticsStatCard
-              label="Scanner-enheder"
-              value={payload.summary.deviceCount}
+              label="Forskellige browsere"
+              value={payload.summary.identifiedBrowserCount}
               hint={
-                payload.byDevice.length === 0
-                  ? "Ingen enheder endnu"
-                  : payload.byDevice.map((d) => d.device).join(", ")
+                payload.summary.legacyScanCount > 0
+                  ? `${payload.summary.legacyScanCount} ældre scans uden browser-id`
+                  : payload.summary.identifiedBrowserCount === 0
+                    ? "Ingen auto-ID endnu"
+                    : `${payload.summary.identifiedBrowserCount} unikke browsere`
               }
             />
             <ScanalyticsStatCard
@@ -131,10 +133,11 @@ export default async function ScanalyticsPage({ searchParams }: PageProps) {
 
           <section className="mt-8">
             <ScanalyticsDeviceOverview
-              deviceCount={payload.summary.deviceCount}
-              deviceCountForDay={payload.deviceCountForDay}
-              devices={payload.byDevice}
-              devicesForDay={payload.devicesForDay}
+              identifiedBrowserCount={payload.summary.identifiedBrowserCount}
+              identifiedBrowserCountForDay={payload.identifiedBrowserCountForDay}
+              legacyScanCount={payload.summary.legacyScanCount}
+              legacyScanCountForDay={payload.legacyScanCountForDay}
+              identifiedBrowsers={payload.identifiedBrowsers}
             />
           </section>
 
@@ -148,27 +151,42 @@ export default async function ScanalyticsPage({ searchParams }: PageProps) {
 
           <div className="mt-8 grid gap-6 lg:grid-cols-2 lg:gap-8">
             <ScanalyticsCheckInPie checkedIn={payload.summary.checkedIn} remaining={payload.summary.remaining} />
-            <ScanalyticsDeviceBars rows={payload.byDevice} />
+            <ScanalyticsDeviceBars rows={payload.identifiedBrowsers} />
           </div>
 
-          {payload.byDevice.length > 0 ? (
+          {payload.summary.legacyScanCount > 0 ? (
+            <section className="mt-8 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+              <p className="font-semibold">Ældre scans uden browser-id</p>
+              <p className="mt-1 leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+                {payload.summary.legacyScanCount} check-ins blev gemt som &quot;scanner&quot; før auto-identifikation.
+                Antallet af telefoner/browsere bag disse kan desværre ikke findes bagefter — kun nye scans tælles
+                korrekt.
+              </p>
+            </section>
+          ) : null}
+
+          {payload.identifiedBrowsers.length > 0 ? (
             <section className="mt-12">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Enheder (detaljer)</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Browsere (detaljer)</h2>
               <div className="mt-4 overflow-hidden rounded-xl border border-lc-border bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <table className="w-full min-w-0 text-left text-sm">
                   <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-400">
                     <tr>
-                      <th className="px-4 py-3">Enhed</th>
+                      <th className="px-4 py-3">Browser</th>
+                      <th className="hidden px-4 py-3 sm:table-cell">IP</th>
                       <th className="px-4 py-3 text-right">Scans</th>
-                      <th className="hidden px-4 py-3 text-right sm:table-cell">Andel</th>
+                      <th className="hidden px-4 py-3 text-right md:table-cell">Andel</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {payload.byDevice.map((row) => (
-                      <tr key={row.device} className="text-gray-800 dark:text-gray-200">
+                    {payload.identifiedBrowsers.map((row) => (
+                      <tr key={row.shortId ?? row.device} className="text-gray-800 dark:text-gray-200">
                         <td className="px-4 py-2.5 font-medium">{row.device}</td>
+                        <td className="hidden px-4 py-2.5 font-mono text-xs text-gray-500 sm:table-cell dark:text-gray-400">
+                          {row.ip ?? "—"}
+                        </td>
                         <td className="px-4 py-2.5 text-right tabular-nums">{row.count}</td>
-                        <td className="hidden px-4 py-2.5 text-right tabular-nums text-gray-500 sm:table-cell dark:text-gray-400">
+                        <td className="hidden px-4 py-2.5 text-right tabular-nums text-gray-500 md:table-cell dark:text-gray-400">
                           {payload.summary.checkedIn > 0
                             ? `${Math.round((row.count / payload.summary.checkedIn) * 100)}%`
                             : "—"}

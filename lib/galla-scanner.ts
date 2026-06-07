@@ -1,4 +1,4 @@
-import { GALLA_EVENT_ID } from "@/lib/galla-scanner-config";
+import { getOrCreateBrowserDeviceId } from "@/lib/galla-scanner-device";
 import { supabase } from "@/lib/supabase";
 
 export type GallaCheckInStatus = "approved" | "already_checked_in" | "invalid";
@@ -61,38 +61,32 @@ export async function fetchGallaTicketStats(): Promise<GallaTicketStats> {
 export async function gallaCheckInTicket(params: {
   attendeeId: number;
   securityCode: string;
-  checkedInBy: string;
+  checkedInBy?: string;
+  browserDeviceId?: string;
 }): Promise<GallaCheckInResult> {
-  const { data, error } = await supabase.rpc("galla_check_in_ticket", {
-    p_attendee_id: params.attendeeId,
-    p_security_code: params.securityCode,
-    p_event_id: GALLA_EVENT_ID,
-    p_checked_in_by: params.checkedInBy,
-  });
+  const browserDeviceId = params.browserDeviceId ?? getOrCreateBrowserDeviceId();
 
-  if (error) {
-    return {
-      status: "invalid",
-      message: "Ugyldig billet",
-      reason: "rpc_error",
-    };
-  }
+  try {
+    const res = await fetch("/api/galla-check-in", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        attendeeId: params.attendeeId,
+        securityCode: params.securityCode,
+        browserDeviceId,
+        customName: params.checkedInBy,
+      }),
+      cache: "no-store",
+    });
 
-  const row = (data ?? {}) as Record<string, unknown>;
-  const status = row.status as GallaCheckInStatus;
-  if (status !== "approved" && status !== "already_checked_in" && status !== "invalid") {
+    const row = (await res.json()) as GallaCheckInResult;
+    if (row.status === "approved" || row.status === "already_checked_in" || row.status === "invalid") {
+      return row;
+    }
     return { status: "invalid", message: "Ugyldig billet", reason: "unknown" };
+  } catch {
+    return { status: "invalid", message: "Ugyldig billet", reason: "rpc_error" };
   }
-
-  return {
-    status,
-    message: typeof row.message === "string" ? row.message : "Ugyldig billet",
-    reason: typeof row.reason === "string" ? row.reason : undefined,
-    attendee_id: typeof row.attendee_id === "number" ? row.attendee_id : undefined,
-    name: typeof row.name === "string" ? row.name : null,
-    ticket_type: typeof row.ticket_type === "string" ? row.ticket_type : null,
-    checked_in_at: typeof row.checked_in_at === "string" ? row.checked_in_at : null,
-  };
 }
 
 export async function searchGallaTickets(query: string): Promise<GallaTicketRow[]> {

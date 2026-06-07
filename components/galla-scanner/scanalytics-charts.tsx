@@ -139,59 +139,72 @@ export function ScanalyticsCheckInPie({ checkedIn, remaining }: { checkedIn: num
 }
 
 export function ScanalyticsDeviceOverview({
-  deviceCount,
-  deviceCountForDay,
-  devices,
-  devicesForDay,
+  identifiedBrowserCount,
+  identifiedBrowserCountForDay,
+  legacyScanCount,
+  legacyScanCountForDay,
+  identifiedBrowsers,
 }: {
-  deviceCount: number;
-  deviceCountForDay: number;
-  devices: GallaDeviceScanCount[];
-  devicesForDay: GallaDeviceScanCount[];
+  identifiedBrowserCount: number;
+  identifiedBrowserCountForDay: number;
+  legacyScanCount: number;
+  legacyScanCountForDay: number;
+  identifiedBrowsers: GallaDeviceScanCount[];
 }) {
-  const deviceNames = devices.map((d) => d.device).join(", ");
-
   return (
     <div className="overflow-hidden rounded-xl border border-lc-border bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
       <div className="border-b border-gray-100 px-5 pb-4 pt-5 dark:border-gray-700 sm:px-6 sm:pt-6">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">Registrerede scanner-enheder</h3>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">Forskellige browsere</h3>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Unikke enheder fundet via <code className="text-[11px]">checked_in_by</code>
+          Tæller unikke browser-id&apos;er (IP + browser-id). Ældre scans uden dette kan ikke opdeles.
         </p>
       </div>
       <div className="grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6">
         <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-4 dark:border-gray-700 dark:bg-gray-800/50">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">I alt</p>
-          <p className="mt-2 text-4xl font-semibold tabular-nums text-gray-900 dark:text-gray-50">{deviceCount}</p>
-          <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-            {deviceCount === 0
-              ? "Ingen enheder registreret endnu"
-              : deviceCount === 1
-                ? "1 unik scanner-enhed"
-                : `${deviceCount} unikke scanner-enheder`}
+          <p className="mt-2 text-4xl font-semibold tabular-nums text-gray-900 dark:text-gray-50">
+            {identifiedBrowserCount}
           </p>
+          <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+            {identifiedBrowserCount === 0
+              ? "Ingen browsere med auto-ID endnu"
+              : identifiedBrowserCount === 1
+                ? "1 unik browser registreret"
+                : `${identifiedBrowserCount} forskellige browsere registreret`}
+          </p>
+          {legacyScanCount > 0 ? (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+              {legacyScanCount} ældre scan{legacyScanCount === 1 ? "" : "s"} uden browser-id — antal telefoner
+              ukendt for disse
+            </p>
+          ) : null}
         </div>
         <div className="rounded-xl border border-teal-100 bg-teal-50/60 px-4 py-4 dark:border-teal-900/40 dark:bg-teal-950/30">
           <p className="text-xs font-semibold uppercase tracking-wide text-[#0f766e] dark:text-teal-300">Valgt dag</p>
           <p className="mt-2 text-4xl font-semibold tabular-nums text-gray-900 dark:text-gray-50">
-            {deviceCountForDay}
+            {identifiedBrowserCountForDay}
           </p>
           <p className="mt-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-            {deviceCountForDay === 0
-              ? "Ingen enheder aktiv denne dag"
-              : devicesForDay.map((d) => d.device).join(", ")}
+            {identifiedBrowserCountForDay === 0
+              ? "Ingen browsere med auto-ID denne dag"
+              : `${identifiedBrowserCountForDay} browser${identifiedBrowserCountForDay === 1 ? "" : "e"} denne dag`}
           </p>
+          {legacyScanCountForDay > 0 ? (
+            <p className="mt-3 rounded-lg bg-amber-50/80 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              {legacyScanCountForDay} scan{legacyScanCountForDay === 1 ? "" : "s"} uden browser-id denne dag
+            </p>
+          ) : null}
         </div>
       </div>
-      {devices.length > 0 ? (
+      {identifiedBrowsers.length > 0 ? (
         <div className="border-t border-gray-100 px-5 py-4 dark:border-gray-700 sm:px-6">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            Alle enheder
+            Identificerede browsere
           </p>
           <ul className="mt-3 flex flex-wrap gap-2">
-            {devices.map((d) => (
+            {identifiedBrowsers.map((d) => (
               <li
-                key={d.device}
+                key={d.shortId ?? d.device}
                 className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-sm dark:bg-gray-800"
               >
                 <span className="font-medium text-gray-900 dark:text-gray-100">{d.device}</span>
@@ -199,9 +212,13 @@ export function ScanalyticsDeviceOverview({
               </li>
             ))}
           </ul>
-          {deviceNames ? (
-            <p className="sr-only">Registrerede enheder: {deviceNames}</p>
-          ) : null}
+        </div>
+      ) : legacyScanCount > 0 ? (
+        <div className="border-t border-gray-100 px-5 py-4 dark:border-gray-700 sm:px-6">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Alle {legacyScanCount} scans er fra før auto-identifikation. Nye scans efter deploy vises som separate
+            browsere her.
+          </p>
         </div>
       ) : null}
     </div>
@@ -219,10 +236,8 @@ export function ScanalyticsDeviceBars({ rows }: { rows: GallaDeviceScanCount[] }
   return (
     <div className="overflow-hidden rounded-xl border border-lc-border bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
       <div className="border-b border-gray-100 px-5 pb-4 pt-5 dark:border-gray-700 sm:px-6 sm:pt-6">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">Scans pr. enhed</h3>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Hver scanner gemmer navnet i <code className="text-[11px]">checked_in_by</code>
-        </p>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">Scans pr. browser</h3>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Kun scans med auto-identificeret browser-id</p>
       </div>
       <div className="px-4 pb-6 pt-4 sm:px-6 sm:pb-7">
         {barRows.length === 0 ? (

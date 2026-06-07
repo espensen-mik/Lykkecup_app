@@ -14,6 +14,11 @@ import {
   isGallaScannerAccessCodeRequired,
   setStoredScannerDeviceName,
 } from "@/lib/galla-scanner-config";
+import {
+  buildCheckedInByLabel,
+  getOrCreateBrowserDeviceId,
+  shortDeviceId,
+} from "@/lib/galla-scanner-device";
 import { attendeeIdFromTicketId, parseGallaQrPayload } from "@/lib/galla-qr";
 import {
   gallaCheckInTicket,
@@ -39,6 +44,8 @@ export function GallaScannerClient() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [result, setResult] = useState<GallaCheckInResult | null>(null);
   const [checkedInBy, setCheckedInBy] = useState("scanner");
+  const [browserDeviceId, setBrowserDeviceId] = useState("");
+  const [clientIp, setClientIp] = useState<string | null>(null);
   const [deviceEditorOpen, setDeviceEditorOpen] = useState(false);
   const [deviceDraft, setDeviceDraft] = useState("scanner");
 
@@ -119,6 +126,7 @@ export function GallaScannerClient() {
           attendeeId,
           securityCode: parsed.security_code,
           checkedInBy,
+          browserDeviceId,
         });
         if (checkResult.status === "invalid" && checkResult.reason) {
           checkResult.message = invalidReasonLabel(checkResult.reason);
@@ -131,7 +139,7 @@ export function GallaScannerClient() {
       setPhase("result");
       scheduleReset();
     },
-    [checkedInBy, scheduleReset],
+    [checkedInBy, browserDeviceId, scheduleReset],
   );
 
   handleScanRef.current = handleScan;
@@ -185,9 +193,31 @@ export function GallaScannerClient() {
 
   useEffect(() => {
     const stored = getStoredScannerDeviceName();
+    const deviceId = getOrCreateBrowserDeviceId();
     setCheckedInBy(stored);
     setDeviceDraft(stored);
+    setBrowserDeviceId(deviceId);
+
+    void fetch("/api/galla-scanner-device", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { ip?: string }) => {
+        if (typeof data.ip === "string" && data.ip.trim()) setClientIp(data.ip.trim());
+      })
+      .catch(() => {
+        /* ignore */
+      });
   }, []);
+
+  const deviceHeaderLabel =
+    clientIp && browserDeviceId
+      ? buildCheckedInByLabel({
+          browserDeviceId,
+          ip: clientIp,
+          customName: checkedInBy !== "scanner" ? checkedInBy : undefined,
+        })
+      : browserDeviceId
+        ? `Scanner ${shortDeviceId(browserDeviceId)}`
+        : "LykkeCup Galla Scanner";
 
   useEffect(() => {
     if (!accessOk) return;
@@ -223,8 +253,11 @@ export function GallaScannerClient() {
           }}
           className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-400/90 underline-offset-2 hover:underline"
         >
-          LykkeCup Galla Scanner · {checkedInBy}
+          {deviceHeaderLabel}
         </button>
+        <p className="mt-1 text-[10px] font-medium tracking-wide text-neutral-500">
+          Tap for valgfrit navn · enhed identificeres via IP + browser
+        </p>
       </div>
 
       {deviceEditorOpen ? (
@@ -240,8 +273,12 @@ export function GallaScannerClient() {
             className="w-full max-w-xs rounded-xl border border-neutral-700 bg-neutral-900/95 p-3 shadow-lg backdrop-blur"
           >
             <label className="block text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
-              Enhedsnavn
+              Valgfrit navn (fx Indgang 1)
             </label>
+            <p className="mt-1 text-left text-[10px] leading-relaxed text-neutral-500">
+              Enheden identificeres automatisk via IP ({clientIp ?? "henter…"}) og browser-id{" "}
+              {browserDeviceId ? shortDeviceId(browserDeviceId) : "…"}
+            </p>
             <input
               value={deviceDraft}
               onChange={(e) => setDeviceDraft(e.target.value)}

@@ -1,11 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { parseCheckedInBy } from "@/lib/galla-scanner-device";
 
 export type GallaScanalyticsSummary = {
   total: number;
   checkedIn: number;
   remaining: number;
   checkedInPct: number;
-  deviceCount: number;
+  /** Distinct browsers with auto-ID (IP · browser-id format). */
+  identifiedBrowserCount: number;
+  /** Scans before auto-ID — browser count unknown. */
+  legacyScanCount: number;
 };
 
 export type MinuteViewPoint = {
@@ -23,6 +27,9 @@ export type ScanPeakMinute = {
 export type GallaDeviceScanCount = {
   device: string;
   count: number;
+  ip: string | null;
+  shortId: string | null;
+  isLegacy: boolean;
 };
 
 export type GallaScanDayOption = {
@@ -33,8 +40,11 @@ export type GallaScanDayOption = {
 export type GallaScanalyticsPayload = {
   summary: GallaScanalyticsSummary;
   byDevice: GallaDeviceScanCount[];
+  identifiedBrowsers: GallaDeviceScanCount[];
   devicesForDay: GallaDeviceScanCount[];
-  deviceCountForDay: number;
+  identifiedBrowsersForDay: GallaDeviceScanCount[];
+  identifiedBrowserCountForDay: number;
+  legacyScanCountForDay: number;
   minuteForDay: MinuteViewPoint[];
   peakMinute: ScanPeakMinute | null;
   scanDays: GallaScanDayOption[];
@@ -100,14 +110,45 @@ async function fetchAllCheckedInRows(supabase: SupabaseClient): Promise<CheckedI
 }
 
 function aggregateByDevice(rows: CheckedInRow[]): GallaDeviceScanCount[] {
-  const counts = new Map<string, number>();
+  const counts = new Map<
+    string,
+    { count: number; displayName: string; ip: string | null; shortId: string | null; isLegacy: boolean }
+  >();
+
   for (const row of rows) {
-    const device = row.checked_in_by?.trim() || "Ukendt enhed";
-    counts.set(device, (counts.get(device) ?? 0) + 1);
+    const parsed = parseCheckedInBy(row.checked_in_by);
+    const isLegacy = parsed.shortId == null;
+    const existing = counts.get(parsed.groupKey);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(parsed.groupKey, {
+        count: 1,
+        displayName: parsed.displayName,
+        ip: parsed.ip,
+        shortId: parsed.shortId,
+        isLegacy,
+      });
+    }
   }
+
   return [...counts.entries()]
-    .map(([device, count]) => ({ device, count }))
+    .map(([, value]) => ({
+      device: value.displayName,
+      count: value.count,
+      ip: value.ip,
+      shortId: value.shortId,
+      isLegacy: value.isLegacy,
+    }))
     .sort((a, b) => b.count - a.count || a.device.localeCompare(b.device, "da"));
+}
+
+function countLegacyScans(rows: CheckedInRow[]): number {
+  return rows.filter((row) => parseCheckedInBy(row.checked_in_by).shortId == null).length;
+}
+
+function identifiedOnly(devices: GallaDeviceScanCount[]): GallaDeviceScanCount[] {
+  return devices.filter((d) => !d.isLegacy);
 }
 
 function aggregateScanDays(rows: CheckedInRow[]): GallaScanDayOption[] {
@@ -204,7 +245,11 @@ export async function fetchGallaScanalytics(
   const scanDays = aggregateScanDays(checkedInRows);
   const day = scanDays.some((d) => d.day === selectedDay) ? selectedDay : pickDefaultScanDay(scanDays, selectedDay);
   const byDevice = aggregateByDevice(checkedInRows);
+  const identifiedBrowsers = identifiedOnly(byDevice);
+  const legacyScanCount = countLegacyScans(checkedInRows);
   const devicesForDay = aggregateByDevice(rowsForDay(checkedInRows, day));
+  const identifiedBrowsersForDay = identifiedOnly(devicesForDay);
+  const legacyScanCountForDay = countLegacyScans(rowsForDay(checkedInRows, day));
   const minuteForDay = aggregateMinutelyForDay(checkedInRows, day);
   const peakMinute = findPeakMinute(minuteForDay);
 
@@ -214,11 +259,15 @@ export async function fetchGallaScanalytics(
       checkedIn,
       remaining,
       checkedInPct,
-      deviceCount: byDevice.length,
+      identifiedBrowserCount: identifiedBrowsers.length,
+      legacyScanCount,
     },
     byDevice,
+    identifiedBrowsers,
     devicesForDay,
-    deviceCountForDay: devicesForDay.length,
+    identifiedBrowsersForDay,
+    identifiedBrowserCountForDay: identifiedBrowsersForDay.length,
+    legacyScanCountForDay,
     minuteForDay,
     peakMinute,
     scanDays,
