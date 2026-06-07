@@ -10,7 +10,9 @@ import {
   GALLA_EVENT_ID,
   GALLA_SCANNER_DEDUPE_MS,
   GALLA_SCANNER_RESET_MS,
+  getStoredScannerDeviceName,
   isGallaScannerAccessCodeRequired,
+  setStoredScannerDeviceName,
 } from "@/lib/galla-scanner-config";
 import { attendeeIdFromTicketId, parseGallaQrPayload } from "@/lib/galla-qr";
 import {
@@ -37,6 +39,8 @@ export function GallaScannerClient() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [result, setResult] = useState<GallaCheckInResult | null>(null);
   const [checkedInBy, setCheckedInBy] = useState("scanner");
+  const [deviceEditorOpen, setDeviceEditorOpen] = useState(false);
+  const [deviceDraft, setDeviceDraft] = useState("scanner");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<import("@zxing/browser").BrowserMultiFormatReader | null>(null);
@@ -180,6 +184,12 @@ export function GallaScannerClient() {
   }, []);
 
   useEffect(() => {
+    const stored = getStoredScannerDeviceName();
+    setCheckedInBy(stored);
+    setDeviceDraft(stored);
+  }, []);
+
+  useEffect(() => {
     if (!accessOk) return;
     void initCamera();
     return () => teardownCamera();
@@ -204,9 +214,56 @@ export function GallaScannerClient() {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-neutral-950 text-white">
-      <p className="shrink-0 py-2.5 text-center text-xs font-semibold uppercase tracking-[0.12em] text-teal-400/90">
-        LykkeCup Galla Scanner
-      </p>
+      <div className="relative z-40 shrink-0 py-2.5 text-center">
+        <button
+          type="button"
+          onClick={() => {
+            setDeviceDraft(checkedInBy);
+            setDeviceEditorOpen(true);
+          }}
+          className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-400/90 underline-offset-2 hover:underline"
+        >
+          LykkeCup Galla Scanner · {checkedInBy}
+        </button>
+      </div>
+
+      {deviceEditorOpen ? (
+        <div className="absolute inset-x-0 top-0 z-50 flex justify-center px-4 pt-3">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const name = deviceDraft.trim() || "scanner";
+              setCheckedInBy(name);
+              setStoredScannerDeviceName(name);
+              setDeviceEditorOpen(false);
+            }}
+            className="w-full max-w-xs rounded-xl border border-neutral-700 bg-neutral-900/95 p-3 shadow-lg backdrop-blur"
+          >
+            <label className="block text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+              Enhedsnavn
+            </label>
+            <input
+              value={deviceDraft}
+              onChange={(e) => setDeviceDraft(e.target.value)}
+              placeholder="fx Indgang 1"
+              maxLength={40}
+              className="mt-1.5 w-full rounded-lg border border-neutral-600 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-teal-400"
+            />
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDeviceEditorOpen(false)}
+                className="flex-1 rounded-lg bg-neutral-800 py-2 text-xs font-semibold"
+              >
+                Annuller
+              </button>
+              <button type="submit" className="flex-1 rounded-lg bg-teal-600 py-2 text-xs font-semibold">
+                Gem
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       <div className="relative min-h-0 flex-1 bg-black">
         <video
