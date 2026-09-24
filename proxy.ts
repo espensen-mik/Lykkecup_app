@@ -19,6 +19,7 @@ function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   if (pathname === "/api/galla-check-in" || pathname === "/api/galla-scanner-device") return true;
   if (pathname === "/lykkecup26" || pathname.startsWith("/lykkecup26/")) return true;
+  if (pathname === "/lykkecup27" || pathname.startsWith("/lykkecup27/")) return true;
   return false;
 }
 
@@ -28,7 +29,7 @@ export async function proxy(request: NextRequest) {
   /** Offentlig forside uden 307 — vigtigt for Facebook/LinkedIn (følger ikke altid redirect). */
   if (pathname === "/") {
     const rewriteUrl = request.nextUrl.clone();
-    rewriteUrl.pathname = "/lykkecup26";
+    rewriteUrl.pathname = "/lykkecup27";
     rewriteUrl.search = search;
     return NextResponse.rewrite(rewriteUrl);
   }
