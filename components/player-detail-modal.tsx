@@ -267,7 +267,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
           .eq("id", playerId)
           .eq("event_id", LYKKECUP_EVENT_ID)
           .maybeSingle(),
-        fetchAssignedTeamForPlayer(playerId),
+        fetchAssignedTeamForPlayer(supabase, playerId),
         supabase
           .from("player_change_log")
           .select("id, field_name, old_value, new_value, changed_at, changed_by_name")

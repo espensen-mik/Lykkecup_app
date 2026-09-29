@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrintTeamsLinkIcon } from "@/components/holddannelse/print-teams-link-icon";
 import { TeamBuilder } from "@/components/holddannelse/team-builder";
+import { createServerSupabase } from "@/lib/auth-server";
 import { fetchHoldLevelData, formatLevelShortLabel, normalizeLevelKey } from "@/lib/holddannelse";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export default async function HoldLevelPage({ params, searchParams }: PageProps)
   const levelKey = normalizeLevelKey(decodeLevelParam(level));
   const levelLabel = formatLevelShortLabel(levelKey);
 
-  const bundle = await fetchHoldLevelData(levelKey);
+  const bundle = await fetchHoldLevelData(await createServerSupabase(), levelKey);
 
   if (bundle.error) {
     return (

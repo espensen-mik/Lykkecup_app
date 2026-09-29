@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { UNKNOWN_CLUB_LABEL } from "@/lib/clubs";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
-import { supabase } from "@/lib/supabase";
 import type { ClubFeedbackInternalMessage, ClubFeedbackRow } from "@/types/club-feedback";
 
 /** Samme nøgle som `groupPlayersByClub` bruger til klubnavn. */
@@ -28,11 +27,11 @@ function normalizeClubFeedbackRow(r: ClubFeedbackRow): ClubFeedbackRow {
   };
 }
 
-export async function fetchClubFeedbackForEvent(): Promise<{
+export async function fetchClubFeedbackForEvent(client: SupabaseClient): Promise<{
   comments: ClubFeedbackRow[];
   error: string | null;
 }> {
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("club_feedback")
     .select(
       "id, event_id, home_club, author_name, author_phone, comment_text, created_at, ll_status_text, ll_status_created_at, ll_status_author_id, ll_status_author_name, ll_status_author_avatar_url, handled_at, handled_by, working_on_user_id, working_on_name, working_on_avatar_url, working_on_at",
@@ -104,8 +103,8 @@ export async function fetchClubFeedbackForKontrolcenter(client: SupabaseClient):
 }
 
 /** Antal kommentarer for arrangementet, som endnu ikke er markeret som håndteret. */
-export async function fetchUnhandledClubFeedbackCount(): Promise<number> {
-  const { count, error } = await supabase
+export async function fetchUnhandledClubFeedbackCount(client: SupabaseClient): Promise<number> {
+  const { count, error } = await client
     .from("club_feedback")
     .select("id", { count: "exact", head: true })
     .eq("event_id", LYKKECUP_EVENT_ID)
@@ -116,7 +115,7 @@ export async function fetchUnhandledClubFeedbackCount(): Promise<number> {
 }
 
 /** Antal trænerkommentarer i alt og inden for de seneste `hours` timer (til dashboard-KPI’er). */
-export async function fetchClubFeedbackCounts(hoursRecent = 24): Promise<{
+export async function fetchClubFeedbackCounts(client: SupabaseClient, hoursRecent = 24): Promise<{
   total: number;
   recent: number;
   error: string | null;
@@ -124,11 +123,11 @@ export async function fetchClubFeedbackCounts(hoursRecent = 24): Promise<{
   const sinceIso = new Date(Date.now() - hoursRecent * 60 * 60 * 1000).toISOString();
 
   const [totalRes, recentRes] = await Promise.all([
-    supabase
+    client
       .from("club_feedback")
       .select("id", { count: "exact", head: true })
       .eq("event_id", LYKKECUP_EVENT_ID),
-    supabase
+    client
       .from("club_feedback")
       .select("id", { count: "exact", head: true })
       .eq("event_id", LYKKECUP_EVENT_ID)

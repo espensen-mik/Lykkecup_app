@@ -46,8 +46,6 @@ import {
   turneringLevelMergeKey,
 } from "@/lib/holddannelse";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
-import { supabase } from "@/lib/supabase";
-
 const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
 
 const CUPCHAT_LAST_SEEN_KEY = "lc26_cupchat_last_seen_at";
@@ -142,9 +140,9 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     let cancelled = false;
     (async () => {
       const [playersRes, teamsRes, poolsRes] = await Promise.all([
-        supabase.from("players").select("level").eq("event_id", LYKKECUP_EVENT_ID),
-        supabase.from("teams").select("level").eq("event_id", LYKKECUP_EVENT_ID),
-        supabase.from("pools").select("level").eq("event_id", LYKKECUP_EVENT_ID),
+        authClient.from("players").select("level").eq("event_id", LYKKECUP_EVENT_ID),
+        authClient.from("teams").select("level").eq("event_id", LYKKECUP_EVENT_ID),
+        authClient.from("pools").select("level").eq("event_id", LYKKECUP_EVENT_ID),
       ]);
       if (cancelled) return;
       if (playersRes.error || teamsRes.error || poolsRes.error) return;
@@ -171,7 +169,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authClient]);
 
   useEffect(() => {
     const client = getAuthBrowserClient();

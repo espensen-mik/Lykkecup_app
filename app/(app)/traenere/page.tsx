@@ -1,14 +1,15 @@
 import { TrainersAdmin } from "@/components/trainers-admin";
+import { createServerSupabase } from "@/lib/auth-server";
 import { fetchCoachesForEvent } from "@/lib/coaches";
 import { CoachModalProvider } from "@/components/coach-modal-context";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
-import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export default async function TraenerePage() {
+  const supabase = await createServerSupabase();
   const [{ coaches, error }, teamCoachRes] = await Promise.all([
-    fetchCoachesForEvent(),
+    fetchCoachesForEvent(supabase),
     supabase.from("team_coaches").select("coach_id").eq("event_id", LYKKECUP_EVENT_ID),
   ]);
   const assignedCoachIds = new Set(

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DashboardCharts } from "@/components/dashboard-charts";
+import { createServerSupabase } from "@/lib/auth-server";
 import { fetchClubFeedbackCounts } from "@/lib/club-feedback";
 import { fetchHolddannelseProgress } from "@/lib/holddannelse";
 import {
@@ -21,10 +22,11 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardPage() {
+  const supabase = await createServerSupabase();
   const [{ players, error }, { progress: holddannelseProgress }, commentKpis, turneringOverview] = await Promise.all([
-    fetchPlayersForDashboard(),
-    fetchHolddannelseProgress(),
-    fetchClubFeedbackCounts(24),
+    fetchPlayersForDashboard(supabase),
+    fetchHolddannelseProgress(supabase),
+    fetchClubFeedbackCounts(supabase, 24),
     fetchTurneringDashboardOverview(),
   ]);
 
