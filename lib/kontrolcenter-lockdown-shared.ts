@@ -1,6 +1,9 @@
 export const PLANNING_LOCKDOWN_MESSAGE =
   "Planlægning er låst (Lockdown). En administrator skal slå Lockdown fra, før der kan redigeres.";
 
+export const ARCHIVED_EVENT_MESSAGE =
+  "Dette år er arkiveret og kan kun læses. Skift til et aktivt år i topbjælken for at redigere.";
+
 /** LykkeCup 26 brand coral — samme som public app (#df6763). */
 export const LC26_BRAND_CORAL = "#df6763";
 export const LC26_BRAND_CORAL_HOVER = "#d75a56";

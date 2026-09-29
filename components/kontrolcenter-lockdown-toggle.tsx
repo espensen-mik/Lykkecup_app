@@ -8,7 +8,19 @@ import {
 } from "@/lib/kontrolcenter-lockdown-shared";
 
 export function KontrolcenterLockdownToggle() {
-  const { planningLockdown, isAdmin, toggleBusy, setPlanningLockdown } = useKontrolcenterLockdown();
+  const { planningLockdown, archived, isAdmin, toggleBusy, setPlanningLockdown } = useKontrolcenterLockdown();
+
+  if (archived) {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 border-white/70 bg-white/20 px-3 py-1.5 text-[0.65rem] font-extrabold uppercase tracking-[0.1em] text-white"
+        title="Arkiveret år. Intet kan ændres."
+      >
+        <Lock className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />
+        <span className="hidden sm:inline">Kun læsning</span>
+      </span>
+    );
+  }
 
   if (!isAdmin) return null;
 

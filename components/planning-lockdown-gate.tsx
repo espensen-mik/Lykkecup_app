@@ -4,7 +4,15 @@ import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { useKontrolcenterLockdown } from "@/components/kontrolcenter-lockdown-context";
 
-function PlanningLockdownBanner({ message, viewOnly }: { message: string; viewOnly: boolean }) {
+function PlanningLockdownBanner({
+  message,
+  viewOnly,
+  archived,
+}: {
+  message: string;
+  viewOnly: boolean;
+  archived: boolean;
+}) {
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center p-4 pt-8 sm:pt-12">
       <div
@@ -12,10 +20,14 @@ function PlanningLockdownBanner({ message, viewOnly }: { message: string; viewOn
         className="pointer-events-auto max-w-lg rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-center shadow-lg dark:border-amber-800 dark:bg-amber-950/90"
       >
         <Lock className="mx-auto h-8 w-8 text-amber-700 dark:text-amber-300" strokeWidth={2} aria-hidden />
-        <p className="mt-3 text-base font-semibold text-amber-950 dark:text-amber-50">Lockdown er aktiv</p>
+        <p className="mt-3 text-base font-semibold text-amber-950 dark:text-amber-50">
+          {archived ? "Arkiveret år" : "Lockdown er aktiv"}
+        </p>
         <p className="mt-2 text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">{message}</p>
         <p className="mt-2 text-xs text-amber-800/80 dark:text-amber-200/80">
-          {viewOnly
+          {archived
+            ? "Du kan gennemse alt, men intet kan ændres."
+            : viewOnly
             ? "Du kan stadig gennemse kampprogrammet og filtrere — men ikke redigere eller flytte kampe. App Indhold kan stadig redigeres."
             : "App Indhold og øvrige dele af KontrolCenter kan stadig redigeres. Kun administratorer kan slå Lockdown fra i menuen øverst."}
         </p>
@@ -35,7 +47,7 @@ export function PlanningLockdownGate({
   children: ReactNode;
   viewOnly?: boolean;
 }) {
-  const { planningLockdown, message } = useKontrolcenterLockdown();
+  const { planningLockdown, archived, message } = useKontrolcenterLockdown();
 
   if (!planningLockdown) {
     return <>{children}</>;
@@ -45,7 +57,7 @@ export function PlanningLockdownGate({
     return (
       <div className="relative min-h-[12rem]">
         {children}
-        <PlanningLockdownBanner message={message} viewOnly />
+        <PlanningLockdownBanner message={message} viewOnly archived={archived} />
       </div>
     );
   }
@@ -66,7 +78,7 @@ export function PlanningLockdownGate({
       >
         {children}
       </div>
-      <PlanningLockdownBanner message={message} viewOnly={false} />
+      <PlanningLockdownBanner message={message} viewOnly={false} archived={archived} />
     </div>
   );
 }

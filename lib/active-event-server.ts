@@ -35,11 +35,17 @@ export const getRequestedEventId = cache(async (): Promise<string | null> => {
   return (await cookies()).get(ACTIVE_EVENT_COOKIE)?.value ?? null;
 });
 
-/** Arrangementet KontrolCenter arbejder i for denne request. Cookien stoles kun på, hvis id'et findes i `events`. */
+/**
+ * Arrangementet KontrolCenter arbejder i for denne request. Cookien stoles kun på, hvis id'et findes i `events`;
+ * uden gyldigt valg bruges det nyeste aktive arrangement.
+ */
 export const getActiveEvent = cache(async (): Promise<EventSummary> => {
   const [events, requested] = await Promise.all([listEvents(), getRequestedEventId()]);
   const match =
-    events.find((e) => e.id === requested) ?? events.find((e) => e.id === DEFAULT_EVENT_ID) ?? events[0];
+    events.find((e) => e.id === requested) ??
+    events.find((e) => e.status === "active") ??
+    events.find((e) => e.id === DEFAULT_EVENT_ID) ??
+    events[0];
   if (!match) throw new Error("Der findes ingen arrangementer i databasen.");
   return match;
 });
