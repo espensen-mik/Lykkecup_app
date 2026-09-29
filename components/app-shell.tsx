@@ -967,6 +967,22 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           </div>
         </div>
       </header>
+      {activeEvent.status === "archived" ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950 print:hidden dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-50"
+        >
+          <span>
+            Du ser <strong>{activeEvent.name}</strong>, som er arkiveret. Alt kan ses, men intet kan ændres.
+          </span>
+          <Link
+            href={`${EVENT_PICKER_PATH}?next=${encodeURIComponent(pathname)}`}
+            className="font-semibold underline underline-offset-4"
+          >
+            Skift år
+          </Link>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
       {mobileOpen ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActiveEventId } from "@/components/active-event-context";
+import { useActiveEvent } from "@/components/active-event-context";
 import {
   createContext,
   useCallback,
@@ -15,10 +15,15 @@ import { usePathname, useRouter } from "next/navigation";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import type { AuthAppUser } from "@/lib/auth-app-user";
 import { setPlanningLockdownAction } from "@/lib/kontrolcenter-lockdown-actions";
-import { isPlanningLockdownPath, PLANNING_LOCKDOWN_MESSAGE } from "@/lib/kontrolcenter-lockdown-shared";
+import {
+  ARCHIVED_EVENT_MESSAGE,
+  isPlanningLockdownPath,
+  PLANNING_LOCKDOWN_MESSAGE,
+} from "@/lib/kontrolcenter-lockdown-shared";
 
 type KontrolcenterLockdownContextValue = {
   planningLockdown: boolean;
+  archived: boolean;
   isPlanningSection: boolean;
   isAdmin: boolean;
   message: string;
@@ -37,7 +42,9 @@ export function KontrolcenterLockdownProvider({
   initialPlanningLockdown: boolean;
   currentUser: AuthAppUser | null;
 }) {
-  const eventId = useActiveEventId();
+  const activeEvent = useActiveEvent();
+  const eventId = activeEvent.id;
+  const archived = activeEvent.status === "archived";
   const pathname = usePathname();
   const router = useRouter();
   const [planningLockdown, setPlanningLockdownState] = useState(initialPlanningLockdown);
@@ -133,7 +140,7 @@ export function KontrolcenterLockdownProvider({
 
   const setPlanningLockdown = useCallback(
     async (enabled: boolean) => {
-      if (!isAdmin) return;
+      if (!isAdmin || archived) return;
       setToggleBusy(true);
       try {
         const result = await setPlanningLockdownAction(enabled);
@@ -147,19 +154,20 @@ export function KontrolcenterLockdownProvider({
         setToggleBusy(false);
       }
     },
-    [isAdmin, router],
+    [isAdmin, archived, router],
   );
 
   const value = useMemo(
     (): KontrolcenterLockdownContextValue => ({
-      planningLockdown,
+      planningLockdown: archived || planningLockdown,
+      archived,
       isPlanningSection,
       isAdmin,
-      message: PLANNING_LOCKDOWN_MESSAGE,
+      message: archived ? ARCHIVED_EVENT_MESSAGE : PLANNING_LOCKDOWN_MESSAGE,
       toggleBusy,
       setPlanningLockdown,
     }),
-    [planningLockdown, isPlanningSection, isAdmin, toggleBusy, setPlanningLockdown],
+    [archived, planningLockdown, isPlanningSection, isAdmin, toggleBusy, setPlanningLockdown],
   );
 
   return (
@@ -179,6 +187,7 @@ export function useKontrolcenterLockdown(): KontrolcenterLockdownContextValue {
   if (!ctx) {
     return {
       planningLockdown: false,
+      archived: false,
       isPlanningSection: false,
       isAdmin: false,
       message: PLANNING_LOCKDOWN_MESSAGE,

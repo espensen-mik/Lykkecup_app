@@ -1,9 +1,11 @@
-import { getActiveEventId } from "@/lib/active-event-server";
+import { getActiveEvent } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
-import { PLANNING_LOCKDOWN_MESSAGE } from "@/lib/kontrolcenter-lockdown-shared";
+import { ARCHIVED_EVENT_MESSAGE, PLANNING_LOCKDOWN_MESSAGE } from "@/lib/kontrolcenter-lockdown-shared";
 
 export async function fetchPlanningLockdown(): Promise<boolean> {
-  const [supabase, eventId] = await Promise.all([createServerSupabase(), getActiveEventId()]);
+  const [supabase, event] = await Promise.all([createServerSupabase(), getActiveEvent()]);
+  if (event.status === "archived") return true;
+  const eventId = event.id;
   const { data, error } = await supabase
     .from("kontrolcenter_event_settings")
     .select("planning_lockdown")
@@ -19,6 +21,9 @@ export async function fetchPlanningLockdown(): Promise<boolean> {
 
 /** Returnerer fejl-resultat hvis planlægning er låst; ellers null. */
 export async function planningLockdownBlock(): Promise<{ ok: false; message: string } | null> {
+  if ((await getActiveEvent()).status === "archived") {
+    return { ok: false, message: ARCHIVED_EVENT_MESSAGE };
+  }
   if (await fetchPlanningLockdown()) {
     return { ok: false, message: PLANNING_LOCKDOWN_MESSAGE };
   }
