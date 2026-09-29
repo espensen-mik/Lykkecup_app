@@ -1,15 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import type { Coach } from "@/types/coach";
 
-export async function fetchCoachesForEvent(client: SupabaseClient): Promise<{
+export async function fetchCoachesForEvent(client: SupabaseClient, eventId: string): Promise<{
   coaches: Coach[];
   error: string | null;
 }> {
   const { data, error } = await client
     .from("coaches")
     .select("id, event_id, ticket_id, name, home_club, email, phone, birthdate, age, tshirt_size")
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .order("name", { ascending: true });
 
   if (error) return { coaches: [], error: error.message };
@@ -23,13 +22,14 @@ export async function fetchCoachesForEvent(client: SupabaseClient): Promise<{
 
 export async function fetchCoachById(
   client: SupabaseClient,
+  eventId: string,
   coachId: string,
 ): Promise<{ coach: Coach | null; error: string | null }> {
   const { data, error } = await client
     .from("coaches")
     .select("id, event_id, ticket_id, name, home_club, email, phone, birthdate, age, tshirt_size")
     .eq("id", coachId)
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .maybeSingle();
 
   if (error) {

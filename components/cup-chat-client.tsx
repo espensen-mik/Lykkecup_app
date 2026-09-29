@@ -1,10 +1,10 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ThumbsUp } from "lucide-react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { formatDaDateTime } from "@/lib/datetime";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 
 export type CupChatCurrentUser = {
   id: string;
@@ -118,6 +118,7 @@ function MessageBlock({
 }
 
 export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser | null }) {
+  const eventId = useActiveEventId();
   const [rows, setRows] = useState<ChatRow[]>([]);
   const [likesByMessageId, setLikesByMessageId] = useState<Record<string, LikeSummary>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -132,7 +133,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
     const { data, error } = await supabase
       .from("holddannelse_chat_messages")
       .select("id, event_id, parent_id, body, author_id, author_name, author_avatar_url, created_at")
-      .eq("event_id", LYKKECUP_EVENT_ID)
+      .eq("event_id", eventId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -170,7 +171,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
       }
     }
     setLikesByMessageId(likesMap);
-  }, [currentUser?.id]);
+  }, [currentUser?.id, eventId]);
 
   useEffect(() => {
     void load();
@@ -186,7 +187,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
           event: "INSERT",
           schema: "public",
           table: "holddannelse_chat_messages",
-          filter: `event_id=eq.${LYKKECUP_EVENT_ID}`,
+          filter: `event_id=eq.${eventId}`,
         },
         () => {
           void load();
@@ -217,7 +218,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
       document.removeEventListener("visibilitychange", onVis);
       void supabase.removeChannel(channel);
     };
-  }, [load]);
+  }, [load, eventId]);
 
   const threads = useMemo((): Thread[] => {
     const tops = rows
@@ -255,7 +256,7 @@ export function CupChatClient({ currentUser }: { currentUser: CupChatCurrentUser
     setBusy(true);
     const supabase = getAuthBrowserClient();
     const { error } = await supabase.from("holddannelse_chat_messages").insert({
-      event_id: LYKKECUP_EVENT_ID,
+      event_id: eventId,
       parent_id: parentId,
       body: text,
       author_id: currentUser.id,

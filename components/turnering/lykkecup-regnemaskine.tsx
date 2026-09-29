@@ -1,5 +1,6 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,7 +21,6 @@ import { BaneStatusPanel } from "@/components/turnering/bane-status-panel";
 import { insertLevelSchedulePlanning, writeLevelSchedulePlanning } from "@/lib/level-schedule-settings";
 import { revalidateAfterKampeSettingsAction } from "@/lib/turnering-actions";
 import { findLevelScheduleRow, poolPlanningHint } from "@/lib/puljer";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
 export type RegnemaskineLevelInput = {
   levelKey: string;
@@ -117,7 +117,7 @@ export function LykkecupRegnemaskine({
 }) {
   const router = useRouter();
   const supabase = useMemo(() => getAuthBrowserClient(), []);
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = useActiveEventId();
 
   const [matchesDrafts, setMatchesDrafts] = useState<Record<string, string>>(() =>
     matchesDraftFromServer(levels, baner.levelSettings),

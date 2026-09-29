@@ -1,12 +1,12 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import { CheckCircle2, ChevronDown, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { debounceCallback } from "@/lib/debounce-callback";
 import { formatDaDateTime } from "@/lib/datetime";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { StyledSelect } from "@/components/ui/styled-select";
 import type { ClubFeedbackRow } from "@/types/club-feedback";
 
@@ -39,6 +39,7 @@ function initialsFromName(name: string): string {
 }
 
 export function KommentarerFilteredList({ comments, totalCount, currentUser }: Props) {
+  const eventId = useActiveEventId();
   const router = useRouter();
   const [clubKey, setClubKey] = useState<string>(ALL_CLUBS);
   const [sortMode, setSortMode] = useState<string>(SORT_CLUB);
@@ -61,12 +62,12 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
       .channel("kommentarer-live")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "club_feedback", filter: `event_id=eq.${LYKKECUP_EVENT_ID}` },
+        { event: "*", schema: "public", table: "club_feedback", filter: `event_id=eq.${eventId}` },
         scheduleRefresh,
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "club_feedback_internal_messages", filter: `event_id=eq.${LYKKECUP_EVENT_ID}` },
+        { event: "*", schema: "public", table: "club_feedback_internal_messages", filter: `event_id=eq.${eventId}` },
         scheduleRefresh,
       )
       .subscribe();
@@ -74,7 +75,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [eventId]);
 
   const clubs = useMemo(() => {
     const set = new Set<string>();
@@ -140,7 +141,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
     const supabase = getAuthBrowserClient();
     const { error } = await supabase.from("club_feedback_internal_messages").insert({
       club_feedback_id: commentId,
-      event_id: LYKKECUP_EVENT_ID,
+      event_id: eventId,
       body: text,
       author_id: currentUser.id,
       author_name: currentUser.fullName,
@@ -180,7 +181,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
         working_on_at: null,
       })
       .eq("id", commentId)
-      .eq("event_id", LYKKECUP_EVENT_ID);
+      .eq("event_id", eventId);
 
     setBusyId(null);
     if (error) {
@@ -209,7 +210,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
         handled_by: null,
       })
       .eq("id", commentId)
-      .eq("event_id", LYKKECUP_EVENT_ID);
+      .eq("event_id", eventId);
 
     setBusyId(null);
     if (error) {
@@ -241,7 +242,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
             working_on_at: new Date().toISOString(),
           })
           .eq("id", comment.id)
-          .eq("event_id", LYKKECUP_EVENT_ID)
+          .eq("event_id", eventId)
           .or(`working_on_user_id.is.null,working_on_user_id.eq.${currentUser.id}`)
           .select("id")
       : await supabase
@@ -253,7 +254,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
             working_on_at: null,
           })
           .eq("id", comment.id)
-          .eq("event_id", LYKKECUP_EVENT_ID)
+          .eq("event_id", eventId)
           .eq("working_on_user_id", currentUser.id)
           .select("id");
 
@@ -286,7 +287,7 @@ export function KommentarerFilteredList({ comments, totalCount, currentUser }: P
     setErrorById((e) => ({ ...e, [commentId]: null }));
     setBusyId(commentId);
     const supabase = getAuthBrowserClient();
-    const { error } = await supabase.from("club_feedback").delete().eq("id", commentId).eq("event_id", LYKKECUP_EVENT_ID);
+    const { error } = await supabase.from("club_feedback").delete().eq("id", commentId).eq("event_id", eventId);
 
     setBusyId(null);
     if (error) {

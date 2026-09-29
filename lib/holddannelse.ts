@@ -1,8 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import type { HoldCoachRow, HoldPlayerRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
-
-export const HOLD_EVENT_ID = LYKKECUP_EVENT_ID;
 
 /** Kanonisk niveau-nøgle til gruppering og URL (tom → ukendt). */
 export function normalizeLevelKey(level: string | null | undefined): string {
@@ -150,11 +147,10 @@ export type HolddannelseProgressStats = {
  * Samlet fremdrift for holddannelse på tværs af alle niveauer.
  * Tæller unikke spillere med i eventet og hvor mange af dem der er på et hold.
  */
-export async function fetchHolddannelseProgress(client: SupabaseClient): Promise<{
+export async function fetchHolddannelseProgress(client: SupabaseClient, eventId: string): Promise<{
   progress: HolddannelseProgressStats | null;
   error: string | null;
 }> {
-  const eventId = HOLD_EVENT_ID;
 
   const [playersRes, membersRes] = await Promise.all([
     client.from("players").select("id").eq("event_id", eventId),
@@ -191,11 +187,10 @@ export async function fetchHolddannelseProgress(client: SupabaseClient): Promise
   };
 }
 
-export async function fetchHolddannelseOverview(client: SupabaseClient): Promise<{
+export async function fetchHolddannelseOverview(client: SupabaseClient, eventId: string): Promise<{
   levels: LevelOverviewStats[];
   error: string | null;
 }> {
-  const eventId = HOLD_EVENT_ID;
 
   const [playersRes, teamsRes, membersRes] = await Promise.all([
     client.from("players").select("id, level").eq("event_id", eventId),
@@ -285,8 +280,11 @@ export type HoldLevelBundle = {
   error: string | null;
 };
 
-export async function fetchHoldLevelData(client: SupabaseClient, levelKey: string): Promise<HoldLevelBundle> {
-  const eventId = HOLD_EVENT_ID;
+export async function fetchHoldLevelData(
+  client: SupabaseClient,
+  eventId: string,
+  levelKey: string,
+): Promise<HoldLevelBundle> {
   const normalized = normalizeLevelKey(levelKey);
 
   const playersQuery = client
@@ -442,12 +440,12 @@ export type TeamsPrintLevelGroup = {
  */
 export async function fetchTeamsPrintData(
   client: SupabaseClient,
+  eventId: string,
   levelFilter: string | null,
 ): Promise<{
   groups: TeamsPrintLevelGroup[];
   error: string | null;
 }> {
-  const eventId = HOLD_EVENT_ID;
 
   let q = client
     .from("teams")

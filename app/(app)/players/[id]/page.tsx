@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { PlayerDetailContent } from "@/components/player-detail-content";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
 import { fetchAssignedTeamForPlayer, fetchPlayerById } from "@/lib/players";
 
@@ -13,7 +14,7 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const { player } = await fetchPlayerById(await createServerSupabase(), id);
+  const { player } = await fetchPlayerById(await createServerSupabase(), await getActiveEventId(), id);
   if (!player) {
     return { title: "Spiller ikke fundet — LykkeCup KontrolCenter" };
   }
@@ -25,10 +26,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PlayerDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const supabase = await createServerSupabase();
+  const [supabase, eventId] = await Promise.all([createServerSupabase(), getActiveEventId()]);
   const [{ player, error }, assignedTeam] = await Promise.all([
-    fetchPlayerById(supabase, id),
-    fetchAssignedTeamForPlayer(supabase, id),
+    fetchPlayerById(supabase, eventId, id),
+    fetchAssignedTeamForPlayer(supabase, eventId, id),
   ]);
 
   if (error) {

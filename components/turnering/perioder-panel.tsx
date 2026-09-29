@@ -1,5 +1,6 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import { Plus, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -43,6 +44,7 @@ export function PerioderPanel({
   initial: PeriodsBundle;
   capacityHints: PeriodCapacityHint[];
 }) {
+  const eventId = useActiveEventId();
   const router = useRouter();
   const supabase = useMemo(() => getAuthBrowserClient(), []);
 
@@ -96,7 +98,7 @@ export function PerioderPanel({
   );
 
   const refresh = useCallback(async () => {
-    const bundle = await fetchPeriodsBundle(supabase);
+    const bundle = await fetchPeriodsBundle(supabase, eventId);
     if (bundle.error) {
       setError(bundle.error);
       return;
@@ -105,7 +107,7 @@ export function PerioderPanel({
     setPools(bundle.pools);
     setDrafts(Object.fromEntries(bundle.periods.map((p) => [p.id, draftFromRow(p)])));
     router.refresh();
-  }, [router, supabase]);
+  }, [router, supabase, eventId]);
 
   async function ensureDefaultPeriods() {
     if (periods.length > 0) return;
@@ -114,7 +116,7 @@ export function PerioderPanel({
     try {
       for (let i = 0; i < DEFAULT_PERIODS.length; i += 1) {
         const d = DEFAULT_PERIODS[i]!;
-        const payload = periodInsertPayload(d.name, d.start, d.end, i);
+        const payload = periodInsertPayload(eventId, d.name, d.start, d.end, i);
         const { error: insErr } = await supabase.from("tournament_periods").insert(payload);
         if (insErr) throw new Error(insErr.message);
       }
@@ -143,6 +145,7 @@ export function PerioderPanel({
     setError(null);
     try {
       const payload = periodInsertPayload(
+        eventId,
         draft.name,
         allDay ? ALL_DAY_PERIOD_PRESET.start : draft.start,
         allDay ? ALL_DAY_PERIOD_PRESET.end : draft.end,
@@ -179,6 +182,7 @@ export function PerioderPanel({
     setError(null);
     try {
       const payload = periodInsertPayload(
+        eventId,
         ALL_DAY_PERIOD_PRESET.name,
         ALL_DAY_PERIOD_PRESET.start,
         ALL_DAY_PERIOD_PRESET.end,
@@ -210,7 +214,7 @@ export function PerioderPanel({
     setError(null);
     try {
       const sortOrder = periods.length;
-      const payload = periodInsertPayload(newName, newStart, newEnd, sortOrder);
+      const payload = periodInsertPayload(eventId, newName, newStart, newEnd, sortOrder);
       const { error: insErr } = await supabase.from("tournament_periods").insert(payload);
       if (insErr) throw new Error(insErr.message);
       setNewName("");

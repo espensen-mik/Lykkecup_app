@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/auth-server";
 import { planningLockdownBlock } from "@/lib/kontrolcenter-lockdown-server";
 import { isOrphanKampprogramMatch } from "@/lib/kampprogram";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
+import { getActiveEventId } from "@/lib/active-event-server";
 import type { TurneringActionResult } from "@/lib/turnering-actions";
 
 export async function deleteOrphanMatchesAction(): Promise<
@@ -21,7 +21,7 @@ export async function deleteOrphanMatchesAction(): Promise<
   const locked = await planningLockdownBlock();
   if (locked) return locked;
 
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
   const [matchesRes, teamsRes, poolsRes] = await Promise.all([
     supabase.from("matches").select("id, pool_id, team_a_id, team_b_id").eq("event_id", eventId),
     supabase.from("teams").select("id").eq("event_id", eventId),

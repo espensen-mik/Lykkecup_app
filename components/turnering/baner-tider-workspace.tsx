@@ -1,5 +1,6 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import { Calculator } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,7 +30,6 @@ import {
 } from "@/lib/lykkecup-regnemaskine";
 import { formatLevelShortLabel } from "@/lib/holddannelse";
 import { courtTypeForLevel, defaultRoundsPerMatchForLevel } from "@/lib/level-court-settings";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
 import {
   LykkecupRegnemaskine,
   type RegnemaskineLevelInput,
@@ -164,7 +164,7 @@ export function BanerTiderWorkspace({
 }) {
   const router = useRouter();
   const supabase = useMemo(() => getAuthBrowserClient(), []);
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = useActiveEventId();
 
   const [tab, setTab] = useState<TabId>("haller");
   const [busy, setBusy] = useState(false);

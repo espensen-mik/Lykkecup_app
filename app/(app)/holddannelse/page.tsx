@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight, MessagesSquare } from "lucide-react";
 import Link from "next/link";
 import { PrintTeamsLinkIcon } from "@/components/holddannelse/print-teams-link-icon";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
 import { fetchHolddannelseOverview, formatLevelShortLabel, levelPathSegment } from "@/lib/holddannelse";
 
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HolddannelsePage() {
-  const { levels, error } = await fetchHolddannelseOverview(await createServerSupabase());
+  const { levels, error } = await fetchHolddannelseOverview(await createServerSupabase(), await getActiveEventId());
 
   if (error) {
     return (

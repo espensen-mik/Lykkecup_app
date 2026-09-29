@@ -1,13 +1,13 @@
+import { getActiveEventId } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { PLANNING_LOCKDOWN_MESSAGE } from "@/lib/kontrolcenter-lockdown-shared";
 
 export async function fetchPlanningLockdown(): Promise<boolean> {
-  const supabase = await createServerSupabase();
+  const [supabase, eventId] = await Promise.all([createServerSupabase(), getActiveEventId()]);
   const { data, error } = await supabase
     .from("kontrolcenter_event_settings")
     .select("planning_lockdown")
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .maybeSingle();
 
   if (error) {

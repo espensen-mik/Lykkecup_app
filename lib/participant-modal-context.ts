@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { kontrolCenterTeamDisplayNameFromRow } from "@/lib/team-detail";
 
 export type ParticipantPerson = {
@@ -195,14 +194,13 @@ async function buildMatchesForTeamIds(
 /** Holdkammerater, trænere og kampprogram for en spiller (KontrolCenter-modal). */
 export async function fetchPlayerParticipantContext(
   supabase: SupabaseClient,
+  eventId: string,
   playerId: string,
   teamId: string | null,
 ): Promise<PlayerParticipantContext> {
   if (!teamId) {
     return { teammates: [], coaches: [], matches: [], error: null };
   }
-
-  const eventId = LYKKECUP_EVENT_ID;
 
   const [{ data: allMembers, error: memErr }, { data: tcRows, error: tcErr }, { data: teamRow }] = await Promise.all([
     supabase.from("team_members").select("player_id").eq("event_id", eventId).eq("team_id", teamId),
@@ -254,9 +252,9 @@ export async function fetchPlayerParticipantContext(
 /** Hold, spillere, trænere og kampprogram for en træner (KontrolCenter-modal). */
 export async function fetchCoachParticipantContext(
   supabase: SupabaseClient,
+  eventId: string,
   coachId: string,
 ): Promise<CoachParticipantContext> {
-  const eventId = LYKKECUP_EVENT_ID;
 
   const { data: links, error: lErr } = await supabase
     .from("team_coaches")

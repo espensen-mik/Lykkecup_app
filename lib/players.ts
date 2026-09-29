@@ -1,17 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DashboardPlayer, Player, PlayerDetail } from "@/types/player";
 import { kontrolCenterTeamDisplayNameFromRow } from "@/lib/team-detail";
-
-export const LYKKECUP_EVENT_ID = "ae74ce1e-9793-48cd-bb1d-c4a248eaf4bf";
-
-export async function fetchPlayersForEvent(client: SupabaseClient): Promise<{
+export async function fetchPlayersForEvent(client: SupabaseClient, eventId: string): Promise<{
   players: Player[];
   error: string | null;
 }> {
   const { data, error } = await client
     .from("players")
     .select("id, name, home_club, level, age, ticket_id")
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .order("name", { ascending: true });
 
   if (error) {
@@ -27,6 +24,7 @@ export async function fetchPlayersForEvent(client: SupabaseClient): Promise<{
 
 export async function fetchPlayerById(
   client: SupabaseClient,
+  eventId: string,
   playerId: string,
 ): Promise<{ player: PlayerDetail | null; error: string | null }> {
   const { data, error } = await client
@@ -35,7 +33,7 @@ export async function fetchPlayerById(
       "id, name, home_club, birthdate, age, gender, level, preferences, ticket_id",
     )
     .eq("id", playerId)
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .maybeSingle();
 
   if (error) {
@@ -63,13 +61,14 @@ export type PlayerAssignedTeamSummary = {
 /** Hold spilleren er på i dette arrangement — med officielt navn og valgfrit kaldenavn. */
 export async function fetchAssignedTeamForPlayer(
   client: SupabaseClient,
+  eventId: string,
   playerId: string,
 ): Promise<PlayerAssignedTeamSummary | null> {
   const { data: mem, error: memErr } = await client
     .from("team_members")
     .select("team_id")
     .eq("player_id", playerId)
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .limit(1)
     .maybeSingle();
 
@@ -79,7 +78,7 @@ export async function fetchAssignedTeamForPlayer(
     .from("teams")
     .select("id, name, nickname, level")
     .eq("id", mem.team_id)
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .maybeSingle();
 
   if (teamErr || !team) return null;
@@ -95,14 +94,14 @@ export async function fetchAssignedTeamForPlayer(
 }
 
 /** All players for the event — dashboard aggregations and charts */
-export async function fetchPlayersForDashboard(client: SupabaseClient): Promise<{
+export async function fetchPlayersForDashboard(client: SupabaseClient, eventId: string): Promise<{
   players: DashboardPlayer[];
   error: string | null;
 }> {
   const withTimestamp = await client
     .from("players")
     .select("id, name, home_club, level, age, gender, created_at")
-    .eq("event_id", LYKKECUP_EVENT_ID);
+    .eq("event_id", eventId);
 
   if (!withTimestamp.error) {
     const rows = (withTimestamp.data ?? []) as DashboardPlayer[];
@@ -115,7 +114,7 @@ export async function fetchPlayersForDashboard(client: SupabaseClient): Promise<
   const fallback = await client
     .from("players")
     .select("id, name, home_club, level, age, gender")
-    .eq("event_id", LYKKECUP_EVENT_ID);
+    .eq("event_id", eventId);
 
   if (fallback.error) {
     return { players: [], error: fallback.error.message };

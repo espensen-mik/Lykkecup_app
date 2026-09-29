@@ -1,15 +1,16 @@
 import { PlayersAdmin } from "@/components/players-admin";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
-import { fetchPlayersForEvent, LYKKECUP_EVENT_ID } from "@/lib/players";
+import { fetchPlayersForEvent } from "@/lib/players";
 import { fetchPlayerMatchCountsForEvent } from "@/lib/players-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function SpillerePage() {
-  const supabase = await createServerSupabase();
+  const [supabase, eventId] = await Promise.all([createServerSupabase(), getActiveEventId()]);
   const [{ players, error }, membersRes, matchCounts] = await Promise.all([
-    fetchPlayersForEvent(supabase),
-    supabase.from("team_members").select("player_id").eq("event_id", LYKKECUP_EVENT_ID),
+    fetchPlayersForEvent(supabase, eventId),
+    supabase.from("team_members").select("player_id").eq("event_id", eventId),
     fetchPlayerMatchCountsForEvent(),
   ]);
   const assignedPlayerIds = new Set(

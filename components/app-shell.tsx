@@ -1,5 +1,6 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import {
   BarChart3,
   Building2,
@@ -45,7 +46,6 @@ import {
   sortLevelKeysForNav,
   turneringLevelMergeKey,
 } from "@/lib/holddannelse";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
 
 const CUPCHAT_LAST_SEEN_KEY = "lc26_cupchat_last_seen_at";
@@ -102,6 +102,7 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
 }
 
 export function AppShell({ children, currentUser }: { children: React.ReactNode; currentUser: AuthAppUser | null }) {
+  const eventId = useActiveEventId();
   const { planningLockdown } = useKontrolcenterLockdown();
   const authClient = getAuthBrowserClient();
   function initialsFromName(name: string) {
@@ -140,9 +141,9 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     let cancelled = false;
     (async () => {
       const [playersRes, teamsRes, poolsRes] = await Promise.all([
-        authClient.from("players").select("level").eq("event_id", LYKKECUP_EVENT_ID),
-        authClient.from("teams").select("level").eq("event_id", LYKKECUP_EVENT_ID),
-        authClient.from("pools").select("level").eq("event_id", LYKKECUP_EVENT_ID),
+        authClient.from("players").select("level").eq("event_id", eventId),
+        authClient.from("teams").select("level").eq("event_id", eventId),
+        authClient.from("pools").select("level").eq("event_id", eventId),
       ]);
       if (cancelled) return;
       if (playersRes.error || teamsRes.error || poolsRes.error) return;
@@ -169,7 +170,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
     return () => {
       cancelled = true;
     };
-  }, [authClient]);
+  }, [authClient, eventId]);
 
   useEffect(() => {
     const client = getAuthBrowserClient();
@@ -179,7 +180,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       const { count, error } = await client
         .from("club_feedback")
         .select("id", { count: "exact", head: true })
-        .eq("event_id", LYKKECUP_EVENT_ID)
+        .eq("event_id", eventId)
         .is("handled_at", null);
       if (!cancelled && !error) setKommentarerNyeCount(count ?? 0);
     }
@@ -190,7 +191,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       .channel("app-shell-kommentarer-count")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "club_feedback", filter: `event_id=eq.${LYKKECUP_EVENT_ID}` },
+        { event: "*", schema: "public", table: "club_feedback", filter: `event_id=eq.${eventId}` },
         () => {
           void refreshKommentarerCount();
         },
@@ -201,7 +202,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       cancelled = true;
       void client.removeChannel(channel);
     };
-  }, []);
+  }, [eventId]);
 
   useEffect(() => {
     if (pathname.startsWith("/holddannelse")) setHoldOpen(true);
@@ -220,7 +221,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       const { data, error } = await client
         .from("holddannelse_chat_messages")
         .select("created_at")
-        .eq("event_id", LYKKECUP_EVENT_ID)
+        .eq("event_id", eventId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -261,7 +262,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
           event: "INSERT",
           schema: "public",
           table: "holddannelse_chat_messages",
-          filter: `event_id=eq.${LYKKECUP_EVENT_ID}`,
+          filter: `event_id=eq.${eventId}`,
         },
         () => {
           void refreshCupChatUnread();
@@ -273,7 +274,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       cancelled = true;
       void client.removeChannel(channel);
     };
-  }, []);
+  }, [eventId]);
 
   useEffect(() => {
     if (pathname !== "/cup-chat") return;
@@ -282,7 +283,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       const { data } = await client
         .from("holddannelse_chat_messages")
         .select("created_at")
-        .eq("event_id", LYKKECUP_EVENT_ID)
+        .eq("event_id", eventId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -291,7 +292,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
       else writeCupChatLastSeen(new Date().toISOString());
       setCupChatHasNew(false);
     })();
-  }, [pathname]);
+  }, [pathname, eventId]);
 
   function isActive(href: string) {
     if (href === "/holddannelse") return pathname === "/holddannelse" || pathname.startsWith("/holddannelse/");

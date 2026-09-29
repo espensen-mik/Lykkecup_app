@@ -1,8 +1,5 @@
 import type { PoolPlanningHint } from "@/lib/puljer";
 import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
-
-export const TURNERING_EVENT_ID = "ae74ce1e-9793-48cd-bb1d-c4a248eaf4bf";
-
 export type PuljerOverviewLevel = {
   levelKey: string;
   totalTeams: number;

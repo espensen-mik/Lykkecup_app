@@ -20,7 +20,7 @@ import {
   countRelaxedTeamRestMatches,
   type KampprogramSchedulingSummary,
 } from "@/lib/scheduling-summary";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { isMatchStartOutsidePoolPeriod } from "@/lib/tournament-periods";
 import { timeToMinutes } from "@/lib/baner-tider";
 import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
@@ -47,7 +47,7 @@ const empty: KampprogramBundle = {
 };
 
 export async function fetchKampprogramBundle(): Promise<KampprogramBundle> {
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
   const client = await createServerSupabase();
 
   const [matchesRes, teamsRes, poolsRes, periodsRes, venuesRes, levelScheduleRes, levelCourtRes, availabilityRes, membersRes, playersRes, coachesRes, teamCoachesRes] =

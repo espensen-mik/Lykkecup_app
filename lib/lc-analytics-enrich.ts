@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
+import { LYKKECUP_2026_EVENT_ID } from "@/lib/events";
 
 /** Matcher navigation i `lc26-public-header.tsx` (LykkeCup 26). */
 export const LC26_STATIC_PAGE_TITLES: Record<string, string> = {
@@ -38,7 +38,7 @@ function matchRouteUuid(path: string, segment: "spiller" | "coach"): string | nu
 export async function enrichLc26AnalyticsPaths(
   rows: { path: string; views: number }[],
   supabase: SupabaseClient,
-  eventId: string = LYKKECUP_EVENT_ID,
+  eventId: string = LYKKECUP_2026_EVENT_ID,
 ): Promise<EnrichedPathRow[]> {
   const playerIds = new Set<string>();
   const coachIds = new Set<string>();

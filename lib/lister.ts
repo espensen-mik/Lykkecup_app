@@ -1,7 +1,7 @@
 import { normalizeLevelKey, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { kontrolCenterTeamDisplayNameFromRow } from "@/lib/team-detail";
 import { createServerSupabase } from "@/lib/auth-server";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
+import { getActiveEventId } from "@/lib/active-event-server";
 
 export type ListerTeamRow = {
   id: string;
@@ -42,7 +42,7 @@ export async function fetchListerExportData(): Promise<{
   coaches: ListerCoachRow[];
   error: string | null;
 }> {
-  const eventId = LYKKECUP_EVENT_ID;
+  const eventId = await getActiveEventId();
   const supabase = await createServerSupabase();
 
   const [

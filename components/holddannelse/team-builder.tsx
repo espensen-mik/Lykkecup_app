@@ -1,8 +1,9 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, ChevronDown, Plus, Search } from "lucide-react";
-import { HOLD_EVENT_ID, nextDefaultTeamName, normalizeLevelKey } from "@/lib/holddannelse";
+import { nextDefaultTeamName, normalizeLevelKey } from "@/lib/holddannelse";
 import { kontrolCenterTeamDisplayNameFromRow } from "@/lib/team-detail";
 import {
   derivePreferenceBadge,
@@ -66,6 +67,7 @@ export function TeamBuilder({
   initialTeamCoaches,
   initialActiveTeamId,
 }: Props) {
+  const eventId = useActiveEventId();
   const supabase = useMemo(() => getAuthBrowserClient(), []);
   const canonical = normalizeLevelKey(levelKey);
   /** Åbne hold først (øverst), lukkede hold sidst — inden for hver gruppe nyeste `sort_order` først. */
@@ -283,7 +285,7 @@ export function TeamBuilder({
       const { data, error } = await supabase
         .from("team_members")
         .insert({
-          event_id: HOLD_EVENT_ID,
+          event_id: eventId,
           player_id: playerId,
           team_id: activeTeamId,
         })
@@ -300,7 +302,7 @@ export function TeamBuilder({
       setMembers((prev) => [...prev, row]);
       setAssignedGlobally((prev) => new Set(prev).add(playerId));
     },
-    [activeTeamId, assignedGlobally, teamById, supabase],
+    [activeTeamId, assignedGlobally, teamById, supabase, eventId],
   );
 
   const removeMember = useCallback(async (member: TeamMemberRow) => {
@@ -340,7 +342,7 @@ export function TeamBuilder({
       const { data, error } = await supabase
         .from("team_coaches")
         .insert({
-          event_id: HOLD_EVENT_ID,
+          event_id: eventId,
           team_id: activeTeamId,
           coach_id: coachId,
         })
@@ -360,7 +362,7 @@ export function TeamBuilder({
       const row = data as TeamCoachRow;
       setTeamCoachLinks((prev) => [...prev, row]);
     },
-    [activeTeamId, teamCoachLinks, teamById, supabase],
+    [activeTeamId, teamCoachLinks, teamById, supabase, eventId],
   );
 
   const removeTeamCoach = useCallback(async (link: TeamCoachRow) => {
@@ -448,7 +450,7 @@ export function TeamBuilder({
     const { data, error } = await supabase
       .from("teams")
       .insert({
-        event_id: HOLD_EVENT_ID,
+        event_id: eventId,
         pool_id: null,
         name,
         level: canonical,
@@ -464,7 +466,7 @@ export function TeamBuilder({
     const t = data as TeamRow;
     setTeams((prev) => sortTeamsForDisplay([...prev, t]));
     setActiveTeamId(t.id);
-  }, [teams, canonical, sortTeamsForDisplay, supabase]);
+  }, [teams, canonical, sortTeamsForDisplay, supabase, eventId]);
 
   const deleteTeam = useCallback(
     async (team: TeamRow) => {
@@ -488,7 +490,7 @@ export function TeamBuilder({
       const { error: matchErr } = await supabase
         .from("matches")
         .delete()
-        .eq("event_id", HOLD_EVENT_ID)
+        .eq("event_id", eventId)
         .or(`team_a_id.eq.${team.id},team_b_id.eq.${team.id}`);
       if (matchErr) {
         setBusy(false);
@@ -548,7 +550,7 @@ export function TeamBuilder({
         return copy;
       });
     },
-    [members, teamCoachLinks, activeTeamId, sortTeamsForDisplay, supabase],
+    [members, teamCoachLinks, activeTeamId, sortTeamsForDisplay, supabase, eventId],
   );
 
   type TeamListItem = { kind: "team"; team: TeamRow } | { kind: "header" };

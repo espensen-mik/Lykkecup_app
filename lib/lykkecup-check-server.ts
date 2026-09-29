@@ -15,7 +15,7 @@ import {
   type LykkecupCheckInput,
   type LykkecupCheckResult,
 } from "@/lib/lykkecup-check";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
+import { getActiveEventId } from "@/lib/active-event-server";
 
 function buildCourtUsageRows(
   baner: Awaited<ReturnType<typeof fetchBanerTiderData>>,
@@ -44,7 +44,7 @@ function buildCourtUsageRows(
 }
 
 export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & { error: string | null }> {
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
   const client = await createServerSupabase();
 
   const [playersRes, teamsRes, poolsRes, membersRes, matchesRes, courtsRes, periodsRes, coachesRes, teamCoachesRes, baner] =
@@ -64,7 +64,7 @@ export async function fetchAndRunLykkecupCheck(): Promise<LykkecupCheckResult & 
       client.from("tournament_periods").select("id, name, start_time, end_time, is_all_day").eq("event_id", eventId),
       client.from("coaches").select("id, name").eq("event_id", eventId).order("name", { ascending: true }),
       client.from("team_coaches").select("coach_id, team_id").eq("event_id", eventId),
-      fetchBanerTiderData(client),
+      fetchBanerTiderData(client, eventId),
     ]);
 
   const scheduleFetch = await fetchLevelSchedulePlanningRows(client, eventId);

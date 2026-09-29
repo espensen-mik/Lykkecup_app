@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { getCurrentAuthAppUser, createServerSupabase } from "@/lib/auth-server";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 
 export type SetPlanningLockdownResult = {
   ok: boolean;
@@ -19,12 +19,12 @@ export async function setPlanningLockdownAction(enabled: boolean): Promise<SetPl
     return { ok: false, message: "Kun administratorer kan ændre Lockdown." };
   }
 
-  const supabase = await createServerSupabase();
+  const [supabase, eventId] = await Promise.all([createServerSupabase(), getActiveEventId()]);
   const { error } = await supabase
     .from("kontrolcenter_event_settings")
     .upsert(
       {
-        event_id: LYKKECUP_EVENT_ID,
+        event_id: eventId,
         planning_lockdown: enabled,
         updated_at: new Date().toISOString(),
       },
