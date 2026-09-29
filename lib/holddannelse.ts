@@ -1,5 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { LYKKECUP_EVENT_ID } from "@/lib/players";
-import { supabase } from "@/lib/supabase";
 import type { HoldCoachRow, HoldPlayerRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 
 export const HOLD_EVENT_ID = LYKKECUP_EVENT_ID;
@@ -150,15 +150,15 @@ export type HolddannelseProgressStats = {
  * Samlet fremdrift for holddannelse på tværs af alle niveauer.
  * Tæller unikke spillere med i eventet og hvor mange af dem der er på et hold.
  */
-export async function fetchHolddannelseProgress(): Promise<{
+export async function fetchHolddannelseProgress(client: SupabaseClient): Promise<{
   progress: HolddannelseProgressStats | null;
   error: string | null;
 }> {
   const eventId = HOLD_EVENT_ID;
 
   const [playersRes, membersRes] = await Promise.all([
-    supabase.from("players").select("id").eq("event_id", eventId),
-    supabase.from("team_members").select("player_id").eq("event_id", eventId),
+    client.from("players").select("id").eq("event_id", eventId),
+    client.from("team_members").select("player_id").eq("event_id", eventId),
   ]);
 
   if (playersRes.error) {
@@ -191,16 +191,16 @@ export async function fetchHolddannelseProgress(): Promise<{
   };
 }
 
-export async function fetchHolddannelseOverview(): Promise<{
+export async function fetchHolddannelseOverview(client: SupabaseClient): Promise<{
   levels: LevelOverviewStats[];
   error: string | null;
 }> {
   const eventId = HOLD_EVENT_ID;
 
   const [playersRes, teamsRes, membersRes] = await Promise.all([
-    supabase.from("players").select("id, level").eq("event_id", eventId),
-    supabase.from("teams").select("id, level").eq("event_id", eventId),
-    supabase.from("team_members").select("id, player_id, team_id").eq("event_id", eventId),
+    client.from("players").select("id, level").eq("event_id", eventId),
+    client.from("teams").select("id, level").eq("event_id", eventId),
+    client.from("team_members").select("id, player_id, team_id").eq("event_id", eventId),
   ]);
 
   if (playersRes.error) {
@@ -285,18 +285,18 @@ export type HoldLevelBundle = {
   error: string | null;
 };
 
-export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBundle> {
+export async function fetchHoldLevelData(client: SupabaseClient, levelKey: string): Promise<HoldLevelBundle> {
   const eventId = HOLD_EVENT_ID;
   const normalized = normalizeLevelKey(levelKey);
 
-  const playersQuery = supabase
+  const playersQuery = client
     .from("players")
     .select("id, name, home_club, age, gender, level, preferences")
     .eq("event_id", eventId);
 
   const { data: allPlayers, error: pErr } = normalized === "Ukendt niveau"
     ? await playersQuery
-    : await supabase
+    : await client
         .from("players")
         .select("id, name, home_club, age, gender, level, preferences")
         .eq("event_id", eventId)
@@ -319,7 +319,7 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
     players = players.filter((p) => normalizeLevelKey(p.level) === "Ukendt niveau");
   }
 
-  const { data: teamsData, error: tErr } = await supabase
+  const { data: teamsData, error: tErr } = await client
     .from("teams")
     .select("id, event_id, pool_id, name, nickname, level, sort_order, is_completed")
     .eq("event_id", eventId)
@@ -341,7 +341,7 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
 
   const teams = (teamsData ?? []) as TeamRow[];
 
-  const { data: membersData, error: mErr } = await supabase
+  const { data: membersData, error: mErr } = await client
     .from("team_members")
     .select("id, event_id, player_id, team_id")
     .eq("event_id", eventId);
@@ -367,8 +367,8 @@ export async function fetchHoldLevelData(levelKey: string): Promise<HoldLevelBun
   const members = allMemberRows.filter((m) => teamIds.has(m.team_id));
 
   const [{ data: coachesData, error: cErr }, { data: teamCoachesData, error: tcErr }] = await Promise.all([
-    supabase.from("coaches").select("id, name, home_club, age").eq("event_id", eventId),
-    supabase.from("team_coaches").select("id, event_id, team_id, coach_id").eq("event_id", eventId),
+    client.from("coaches").select("id, name, home_club, age").eq("event_id", eventId),
+    client.from("team_coaches").select("id, event_id, team_id, coach_id").eq("event_id", eventId),
   ]);
 
   if (cErr) {
@@ -440,13 +440,16 @@ export type TeamsPrintLevelGroup = {
  * Henter alle hold for arrangementet med spillere og trænere til print.
  * @param levelFilter – når sat, kun hold med præcis dette `teams.level` (samme som holddannelse-niveau).
  */
-export async function fetchTeamsPrintData(levelFilter: string | null): Promise<{
+export async function fetchTeamsPrintData(
+  client: SupabaseClient,
+  levelFilter: string | null,
+): Promise<{
   groups: TeamsPrintLevelGroup[];
   error: string | null;
 }> {
   const eventId = HOLD_EVENT_ID;
 
-  let q = supabase
+  let q = client
     .from("teams")
     .select("id, event_id, pool_id, name, level, sort_order, is_completed")
     .eq("event_id", eventId);
@@ -475,18 +478,18 @@ export async function fetchTeamsPrintData(levelFilter: string | null): Promise<{
     { data: playersData, error: pErr },
     { data: coachesData, error: cErr },
   ] = await Promise.all([
-    supabase
+    client
       .from("team_members")
       .select("team_id, player_id")
       .eq("event_id", eventId)
       .in("team_id", teamIds),
-    supabase
+    client
       .from("team_coaches")
       .select("team_id, coach_id")
       .eq("event_id", eventId)
       .in("team_id", teamIds),
-    supabase.from("players").select("id, name, home_club").eq("event_id", eventId),
-    supabase.from("coaches").select("id, name").eq("event_id", eventId),
+    client.from("players").select("id, name, home_club").eq("event_id", eventId),
+    client.from("coaches").select("id, name").eq("event_id", eventId),
   ]);
 
   if (mErr) return { groups: [], error: mErr.message };

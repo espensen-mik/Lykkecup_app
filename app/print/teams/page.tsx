@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PrintTeamsButton } from "@/components/print/print-teams-button";
+import { createServerSupabase } from "@/lib/auth-server";
 import { fetchTeamsPrintData, formatLevelShortLabel } from "@/lib/holddannelse";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function PrintTeamsPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const levelFilter = typeof sp.level === "string" && sp.level.trim() !== "" ? sp.level : null;
 
-  const { groups, error } = await fetchTeamsPrintData(levelFilter);
+  const { groups, error } = await fetchTeamsPrintData(await createServerSupabase(), levelFilter);
 
   if (error) {
     return (

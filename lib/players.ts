@@ -1,14 +1,14 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DashboardPlayer, Player, PlayerDetail } from "@/types/player";
-import { supabase } from "@/lib/supabase";
 import { kontrolCenterTeamDisplayNameFromRow } from "@/lib/team-detail";
 
 export const LYKKECUP_EVENT_ID = "ae74ce1e-9793-48cd-bb1d-c4a248eaf4bf";
 
-export async function fetchPlayersForEvent(): Promise<{
+export async function fetchPlayersForEvent(client: SupabaseClient): Promise<{
   players: Player[];
   error: string | null;
 }> {
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("players")
     .select("id, name, home_club, level, age, ticket_id")
     .eq("event_id", LYKKECUP_EVENT_ID)
@@ -26,9 +26,10 @@ export async function fetchPlayersForEvent(): Promise<{
 }
 
 export async function fetchPlayerById(
+  client: SupabaseClient,
   playerId: string,
 ): Promise<{ player: PlayerDetail | null; error: string | null }> {
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("players")
     .select(
       "id, name, home_club, birthdate, age, gender, level, preferences, ticket_id",
@@ -61,9 +62,10 @@ export type PlayerAssignedTeamSummary = {
 
 /** Hold spilleren er på i dette arrangement — med officielt navn og valgfrit kaldenavn. */
 export async function fetchAssignedTeamForPlayer(
+  client: SupabaseClient,
   playerId: string,
 ): Promise<PlayerAssignedTeamSummary | null> {
-  const { data: mem, error: memErr } = await supabase
+  const { data: mem, error: memErr } = await client
     .from("team_members")
     .select("team_id")
     .eq("player_id", playerId)
@@ -73,7 +75,7 @@ export async function fetchAssignedTeamForPlayer(
 
   if (memErr || !mem?.team_id) return null;
 
-  const { data: team, error: teamErr } = await supabase
+  const { data: team, error: teamErr } = await client
     .from("teams")
     .select("id, name, nickname, level")
     .eq("id", mem.team_id)
@@ -93,11 +95,11 @@ export async function fetchAssignedTeamForPlayer(
 }
 
 /** All players for the event — dashboard aggregations and charts */
-export async function fetchPlayersForDashboard(): Promise<{
+export async function fetchPlayersForDashboard(client: SupabaseClient): Promise<{
   players: DashboardPlayer[];
   error: string | null;
 }> {
-  const withTimestamp = await supabase
+  const withTimestamp = await client
     .from("players")
     .select("id, name, home_club, level, age, gender, created_at")
     .eq("event_id", LYKKECUP_EVENT_ID);
@@ -110,7 +112,7 @@ export async function fetchPlayersForDashboard(): Promise<{
     };
   }
 
-  const fallback = await supabase
+  const fallback = await client
     .from("players")
     .select("id, name, home_club, level, age, gender")
     .eq("event_id", LYKKECUP_EVENT_ID);
