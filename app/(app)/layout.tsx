@@ -2,18 +2,18 @@ import { ActiveEventProvider } from "@/components/active-event-context";
 import { AppShell } from "@/components/app-shell";
 import { KontrolcenterLockdownProvider } from "@/components/kontrolcenter-lockdown-context";
 import { PlayerModalProvider } from "@/components/player-modal-context";
-import { getActiveEventId } from "@/lib/active-event-server";
+import { getActiveEvent } from "@/lib/active-event-server";
 import { getCurrentAuthAppUser } from "@/lib/auth-server";
 import { fetchPlanningLockdown } from "@/lib/kontrolcenter-lockdown-server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const [user, planningLockdown, eventId] = await Promise.all([
+  const [user, planningLockdown, event] = await Promise.all([
     getCurrentAuthAppUser(),
     fetchPlanningLockdown(),
-    getActiveEventId(),
+    getActiveEvent(),
   ]);
   return (
-    <ActiveEventProvider eventId={eventId}>
+    <ActiveEventProvider event={event}>
       <KontrolcenterLockdownProvider initialPlanningLockdown={planningLockdown} currentUser={user}>
         <PlayerModalProvider>
           <AppShell currentUser={user}>{children}</AppShell>

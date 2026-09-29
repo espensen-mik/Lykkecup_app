@@ -1,6 +1,6 @@
 "use client";
 
-import { useActiveEventId } from "@/components/active-event-context";
+import { useActiveEvent } from "@/components/active-event-context";
 import {
   BarChart3,
   Building2,
@@ -31,6 +31,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
+import { EVENT_PICKER_PATH, eventYearLabel } from "@/lib/events";
 import { KontrolcenterHelp } from "@/components/kontrolcenter-help";
 import { KontrolcenterLockdownToggle } from "@/components/kontrolcenter-lockdown-toggle";
 import { useKontrolcenterLockdown } from "@/components/kontrolcenter-lockdown-context";
@@ -46,7 +47,7 @@ import {
   sortLevelKeysForNav,
   turneringLevelMergeKey,
 } from "@/lib/holddannelse";
-const HEADER_TITLE = "LykkeCup KontrolCenter 2026";
+const HEADER_TITLE = "LykkeCup KontrolCenter";
 
 const CUPCHAT_LAST_SEEN_KEY = "lc26_cupchat_last_seen_at";
 
@@ -102,7 +103,9 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
 }
 
 export function AppShell({ children, currentUser }: { children: React.ReactNode; currentUser: AuthAppUser | null }) {
-  const eventId = useActiveEventId();
+  const activeEvent = useActiveEvent();
+  const eventId = activeEvent.id;
+  const eventYear = eventYearLabel(activeEvent);
   const { planningLockdown } = useKontrolcenterLockdown();
   const authClient = getAuthBrowserClient();
   function initialsFromName(name: string) {
@@ -859,10 +862,20 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
         <Link href="/admin" className="flex min-w-0 flex-1 items-center gap-3">
           <BrandLogo compact />
           <span className="min-w-0 truncate text-sm font-semibold tracking-tight text-white sm:text-[0.9375rem]">
-            {HEADER_TITLE}
+            {HEADER_TITLE} {eventYear}
           </span>
         </Link>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <Link
+            href={`${EVENT_PICKER_PATH}?next=${encodeURIComponent(pathname)}`}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-white/60 px-3 py-1.5 text-xs font-semibold text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/60 lg:px-4 lg:py-2 lg:text-sm"
+            title="Skift hvilket LykkeCup-år KontrolCenter arbejder i"
+          >
+            <CalendarDays className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            {eventYear}
+            {activeEvent.status === "archived" ? " · Arkiv" : null}
+            <span className="hidden font-normal text-white/80 sm:inline">· Skift</span>
+          </Link>
           <Link
             href="/lister"
             onClick={() => setMobileOpen(false)}
