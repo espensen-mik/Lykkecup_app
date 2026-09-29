@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { supabase } from "@/lib/supabase";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
+import { LYKKECUP_2026_EVENT_ID } from "@/lib/events";
 
 type PlayerRow = {
   id: string;
@@ -67,11 +67,11 @@ export default function StatusPage() {
       supabase
         .from("players")
         .select("id, name, home_club, age, level")
-        .eq("event_id", LYKKECUP_EVENT_ID),
+        .eq("event_id", LYKKECUP_2026_EVENT_ID),
       supabase
         .from("coaches")
         .select("id, name, home_club")
-        .eq("event_id", LYKKECUP_EVENT_ID),
+        .eq("event_id", LYKKECUP_2026_EVENT_ID),
     ]);
 
     if (pErr || cErr) {

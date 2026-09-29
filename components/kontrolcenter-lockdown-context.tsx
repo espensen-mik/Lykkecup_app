@@ -1,5 +1,6 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import {
   createContext,
   useCallback,
@@ -15,7 +16,6 @@ import { getAuthBrowserClient } from "@/lib/auth-browser";
 import type { AuthAppUser } from "@/lib/auth-app-user";
 import { setPlanningLockdownAction } from "@/lib/kontrolcenter-lockdown-actions";
 import { isPlanningLockdownPath, PLANNING_LOCKDOWN_MESSAGE } from "@/lib/kontrolcenter-lockdown-shared";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 
 type KontrolcenterLockdownContextValue = {
   planningLockdown: boolean;
@@ -37,6 +37,7 @@ export function KontrolcenterLockdownProvider({
   initialPlanningLockdown: boolean;
   currentUser: AuthAppUser | null;
 }) {
+  const eventId = useActiveEventId();
   const pathname = usePathname();
   const router = useRouter();
   const [planningLockdown, setPlanningLockdownState] = useState(initialPlanningLockdown);
@@ -74,7 +75,7 @@ export function KontrolcenterLockdownProvider({
       const { data, error } = await client
         .from("kontrolcenter_event_settings")
         .select("planning_lockdown")
-        .eq("event_id", LYKKECUP_EVENT_ID)
+        .eq("event_id", eventId)
         .maybeSingle();
       if (cancelled || error) return;
       applyPlanningLockdown(Boolean(data?.planning_lockdown), source);
@@ -88,7 +89,7 @@ export function KontrolcenterLockdownProvider({
           event: "*",
           schema: "public",
           table: "kontrolcenter_event_settings",
-          filter: `event_id=eq.${LYKKECUP_EVENT_ID}`,
+          filter: `event_id=eq.${eventId}`,
         },
         (payload) => {
           const row =
@@ -113,7 +114,7 @@ export function KontrolcenterLockdownProvider({
       cancelled = true;
       void client.removeChannel(channel);
     };
-  }, [toggleBusy]);
+  }, [toggleBusy, eventId]);
 
   useEffect(() => {
     if (!remoteToast) return;

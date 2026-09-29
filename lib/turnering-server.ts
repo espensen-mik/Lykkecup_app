@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
 import {
   canonicalBanerLevelLabel,
@@ -18,7 +19,6 @@ import { fetchLevelSchedulePlanningRows } from "@/lib/level-schedule-settings";
 import { poolPlanningHint } from "@/lib/puljer";
 import { teamRestMinutesBetweenMatches } from "@/lib/turnering-scheduler";
 import {
-  TURNERING_EVENT_ID,
   type MatchRow,
   type PuljerOverviewLevel,
   type TurneringsplanOverviewLevel,
@@ -80,7 +80,7 @@ export async function fetchPuljerOverview(): Promise<{
   levels: PuljerOverviewLevel[];
   error: string | null;
 }> {
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
   const client = await createServerSupabase();
   const [teamsRes, poolsRes] = await Promise.all([
     client.from("teams").select("id, level, pool_id").eq("event_id", eventId),
@@ -147,7 +147,7 @@ export async function fetchTurneringsplanOverview(): Promise<{
   totalMatchCount: number;
   error: string | null;
 }> {
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
   const { levels, error } = await fetchPuljerOverview();
   if (error) return { levels: [], totalMatchCount: 0, error };
 
@@ -171,7 +171,7 @@ export async function fetchTurneringsplanOverview(): Promise<{
 }
 
 export async function fetchTurneringLevelData(levelKey: string): Promise<TurneringLevelBundle> {
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
   const canonLevel = canonicalBanerLevelLabel(levelKey);
   const client = await createServerSupabase();
 
@@ -258,7 +258,7 @@ export async function fetchTurneringLevelData(levelKey: string): Promise<Turneri
 }
 
 export async function fetchTurneringPlanLevelData(levelKey: string): Promise<TurneringPlanLevelBundle> {
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
   const canonLevel = canonicalBanerLevelLabel(levelKey);
   const client = await createServerSupabase();
   const [poolsRes, teamsRes, membersRes, playersRes, coachesRes, teamCoachesRes, periodsRes, venuesRes] =
@@ -405,7 +405,7 @@ export async function fetchTurneringPlanLevelData(levelKey: string): Promise<Tur
 
 export async function fetchTurneringDashboardOverview(): Promise<TurneringDashboardOverview> {
   const client = await createServerSupabase();
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
   const [playersRes, teamsRes, poolsRes, matchesRes, scheduleFetch] = await Promise.all([
     client.from("players").select("id, level").eq("event_id", eventId),
     client.from("teams").select("id, level, pool_id").eq("event_id", eventId),

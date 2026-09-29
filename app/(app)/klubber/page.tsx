@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { ClubsLiveList } from "@/components/clubs-live-list";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
 import { fetchClubFeedbackForEvent } from "@/lib/club-feedback";
-import { fetchPlayersForEvent, LYKKECUP_EVENT_ID } from "@/lib/players";
+import { fetchPlayersForEvent } from "@/lib/players";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +13,11 @@ export const metadata: Metadata = {
 };
 
 export default async function KlubberPage() {
-  const supabase = await createServerSupabase();
+  const [supabase, eventId] = await Promise.all([createServerSupabase(), getActiveEventId()]);
   const [playersRes, feedbackRes, membersRes] = await Promise.all([
-    fetchPlayersForEvent(supabase),
-    fetchClubFeedbackForEvent(supabase),
-    supabase.from("team_members").select("player_id").eq("event_id", LYKKECUP_EVENT_ID),
+    fetchPlayersForEvent(supabase, eventId),
+    fetchClubFeedbackForEvent(supabase, eventId),
+    supabase.from("team_members").select("player_id").eq("event_id", eventId),
   ]);
   const { players, error } = playersRes;
   const feedbackLoadError = feedbackRes.error;

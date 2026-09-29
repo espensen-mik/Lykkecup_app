@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { KommentarerFilteredList } from "@/components/kommentarer-filtered-list";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { createServerSupabase, getCurrentAuthAppUser } from "@/lib/auth-server";
 import { fetchClubFeedbackForKontrolcenter } from "@/lib/club-feedback";
 
@@ -11,8 +12,12 @@ export const metadata: Metadata = {
 };
 
 export default async function KommentarerPage() {
-  const [supabase, currentUser] = await Promise.all([createServerSupabase(), getCurrentAuthAppUser()]);
-  const feedbackRes = await fetchClubFeedbackForKontrolcenter(supabase);
+  const [supabase, currentUser, eventId] = await Promise.all([
+    createServerSupabase(),
+    getCurrentAuthAppUser(),
+    getActiveEventId(),
+  ]);
+  const feedbackRes = await fetchClubFeedbackForKontrolcenter(supabase, eventId);
   const { comments, error } = feedbackRes;
 
   if (error) {

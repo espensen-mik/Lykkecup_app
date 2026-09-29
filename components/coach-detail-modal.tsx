@@ -1,9 +1,9 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { Coach } from "@/types/coach";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { CoachDetailContent } from "@/components/coach-detail-content";
 import { ParticipantModalContextPanel } from "@/components/participant-modal-context-panel";
@@ -97,6 +97,7 @@ function printValue(value: string | null): string {
 }
 
 export function CoachDetailModal({ coachId, onClose }: Props) {
+  const eventId = useActiveEventId();
   const supabase = getAuthBrowserClient();
   const [coach, setCoach] = useState<Coach | null>(null);
   const [participantContext, setParticipantContext] = useState<CoachParticipantContext>({
@@ -146,13 +147,13 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
           .from("coaches")
           .select("id, event_id, ticket_id, name, home_club, email, phone, birthdate, age, tshirt_size")
           .eq("id", coachId)
-          .eq("event_id", LYKKECUP_EVENT_ID)
+          .eq("event_id", eventId)
           .maybeSingle(),
         supabase
           .from("coach_change_log")
           .select("id, field_name, old_value, new_value, changed_at, changed_by_name")
           .eq("coach_id", coachId)
-          .eq("event_id", LYKKECUP_EVENT_ID)
+          .eq("event_id", eventId)
           .order("changed_at", { ascending: false })
           .limit(30),
       ]);
@@ -170,7 +171,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
       const detail = data as Coach;
       setCoach(detail);
       setDraft(toCoachDraft(detail));
-      const context = await fetchCoachParticipantContext(supabase, coachId);
+      const context = await fetchCoachParticipantContext(supabase, eventId, coachId);
       if (cancelled) return;
       setParticipantContext(context);
       setLogs(filterLegacyUnknownLogs((logsRes.data ?? []) as CoachChangeLogRow[]));
@@ -180,7 +181,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [coachId]);
+  }, [coachId, eventId]);
 
   useEffect(() => {
     if (!coachId) return;
@@ -218,7 +219,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
       .from("coach_change_log")
       .select("id, field_name, old_value, new_value, changed_at, changed_by_name")
       .eq("coach_id", coachIdForLogs)
-      .eq("event_id", LYKKECUP_EVENT_ID)
+      .eq("event_id", eventId)
       .order("changed_at", { ascending: false })
       .limit(30);
     if (!logsRes.error) {
@@ -282,7 +283,7 @@ export function CoachDetailModal({ coachId, onClose }: Props) {
       .from("coaches")
       .update(payload)
       .eq("id", coachId)
-      .eq("event_id", LYKKECUP_EVENT_ID);
+      .eq("event_id", eventId);
     setSaving(false);
 
     if (updateError) {

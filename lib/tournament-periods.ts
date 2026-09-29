@@ -1,8 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatTimeForInput, timeInputToTimestamptz, timeToMinutes, validateAvailability } from "@/lib/baner-tider";
 import type { RegnemaskineAvailability } from "@/lib/lykkecup-regnemaskine";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
-
 export const ALL_DAY_PERIOD_NAME = "Hele dagen";
 
 /** Standard planlægningsvindue når baner ikke har eksplicit tilgængelighed. */
@@ -113,8 +111,7 @@ export function formatPeriodRange(
   return `${a}–${b}`;
 }
 
-export async function fetchPeriodsBundle(supabase: SupabaseClient): Promise<PeriodsBundle> {
-  const eventId = TURNERING_EVENT_ID;
+export async function fetchPeriodsBundle(supabase: SupabaseClient, eventId: string): Promise<PeriodsBundle> {
   const [periodsRes, poolsRes] = await Promise.all([
     supabase
       .from("tournament_periods")
@@ -155,6 +152,7 @@ export function validatePeriodTimes(start: string, end: string): string | null {
 }
 
 export function periodInsertPayload(
+  eventId: string,
   name: string,
   start: string,
   end: string,
@@ -169,7 +167,7 @@ export function periodInsertPayload(
     if (err) throw new Error(err);
   }
   return {
-    event_id: TURNERING_EVENT_ID,
+    event_id: eventId,
     name: name.trim(),
     start_time,
     end_time,

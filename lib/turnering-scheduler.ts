@@ -29,7 +29,6 @@ import {
   type TournamentPeriodRow,
 } from "@/lib/tournament-periods";
 import { canonicalBanerLevelLabel, formatLevelShortLabel } from "@/lib/holddannelse";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
 
 /**
  * Minimum wall-clock minutes between the end of one match and the start of the next for the same team.
@@ -1913,6 +1912,7 @@ function schedulingStateAfterAssignments(
  */
 export async function assignMatchScheduleForLevelPeriodPools(
   supabase: SupabaseClient,
+  eventId: string,
   levelKey: string,
   poolIds: readonly string[],
 ): Promise<AssignPoolScheduleResult> {
@@ -1920,7 +1920,6 @@ export async function assignMatchScheduleForLevelPeriodPools(
     return { scheduled: 0, unscheduled: 0, error: null, overflowPeriodNames: [] };
   }
 
-  const eventId = TURNERING_EVENT_ID;
   const poolIdSet = new Set(poolIds);
 
   const poolsRes = await supabase
@@ -2003,7 +2002,7 @@ export async function assignMatchScheduleForLevelPeriodPools(
       return { scheduled: 0, unscheduled: 0, error: "Periode ikke fundet.", overflowPeriodNames: [] };
     }
     if (isAllDayPeriod(p)) {
-      return assignMatchScheduleForLevelAllDay(supabase, levelKey, poolIds[0]!, periodId);
+      return assignMatchScheduleForLevelAllDay(supabase, eventId, levelKey, poolIds[0]!, periodId);
     }
   }
 
@@ -2361,11 +2360,11 @@ export async function assignMatchScheduleForLevelPeriodPools(
 /** Planlæg alle puljer på samme niveau med «Hele dagen» i én optimering (deler Stor-baner). */
 export async function assignMatchScheduleForLevelAllDay(
   supabase: SupabaseClient,
+  eventId: string,
   levelKey: string,
   triggerPoolId: string,
   primaryPeriodId: string,
 ): Promise<AssignPoolScheduleResult> {
-  const eventId = TURNERING_EVENT_ID;
 
   const [poolsRes, periodsRes] = await Promise.all([
     supabase.from("pools").select("id, level, period_id").eq("event_id", eventId),
@@ -2398,11 +2397,12 @@ export async function assignMatchScheduleForLevelAllDay(
     .map((p) => p.id);
 
   if (levelPoolIds.length === 0) {
-    return assignMatchScheduleForPool(supabase, triggerPoolId);
+    return assignMatchScheduleForPool(supabase, eventId, triggerPoolId);
   }
 
   const result = await assignMatchScheduleForPoolIds(
     supabase,
+    eventId,
     levelPoolIds,
     primaryPeriodId,
     levelKey,
@@ -2413,12 +2413,12 @@ export async function assignMatchScheduleForLevelAllDay(
 
 async function assignMatchScheduleForPoolIds(
   supabase: SupabaseClient,
+  eventId: string,
   poolIds: readonly string[],
   primaryPeriodId: string,
   levelKey: string,
   reportPoolId: string,
 ): Promise<AssignPoolScheduleResult> {
-  const eventId = TURNERING_EVENT_ID;
   const poolIdSet = new Set(poolIds);
 
   const venuesRes = await supabase.from("venues").select("id").eq("event_id", eventId);
@@ -2921,9 +2921,9 @@ async function assignMatchScheduleForPoolIds(
 
 export async function assignMatchScheduleForPool(
   supabase: SupabaseClient,
+  eventId: string,
   poolId: string,
 ): Promise<AssignPoolScheduleResult> {
-  const eventId = TURNERING_EVENT_ID;
 
   const poolRes = await supabase
     .from("pools")
@@ -2958,7 +2958,7 @@ export async function assignMatchScheduleForPool(
     .maybeSingle();
 
   if (periodCheckRes.data && isAllDayPeriod(periodCheckRes.data as TournamentPeriodRow)) {
-    return assignMatchScheduleForLevelAllDay(supabase, levelKey, poolId, pool.period_id);
+    return assignMatchScheduleForLevelAllDay(supabase, eventId, levelKey, poolId, pool.period_id);
   }
 
   const venuesRes = await supabase.from("venues").select("id").eq("event_id", eventId);
@@ -4043,6 +4043,7 @@ function findManualScheduleMoveSuggestions(input: {
 /** Ledige bane/tid til manuel planlægning — inkl. andre banestørrelser og alle perioder. */
 export async function listManualScheduleSlotsForMatch(
   supabase: SupabaseClient,
+  eventId: string,
   matchId: string,
 ): Promise<ManualScheduleSlotsResult> {
   const empty: ManualScheduleSlotsResult = {
@@ -4059,7 +4060,6 @@ export async function listManualScheduleSlotsForMatch(
     bookedBlocks: [],
   };
 
-  const eventId = TURNERING_EVENT_ID;
 
   const matchRes = await supabase
     .from("matches")

@@ -6,12 +6,12 @@ import {
   computeTurneringsplanMatchStatus,
   type TurneringsplanMatchStatus,
 } from "@/lib/turneringsplan-status";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
+import { getActiveEventId } from "@/lib/active-event-server";
 
 export async function fetchTurneringsplanMatchStatus(): Promise<
   TurneringsplanMatchStatus & { error: string | null }
 > {
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
   const client = await createServerSupabase();
 
   const [playersRes, teamsRes, poolsRes, membersRes, matchesRes, courtsRes] = await Promise.all([

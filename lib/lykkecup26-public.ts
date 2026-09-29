@@ -1,9 +1,10 @@
+import { LYKKECUP_2026_EVENT_ID } from "@/lib/events";
 import { supabase } from "@/lib/supabase";
 import { publicTeamDisplayName } from "@/lib/team-public-display-name";
 import type { TeamRow } from "@/types/teams";
 
-/** Offentlig LykkeCup 26-app — samme arrangement som KontrolCenter. */
-export const LYKKECUP26_EVENT_ID = "ae74ce1e-9793-48cd-bb1d-c4a248eaf4bf";
+/** Offentlig LykkeCup 26-app — altid 2026, uanset hvilket år KontrolCenter arbejder i. */
+export const LYKKECUP26_EVENT_ID = LYKKECUP_2026_EVENT_ID;
 
 export type Lc26PlayerListRow = {
   id: string;

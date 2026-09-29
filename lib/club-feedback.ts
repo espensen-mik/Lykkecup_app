@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { UNKNOWN_CLUB_LABEL } from "@/lib/clubs";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
 import type { ClubFeedbackInternalMessage, ClubFeedbackRow } from "@/types/club-feedback";
 
 /** Samme nøgle som `groupPlayersByClub` bruger til klubnavn. */
@@ -27,7 +26,7 @@ function normalizeClubFeedbackRow(r: ClubFeedbackRow): ClubFeedbackRow {
   };
 }
 
-export async function fetchClubFeedbackForEvent(client: SupabaseClient): Promise<{
+export async function fetchClubFeedbackForEvent(client: SupabaseClient, eventId: string): Promise<{
   comments: ClubFeedbackRow[];
   error: string | null;
 }> {
@@ -36,7 +35,7 @@ export async function fetchClubFeedbackForEvent(client: SupabaseClient): Promise
     .select(
       "id, event_id, home_club, author_name, author_phone, comment_text, created_at, ll_status_text, ll_status_created_at, ll_status_author_id, ll_status_author_name, ll_status_author_avatar_url, handled_at, handled_by, working_on_user_id, working_on_name, working_on_avatar_url, working_on_at",
     )
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -54,7 +53,7 @@ export async function fetchClubFeedbackForEvent(client: SupabaseClient): Promise
  * Kommentarer-siden: samme rækker som `fetchClubFeedbackForEvent`, plus intern tråd pr. feedback.
  * Kræver indlogget Supabase-klient (server cookies), så RLS/grants for `club_feedback_internal_messages` gælder.
  */
-export async function fetchClubFeedbackForKontrolcenter(client: SupabaseClient): Promise<{
+export async function fetchClubFeedbackForKontrolcenter(client: SupabaseClient, eventId: string): Promise<{
   comments: ClubFeedbackRow[];
   error: string | null;
 }> {
@@ -63,7 +62,7 @@ export async function fetchClubFeedbackForKontrolcenter(client: SupabaseClient):
     .select(
       "id, event_id, home_club, author_name, author_phone, comment_text, created_at, ll_status_text, ll_status_created_at, ll_status_author_id, ll_status_author_name, ll_status_author_avatar_url, handled_at, handled_by, working_on_user_id, working_on_name, working_on_avatar_url, working_on_at",
     )
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -78,7 +77,7 @@ export async function fetchClubFeedbackForKontrolcenter(client: SupabaseClient):
     const { data: msgData, error: msgError } = await client
       .from("club_feedback_internal_messages")
       .select("id, club_feedback_id, body, author_id, author_name, author_avatar_url, created_at")
-      .eq("event_id", LYKKECUP_EVENT_ID)
+      .eq("event_id", eventId)
       .in("club_feedback_id", ids)
       .order("created_at", { ascending: true });
 
@@ -103,11 +102,11 @@ export async function fetchClubFeedbackForKontrolcenter(client: SupabaseClient):
 }
 
 /** Antal kommentarer for arrangementet, som endnu ikke er markeret som håndteret. */
-export async function fetchUnhandledClubFeedbackCount(client: SupabaseClient): Promise<number> {
+export async function fetchUnhandledClubFeedbackCount(client: SupabaseClient, eventId: string): Promise<number> {
   const { count, error } = await client
     .from("club_feedback")
     .select("id", { count: "exact", head: true })
-    .eq("event_id", LYKKECUP_EVENT_ID)
+    .eq("event_id", eventId)
     .is("handled_at", null);
 
   if (error) return 0;
@@ -115,7 +114,11 @@ export async function fetchUnhandledClubFeedbackCount(client: SupabaseClient): P
 }
 
 /** Antal trænerkommentarer i alt og inden for de seneste `hours` timer (til dashboard-KPI’er). */
-export async function fetchClubFeedbackCounts(client: SupabaseClient, hoursRecent = 24): Promise<{
+export async function fetchClubFeedbackCounts(
+  client: SupabaseClient,
+  eventId: string,
+  hoursRecent = 24,
+): Promise<{
   total: number;
   recent: number;
   error: string | null;
@@ -126,11 +129,11 @@ export async function fetchClubFeedbackCounts(client: SupabaseClient, hoursRecen
     client
       .from("club_feedback")
       .select("id", { count: "exact", head: true })
-      .eq("event_id", LYKKECUP_EVENT_ID),
+      .eq("event_id", eventId),
     client
       .from("club_feedback")
       .select("id", { count: "exact", head: true })
-      .eq("event_id", LYKKECUP_EVENT_ID)
+      .eq("event_id", eventId)
       .gte("created_at", sinceIso),
   ]);
 

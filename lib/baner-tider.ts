@@ -2,8 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { canonicalBanerLevelLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { fetchBanerLevelScheduleRows } from "@/lib/level-schedule-settings";
 import { computeScheduledRoundsByCourtId } from "@/lib/lykkecup-regnemaskine";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
-
 /** DB enum `court_type`: mini (tidligere small), kort (ny), stor (tidligere large). */
 export const COURT_TYPES = ["mini", "kort", "stor"] as const;
 export type CourtType = (typeof COURT_TYPES)[number];
@@ -251,8 +249,7 @@ function dedupeLevelCourtSettingsRows(rows: LevelCourtSettingRow[]): LevelCourtS
   return sortLevelKeysForNav([...map.keys()]).map((k) => map.get(k)!);
 }
 
-export async function fetchBanerTiderData(supabase: SupabaseClient): Promise<BanerTiderBundle> {
-  const eventId = TURNERING_EVENT_ID;
+export async function fetchBanerTiderData(supabase: SupabaseClient, eventId: string): Promise<BanerTiderBundle> {
 
   const [venuesRes, playersRes, teamsRes] = await Promise.all([
     supabase.from("venues").select("id, event_id, name, sort_order").eq("event_id", eventId).order("sort_order", { ascending: true }),

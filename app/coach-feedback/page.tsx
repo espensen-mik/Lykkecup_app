@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { formatDaDateTime } from "@/lib/datetime";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
+import { LYKKECUP_2026_EVENT_ID } from "@/lib/events";
 import { supabase } from "@/lib/supabase";
 import type { ClubFeedbackRow } from "@/types/club-feedback";
 
@@ -87,7 +87,7 @@ export default function CoachFeedbackPage() {
     const { data, error } = await supabase
       .from("club_feedback")
       .select(PUBLIC_CLUB_FEEDBACK_SELECT)
-      .eq("event_id", LYKKECUP_EVENT_ID)
+      .eq("event_id", LYKKECUP_2026_EVENT_ID)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -111,8 +111,8 @@ export default function CoachFeedbackPage() {
         supabase
           .from("players")
           .select("id, name, home_club, age, level")
-          .eq("event_id", LYKKECUP_EVENT_ID),
-        supabase.from("coaches").select("id, name, home_club").eq("event_id", LYKKECUP_EVENT_ID),
+          .eq("event_id", LYKKECUP_2026_EVENT_ID),
+        supabase.from("coaches").select("id, name, home_club").eq("event_id", LYKKECUP_2026_EVENT_ID),
       ]);
 
       if (cancelled) return;

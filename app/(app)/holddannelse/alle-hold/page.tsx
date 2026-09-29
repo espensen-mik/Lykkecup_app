@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AllTeamsExport } from "@/components/all-teams-export";
 import { AllTeamsOverviewList } from "@/components/holddannelse/all-teams-overview-list";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
 import { fetchTeamsPrintData, formatLevelShortLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { fetchListerExportData } from "@/lib/lister";
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 export default async function AlleHoldPage() {
   const [{ teams, players, error }, printData] = await Promise.all([
     fetchListerExportData(),
-    fetchTeamsPrintData(await createServerSupabase(), null),
+    fetchTeamsPrintData(await createServerSupabase(), await getActiveEventId(), null),
   ]);
 
   const playerCountByTeamId = new Map<string, number>();

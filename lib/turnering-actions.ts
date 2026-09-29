@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getActiveEventId } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
 import { canonicalBanerLevelLabel, sortLevelKeysForNav } from "@/lib/holddannelse";
 import { fetchLevelSchedulePlanningRows } from "@/lib/level-schedule-settings";
@@ -9,7 +10,6 @@ import {
   computeLevelBalanceAdditions,
   generateLevelCappedMatches,
   generateRoundRobinMatches,
-  TURNERING_EVENT_ID,
 } from "@/lib/turnering";
 import {
   assignMatchScheduleForLevelAllDay,
@@ -109,6 +109,7 @@ export type PostScheduleCheckResult = {
  */
 async function fetchPostScheduleChecks(
   supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  eventId: string,
   poolIds: string[],
   levelKey: string,
 ): Promise<PostScheduleCheckResult> {
@@ -119,23 +120,23 @@ async function fetchPostScheduleChecks(
     supabase
       .from("matches")
       .select("id, pool_id, team_a_id, team_b_id, court_id, start_time, end_time, schedule_relaxed_team_rest")
-      .eq("event_id", TURNERING_EVENT_ID)
+      .eq("event_id", eventId)
       .in("pool_id", poolIds)
       .not("court_id", "is", null)
       .not("start_time", "is", null),
     supabase
       .from("teams")
       .select("id, name, level, pool_id")
-      .eq("event_id", TURNERING_EVENT_ID),
+      .eq("event_id", eventId),
     supabase
       .from("pools")
       .select("id, name, level, period_id")
-      .eq("event_id", TURNERING_EVENT_ID)
+      .eq("event_id", eventId)
       .in("id", poolIds),
     supabase
       .from("level_schedule_settings")
       .select("level, plan_matches_per_team, match_duration_minutes, break_between_matches_minutes")
-      .eq("event_id", TURNERING_EVENT_ID),
+      .eq("event_id", eventId),
   ]);
 
   if (matchesRes.error || teamsRes.error || poolsRes.error || scheduleRes.error) return empty;
@@ -202,6 +203,7 @@ export async function createPoolAction(
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -213,7 +215,7 @@ export async function createPoolAction(
   const { data: allPools, error: listErr } = await supabase
     .from("pools")
     .select("sort_order, name, level")
-    .eq("event_id", TURNERING_EVENT_ID);
+    .eq("event_id", eventId);
 
   if (listErr) return { ok: false, message: listErr.message };
 
@@ -227,7 +229,7 @@ export async function createPoolAction(
   const { data, error } = await supabase
     .from("pools")
     .insert({
-      event_id: TURNERING_EVENT_ID,
+      event_id: eventId,
       level: normalizedLevel,
       name,
       sort_order: maxSort + 1,
@@ -266,7 +268,7 @@ export async function releaseOrphanedPoolTeamsAction(levelKey: string): Promise<
   }
 
   const canonLevel = canonicalBanerLevelLabel(levelKey);
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
 
   const [teamsRes, poolsRes] = await Promise.all([
     supabase.from("teams").select("id, level, pool_id").eq("event_id", eventId),
@@ -329,7 +331,7 @@ export async function autoAssignPoolsAction(levelKey: string): Promise<
   }
 
   const canonLevel = canonicalBanerLevelLabel(levelKey);
-  const eventId = TURNERING_EVENT_ID;
+  const eventId = await getActiveEventId();
 
   const [teamsRes, poolsRes, membersRes, playersRes] = await Promise.all([
     supabase
@@ -505,6 +507,7 @@ export async function normalizePoolLevelLabelsAction(): Promise<TurneringActionR
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -515,7 +518,7 @@ export async function normalizePoolLevelLabelsAction(): Promise<TurneringActionR
   const { data: pools, error: listErr } = await supabase
     .from("pools")
     .select("id, level")
-    .eq("event_id", TURNERING_EVENT_ID);
+    .eq("event_id", eventId);
 
   if (listErr) return { ok: false, message: listErr.message };
 
@@ -551,6 +554,7 @@ export async function renumberPoolNamesForLevelAction(
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -562,7 +566,7 @@ export async function renumberPoolNamesForLevelAction(
   const { data: allPools, error: listErr } = await supabase
     .from("pools")
     .select("id, level, name, sort_order")
-    .eq("event_id", TURNERING_EVENT_ID);
+    .eq("event_id", eventId);
 
   if (listErr) return { ok: false, message: listErr.message };
 
@@ -620,6 +624,7 @@ export async function updateMatchScheduleAction(
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -636,7 +641,7 @@ export async function updateMatchScheduleAction(
       schedule_relaxed_team_rest: options?.scheduleRelaxedTeamRest ?? false,
     })
     .eq("id", matchId)
-    .eq("event_id", TURNERING_EVENT_ID);
+    .eq("event_id", eventId);
 
   if (error) return { ok: false, message: error.message };
 
@@ -679,7 +684,7 @@ export async function fetchManualScheduleSlotsAction(
   const locked = await planningLockdownBlock();
   if (locked) return locked;
 
-  const result = await listManualScheduleSlotsForMatch(supabase, matchId);
+  const result = await listManualScheduleSlotsForMatch(supabase, await getActiveEventId(), matchId);
   if (!result.ok) {
     return { ok: false, message: result.error ?? "Kunne ikke hente ledige tider." };
   }
@@ -721,13 +726,14 @@ export async function applyManualScheduleSlotAction(
 
 async function appendLevelBalanceMatchesForLevel(
   supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  eventId: string,
   normalizedLevel: string,
   matchesPerTeam: number,
 ): Promise<{ added: number; error: string | null }> {
   const poolsRes = await supabase
     .from("pools")
     .select("id")
-    .eq("event_id", TURNERING_EVENT_ID);
+    .eq("event_id", eventId);
   if (poolsRes.error) return { added: 0, error: poolsRes.error.message };
 
   const levelPoolIds = ((poolsRes.data ?? []) as { id: string }[])
@@ -738,7 +744,7 @@ async function appendLevelBalanceMatchesForLevel(
   const poolsWithLevel = await supabase
     .from("pools")
     .select("id, level")
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .in("id", levelPoolIds);
   if (poolsWithLevel.error) return { added: 0, error: poolsWithLevel.error.message };
 
@@ -750,7 +756,7 @@ async function appendLevelBalanceMatchesForLevel(
   const teamsRes = await supabase
     .from("teams")
     .select("id, name, sort_order, pool_id")
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .in("pool_id", poolIds);
   if (teamsRes.error) return { added: 0, error: teamsRes.error.message };
 
@@ -766,7 +772,7 @@ async function appendLevelBalanceMatchesForLevel(
   const matchesRes = await supabase
     .from("matches")
     .select("team_a_id, team_b_id")
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .or(`team_a_id.in.(${teamIds.join(",")}),team_b_id.in.(${teamIds.join(",")})`);
   if (matchesRes.error) return { added: 0, error: matchesRes.error.message };
 
@@ -783,7 +789,7 @@ async function appendLevelBalanceMatchesForLevel(
   if (additions.length === 0) return { added: 0, error: null };
 
   const payload = additions.map((match) => ({
-    event_id: TURNERING_EVENT_ID,
+    event_id: eventId,
     pool_id: match.poolId,
     team_a_id: match.teamAId,
     team_b_id: match.teamBId,
@@ -814,6 +820,7 @@ export async function generatePoolMatchesAction(
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -825,7 +832,7 @@ export async function generatePoolMatchesAction(
     .from("pools")
     .select("id, name, level")
     .eq("id", poolId)
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .maybeSingle();
 
   if (poolErr) return { ok: false, message: poolErr.message };
@@ -834,7 +841,7 @@ export async function generatePoolMatchesAction(
   const { data: teams, error: teamsErr } = await supabase
     .from("teams")
     .select("id, sort_order, name")
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .eq("pool_id", poolId)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
@@ -845,11 +852,11 @@ export async function generatePoolMatchesAction(
   }
 
   if (regenerate) {
-    const delRes = await supabase.from("matches").delete().eq("event_id", TURNERING_EVENT_ID).eq("pool_id", poolId);
+    const delRes = await supabase.from("matches").delete().eq("event_id", eventId).eq("pool_id", poolId);
     if (delRes.error) return { ok: false, message: delRes.error.message };
   }
 
-  const scheduleFetch = await fetchLevelSchedulePlanningRows(supabase, TURNERING_EVENT_ID);
+  const scheduleFetch = await fetchLevelSchedulePlanningRows(supabase, eventId);
   if (scheduleFetch.error) return { ok: false, message: scheduleFetch.error };
 
   const planningLevel = canonicalBanerLevelLabel(levelKey);
@@ -863,7 +870,7 @@ export async function generatePoolMatchesAction(
   }
 
   const payload = pairings.map((match) => ({
-    event_id: TURNERING_EVENT_ID,
+    event_id: eventId,
     pool_id: poolId,
     team_a_id: match.teamAId,
     team_b_id: match.teamBId,
@@ -881,7 +888,7 @@ export async function generatePoolMatchesAction(
     };
   }
 
-  const balance = await appendLevelBalanceMatchesForLevel(supabase, planningLevel, matchesPerTeam);
+  const balance = await appendLevelBalanceMatchesForLevel(supabase, eventId, planningLevel, matchesPerTeam);
   if (balance.error) {
     return { ok: false, message: balance.error };
   }
@@ -898,7 +905,7 @@ export async function generatePoolMatchesAction(
     };
   }
 
-  const schedule = await assignMatchScheduleForPool(supabase, poolId);
+  const schedule = await assignMatchScheduleForPool(supabase, eventId, poolId);
 
   revalidatePath("/turnering/plan");
   revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
@@ -957,6 +964,7 @@ export async function generateAllPoolMatchesForLevelAction(
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -970,14 +978,14 @@ export async function generateAllPoolMatchesForLevelAction(
     supabase
       .from("pools")
       .select("id, name, level, period_id, sort_order")
-      .eq("event_id", TURNERING_EVENT_ID)
+      .eq("event_id", eventId)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
-    supabase.from("level_schedule_settings").select("level, plan_matches_per_team").eq("event_id", TURNERING_EVENT_ID),
+    supabase.from("level_schedule_settings").select("level, plan_matches_per_team").eq("event_id", eventId),
     supabase
       .from("tournament_periods")
       .select("id, event_id, name, start_time, end_time, sort_order, is_all_day")
-      .eq("event_id", TURNERING_EVENT_ID),
+      .eq("event_id", eventId),
   ]);
 
   if (poolsRes.error) return { ok: false, message: poolsRes.error.message };
@@ -998,14 +1006,14 @@ export async function generateAllPoolMatchesForLevelAction(
 
   const poolIds = levelPools.map((p) => p.id);
 
-  const scheduleFetch = await fetchLevelSchedulePlanningRows(supabase, TURNERING_EVENT_ID);
+  const scheduleFetch = await fetchLevelSchedulePlanningRows(supabase, eventId);
   if (scheduleFetch.error) return { ok: false, message: scheduleFetch.error };
   const matchesPerTeam = poolPlanningHint(normalizedLevel, scheduleFetch.rows).matchesPerTeam;
 
   const { data: levelTeamsRaw, error: teamsErr } = await supabase
     .from("teams")
     .select("id, name, sort_order, pool_id")
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .in("pool_id", poolIds)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
@@ -1026,7 +1034,7 @@ export async function generateAllPoolMatchesForLevelAction(
   const { data: existingMatches } = await supabase
     .from("matches")
     .select("id")
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .or(`team_a_id.in.(${levelTeamIds.join(",")}),team_b_id.in.(${levelTeamIds.join(",")})`);
 
   const hasLevelMatches = (existingMatches ?? []).length > 0;
@@ -1042,7 +1050,7 @@ export async function generateAllPoolMatchesForLevelAction(
     const delRes = await supabase
       .from("matches")
       .delete()
-      .eq("event_id", TURNERING_EVENT_ID)
+      .eq("event_id", eventId)
       .or(`team_a_id.in.(${levelTeamIds.join(",")}),team_b_id.in.(${levelTeamIds.join(",")})`);
     if (delRes.error) return { ok: false, message: delRes.error.message };
   }
@@ -1061,7 +1069,7 @@ export async function generateAllPoolMatchesForLevelAction(
   }
 
   const payload = pairings.map((match) => ({
-    event_id: TURNERING_EVENT_ID,
+    event_id: eventId,
     pool_id: match.poolId,
     team_a_id: match.teamAId,
     team_b_id: match.teamBId,
@@ -1095,6 +1103,7 @@ export async function generateAllPoolMatchesForLevelAction(
     const anchor = allDayPools[0]!;
     const schedule = await assignMatchScheduleForLevelAllDay(
       supabase,
+      eventId,
       normalizedLevel,
       anchor.id,
       anchor.period_id!,
@@ -1113,6 +1122,7 @@ export async function generateAllPoolMatchesForLevelAction(
     if (periodPools.length >= 2) {
       const schedule = await assignMatchScheduleForLevelPeriodPools(
         supabase,
+        eventId,
         normalizedLevel,
         periodPools,
       );
@@ -1134,7 +1144,7 @@ export async function generateAllPoolMatchesForLevelAction(
       );
 
       for (const poolId of scheduleOrder) {
-        const schedule = await assignMatchScheduleForPool(supabase, poolId);
+        const schedule = await assignMatchScheduleForPool(supabase, eventId, poolId);
         scheduled += schedule.scheduled;
         unscheduled += schedule.unscheduled;
         if (schedule.error && !scheduleError) scheduleError = schedule.error;
@@ -1170,7 +1180,7 @@ export async function generateAllPoolMatchesForLevelAction(
     const { data: unscheduledRows } = await supabase
       .from("matches")
       .select("id, team_a_id, team_b_id, pool_id")
-      .eq("event_id", TURNERING_EVENT_ID)
+      .eq("event_id", eventId)
       .in("pool_id", generatedPoolIds)
       .or("court_id.is.null,start_time.is.null");
     if (unscheduledRows?.length) {
@@ -1186,7 +1196,7 @@ export async function generateAllPoolMatchesForLevelAction(
   }
 
   const postScheduleChecks = scheduled > 0
-    ? await fetchPostScheduleChecks(supabase, generatedPoolIds, levelKey)
+    ? await fetchPostScheduleChecks(supabase, eventId, generatedPoolIds, levelKey)
     : undefined;
 
   return {
@@ -1207,6 +1217,7 @@ export async function clearAllTournamentMatchesAction(): Promise<TurneringAction
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -1214,7 +1225,7 @@ export async function clearAllTournamentMatchesAction(): Promise<TurneringAction
     return { ok: false, message: "Du skal være logget ind for at fjerne kampe." };
   }
 
-  const delRes = await supabase.from("matches").delete().eq("event_id", TURNERING_EVENT_ID);
+  const delRes = await supabase.from("matches").delete().eq("event_id", eventId);
   if (delRes.error) return { ok: false, message: delRes.error.message };
 
   revalidatePath("/turnering/plan");
@@ -1243,6 +1254,7 @@ export async function generateAllPoolMatchesForTournamentAction(
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -1253,7 +1265,7 @@ export async function generateAllPoolMatchesForTournamentAction(
   const poolsRes = await supabase
     .from("pools")
     .select("id, level")
-    .eq("event_id", TURNERING_EVENT_ID);
+    .eq("event_id", eventId);
 
   if (poolsRes.error) return { ok: false, message: poolsRes.error.message };
 
@@ -1272,7 +1284,7 @@ export async function generateAllPoolMatchesForTournamentAction(
   }
 
   if (regenerate) {
-    const delRes = await supabase.from("matches").delete().eq("event_id", TURNERING_EVENT_ID);
+    const delRes = await supabase.from("matches").delete().eq("event_id", eventId);
     if (delRes.error) return { ok: false, message: delRes.error.message };
   }
 
@@ -1333,7 +1345,7 @@ export async function generateAllPoolMatchesForTournamentAction(
 
   const allPoolIds = ((poolsRes.data ?? []) as Array<{ id: string; level: string | null }>).map((p) => p.id);
   const postScheduleChecks = scheduled > 0
-    ? await fetchPostScheduleChecks(supabase, allPoolIds, "")
+    ? await fetchPostScheduleChecks(supabase, eventId, allPoolIds, "")
     : undefined;
 
   return {
@@ -1357,6 +1369,7 @@ export async function clearAllPoolMatchesForLevelAction(
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -1369,7 +1382,7 @@ export async function clearAllPoolMatchesForLevelAction(
   const poolsRes = await supabase
     .from("pools")
     .select("id, level")
-    .eq("event_id", TURNERING_EVENT_ID);
+    .eq("event_id", eventId);
 
   if (poolsRes.error) return { ok: false, message: poolsRes.error.message };
 
@@ -1384,7 +1397,7 @@ export async function clearAllPoolMatchesForLevelAction(
   const countRes = await supabase
     .from("matches")
     .select("id", { count: "exact", head: true })
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .in("pool_id", poolIds);
 
   if (countRes.error) return { ok: false, message: countRes.error.message };
@@ -1401,7 +1414,7 @@ export async function clearAllPoolMatchesForLevelAction(
   const delRes = await supabase
     .from("matches")
     .delete()
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .in("pool_id", poolIds);
 
   if (delRes.error) return { ok: false, message: delRes.error.message };
@@ -1428,6 +1441,7 @@ export async function schedulePoolMatchesAction(
   if (locked) return locked;
 
   const supabase = await createServerSupabase();
+  const eventId = await getActiveEventId();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -1439,7 +1453,7 @@ export async function schedulePoolMatchesAction(
     .from("pools")
     .select("id, name")
     .eq("id", poolId)
-    .eq("event_id", TURNERING_EVENT_ID)
+    .eq("event_id", eventId)
     .maybeSingle();
 
   if (poolErr) return { ok: false, message: poolErr.message };
@@ -1451,11 +1465,11 @@ export async function schedulePoolMatchesAction(
     supabase
       .from("pools")
       .select("id, level, period_id")
-      .eq("event_id", TURNERING_EVENT_ID),
+      .eq("event_id", eventId),
     supabase
       .from("tournament_periods")
       .select("id, is_all_day, name")
-      .eq("event_id", TURNERING_EVENT_ID),
+      .eq("event_id", eventId),
   ]);
 
   if (siblingPoolsRes.error) return { ok: false, message: siblingPoolsRes.error.message };
@@ -1482,8 +1496,8 @@ export async function schedulePoolMatchesAction(
 
   const schedule =
     siblingPoolIds.length >= 2
-      ? await assignMatchScheduleForLevelPeriodPools(supabase, normalizedLevel, siblingPoolIds)
-      : await assignMatchScheduleForPool(supabase, poolId);
+      ? await assignMatchScheduleForLevelPeriodPools(supabase, eventId, normalizedLevel, siblingPoolIds)
+      : await assignMatchScheduleForPool(supabase, eventId, poolId);
 
   revalidatePath("/turnering/plan");
   revalidatePath(`/turnering/plan/${encodeURIComponent(levelKey)}`);
@@ -1525,7 +1539,7 @@ export async function schedulePoolMatchesAction(
     const { data: rows } = await supabase
       .from("matches")
       .select("id")
-      .eq("event_id", TURNERING_EVENT_ID)
+      .eq("event_id", eventId)
       .eq("pool_id", poolId)
       .or("court_id.is.null,start_time.is.null");
     if (rows?.length) {
@@ -1542,7 +1556,7 @@ export async function schedulePoolMatchesAction(
 
   const poolsForCheck = siblingPoolIds.length >= 2 ? siblingPoolIds : [poolId];
   const postScheduleChecks = schedule.scheduled > 0
-    ? await fetchPostScheduleChecks(supabase, poolsForCheck, levelKey)
+    ? await fetchPostScheduleChecks(supabase, eventId, poolsForCheck, levelKey)
     : undefined;
 
   return {

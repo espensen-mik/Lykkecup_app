@@ -1,6 +1,6 @@
 import { createServerSupabase } from "@/lib/auth-server";
 import { planMatchesByLevelFromScheduleRows } from "@/lib/lykkecup-regnemaskine";
-import { LYKKECUP_EVENT_ID } from "@/lib/players";
+import { getActiveEventId } from "@/lib/active-event-server";
 
 export type PlayerMatchCountsBundle = {
   matchCountByPlayerId: Record<string, number>;
@@ -11,7 +11,7 @@ export type PlayerMatchCountsBundle = {
 
 /** Antal turneringskampe pr. spiller (via hold) + forventet antal pr. niveau. */
 export async function fetchPlayerMatchCountsForEvent(): Promise<PlayerMatchCountsBundle> {
-  const eventId = LYKKECUP_EVENT_ID;
+  const eventId = await getActiveEventId();
   const client = await createServerSupabase();
 
   const [membersRes, matchesRes, scheduleRes] = await Promise.all([

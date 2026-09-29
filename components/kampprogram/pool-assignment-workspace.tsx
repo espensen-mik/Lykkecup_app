@@ -18,7 +18,6 @@ import {
   createPoolAction,
   releaseOrphanedPoolTeamsAction,
 } from "@/lib/turnering-actions";
-import { TURNERING_EVENT_ID } from "@/lib/turnering";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import type { HoldCoachRow, TeamCoachRow, TeamMemberRow, TeamRow } from "@/types/teams";
 

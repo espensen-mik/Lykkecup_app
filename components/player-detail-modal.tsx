@@ -1,10 +1,10 @@
 "use client";
 
+import { useActiveEventId } from "@/components/active-event-context";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   fetchAssignedTeamForPlayer,
-  LYKKECUP_EVENT_ID,
   type PlayerAssignedTeamSummary,
 } from "@/lib/players";
 import { derivePreferenceBadge } from "@/lib/player-preferences";
@@ -206,6 +206,7 @@ function preferenceIdsFromValue(value: unknown): string[] {
 }
 
 export function PlayerDetailModal({ playerId, onClose }: Props) {
+  const eventId = useActiveEventId();
   const supabase = getAuthBrowserClient();
   const [player, setPlayer] = useState<PlayerDetail | null>(null);
   const [assignedTeam, setAssignedTeam] = useState<PlayerAssignedTeamSummary | null>(null);
@@ -265,17 +266,17 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
             "id, name, home_club, birthdate, age, gender, level, preferences, ticket_id",
           )
           .eq("id", playerId)
-          .eq("event_id", LYKKECUP_EVENT_ID)
+          .eq("event_id", eventId)
           .maybeSingle(),
-        fetchAssignedTeamForPlayer(supabase, playerId),
+        fetchAssignedTeamForPlayer(supabase, eventId, playerId),
         supabase
           .from("player_change_log")
           .select("id, field_name, old_value, new_value, changed_at, changed_by_name")
           .eq("player_id", playerId)
-          .eq("event_id", LYKKECUP_EVENT_ID)
+          .eq("event_id", eventId)
           .order("changed_at", { ascending: false })
           .limit(30),
-        supabase.from("players").select("home_club, gender, level").eq("event_id", LYKKECUP_EVENT_ID),
+        supabase.from("players").select("home_club, gender, level").eq("event_id", eventId),
       ]);
 
       if (cancelled) return;
@@ -293,7 +294,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       setPlayer(detail);
       setDraft(toDraft(detail));
       setAssignedTeam(teamSummary);
-      const context = await fetchPlayerParticipantContext(supabase, playerId, teamSummary?.teamId ?? null);
+      const context = await fetchPlayerParticipantContext(supabase, eventId, playerId, teamSummary?.teamId ?? null);
       if (cancelled) return;
       setParticipantContext(context);
       setLogs(filterLegacyUnknownLogs((logsRes.data ?? []) as PlayerChangeLogRow[]));
@@ -348,7 +349,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [playerId]);
+  }, [playerId, eventId]);
 
   useEffect(() => {
     if (!playerId) return;
@@ -386,7 +387,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       .from("player_change_log")
       .select("id, field_name, old_value, new_value, changed_at, changed_by_name")
       .eq("player_id", playerIdForLogs)
-      .eq("event_id", LYKKECUP_EVENT_ID)
+      .eq("event_id", eventId)
       .order("changed_at", { ascending: false })
       .limit(30);
     if (!logsRes.error) {
@@ -455,7 +456,7 @@ export function PlayerDetailModal({ playerId, onClose }: Props) {
       .from("players")
       .update(payload)
       .eq("id", playerId)
-      .eq("event_id", LYKKECUP_EVENT_ID);
+      .eq("event_id", eventId);
     setSaving(false);
 
     if (updateError) {
