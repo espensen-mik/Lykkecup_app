@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = new Set([
   "/",
   "/coach-feedback",
+  "/frivillig",
   "/login",
   "/glemt-kode",
   "/nulstil-kode",

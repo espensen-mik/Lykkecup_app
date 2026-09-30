@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardList,
+  HandHeart,
   ShieldCheck,
   LayoutDashboard,
   LogOut,
@@ -32,6 +33,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { getAuthBrowserClient } from "@/lib/auth-browser";
 import { EVENT_PICKER_PATH, eventYearLabel } from "@/lib/events";
+import { volunteersEnabledFor } from "@/lib/volunteers";
 import { KontrolcenterHelp } from "@/components/kontrolcenter-help";
 import { KontrolcenterLockdownToggle } from "@/components/kontrolcenter-lockdown-toggle";
 import { useKontrolcenterLockdown } from "@/components/kontrolcenter-lockdown-context";
@@ -73,6 +75,7 @@ const nav: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/admin", label: "Overblik", icon: LayoutDashboard },
   { href: "/spillere", label: "Spillere", icon: Users },
   { href: "/traenere", label: "Trænere", icon: UsersRound },
+  { href: "/frivillige", label: "Frivillige", icon: HandHeart },
   { href: "/klubber", label: "Klubber", icon: Building2 },
   { href: "/kommentarer", label: "Kommentarer", icon: MessageSquareText },
 ];
@@ -329,7 +332,7 @@ export function AppShell({ children, currentUser }: { children: React.ReactNode;
         <p className="mb-1.5 px-3 text-[0.6875rem] font-medium uppercase tracking-wide text-lc-muted dark:text-gray-500">
           Menu
         </p>
-        {nav.map((item) => {
+        {nav.filter((item) => item.href !== "/frivillige" || volunteersEnabledFor(activeEvent)).map((item) => {
           const active = isActive(item.href);
           const NavIcon = item.icon;
 
