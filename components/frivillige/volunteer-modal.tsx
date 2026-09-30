@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Clock, Crown, X } from "lucide-react";
+import { AlertTriangle, Clock, Crown, Mail, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { VolunteerFields, volunteerFieldClass } from "@/components/frivillige/volunteer-fields";
@@ -11,6 +11,7 @@ import {
   saveVolunteerAction,
   unassignVolunteerTaskAction,
 } from "@/lib/volunteers-actions";
+import type { MailAudience } from "@/lib/volunteer-mail-audience";
 import {
   overlappingTasks,
   taskTimeLabel,
@@ -27,12 +28,13 @@ type Props = {
   tasks: VolunteerTask[];
   assignments: VolunteerTaskAssignment[];
   readOnly: boolean;
+  onMail: (audience: MailAudience) => void;
   onClose: () => void;
 };
 
 const createdFormatter = new Intl.DateTimeFormat("da-DK", { dateStyle: "long", timeStyle: "short" });
 
-export function VolunteerModal({ volunteer, teams, tasks, assignments, readOnly, onClose }: Props) {
+export function VolunteerModal({ volunteer, teams, tasks, assignments, readOnly, onMail, onClose }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -43,11 +45,14 @@ export function VolunteerModal({ volunteer, teams, tasks, assignments, readOnly,
   const otherLeader =
     selectedTeam?.leader_volunteer_id && selectedTeam.leader_volunteer_id !== volunteer?.id ? selectedTeam.leader_volunteer_id : null;
 
-  const myTaskIds = volunteer ? new Set(assignments.filter((a) => a.volunteer_id === volunteer.id).map((a) => a.task_id)) : new Set<string>();
+  const myTaskIds = volunteer
+    ? new Set(assignments.filter((a) => a.volunteer_id === volunteer.id).map((a) => a.task_id))
+    : new Set<string>();
   const myTasks = tasks.filter((t) => myTaskIds.has(t.id));
   const savedTeamId = volunteer?.team_id ?? null;
   const otherTasks = savedTeamId ? tasks.filter((t) => !myTaskIds.has(t.id) && t.team_id === savedTeamId) : [];
-  const tasksLostOnTeamChange = (teamId || null) !== savedTeamId ? myTasks.filter((t) => t.team_id !== null && t.team_id !== (teamId || null)) : [];
+  const tasksLostOnTeamChange =
+    (teamId || null) !== savedTeamId ? myTasks.filter((t) => t.team_id !== null && t.team_id !== (teamId || null)) : [];
 
   function taskChange(action: () => ReturnType<typeof assignVolunteerTaskAction>) {
     setError(null);
@@ -113,14 +118,26 @@ export function VolunteerModal({ volunteer, teams, tasks, assignments, readOnly,
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-white"
-            aria-label="Luk"
-          >
-            <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {volunteer && !readOnly ? (
+              <button
+                type="button"
+                onClick={() => onMail({ type: "volunteers", ids: [volunteer.id] })}
+                className="inline-flex items-center gap-1.5 rounded-md border border-lc-border px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:border-[#14b8a6] hover:text-[#0f766e] dark:border-gray-600 dark:text-gray-200 dark:hover:text-teal-300"
+              >
+                <Mail className="h-3.5 w-3.5" aria-hidden />
+                Send mail
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-white"
+              aria-label="Luk"
+            >
+              <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={submit} className="space-y-5 p-5">
@@ -174,7 +191,13 @@ export function VolunteerModal({ volunteer, teams, tasks, assignments, readOnly,
             </div>
             <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
               Intern note (kun synlig i KontrolCenter)
-              <textarea name="admin_note" rows={2} defaultValue={volunteer?.admin_note ?? ""} className={volunteerFieldClass} disabled={readOnly || pending} />
+              <textarea
+                name="admin_note"
+                rows={2}
+                defaultValue={volunteer?.admin_note ?? ""}
+                className={volunteerFieldClass}
+                disabled={readOnly || pending}
+              />
             </label>
           </div>
 
@@ -240,7 +263,9 @@ export function VolunteerModal({ volunteer, teams, tasks, assignments, readOnly,
                 />
               )}
               {!savedTeamId ? (
-                <p className="text-xs text-gray-500 dark:text-gray-400">Sæt først den frivillige på et team og gem. Derefter kan du vælge blandt teamets opgaver.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Sæt først den frivillige på et team og gem. Derefter kan du vælge blandt teamets opgaver.
+                </p>
               ) : null}
             </div>
           ) : null}

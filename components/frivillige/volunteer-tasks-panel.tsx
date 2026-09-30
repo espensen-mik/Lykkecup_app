@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Clock, Crown, Pencil, Trash2, UserMinus } from "lucide-react";
+import { AlertTriangle, Clock, Crown, Mail, Pencil, Trash2, UserMinus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { volunteerFieldClass } from "@/components/frivillige/volunteer-fields";
@@ -12,6 +12,7 @@ import {
   unassignVolunteerTaskAction,
   type VolunteerActionResult,
 } from "@/lib/volunteers-actions";
+import type { MailAudience } from "@/lib/volunteer-mail-audience";
 import {
   overlappingTasks,
   taskTimeLabel,
@@ -29,6 +30,7 @@ type Props = {
   teams: VolunteerTeam[];
   readOnly: boolean;
   onOpenVolunteer: (id: string) => void;
+  onMail: (audience: MailAudience) => void;
 };
 
 const labelClass = "flex flex-col gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300";
@@ -176,7 +178,7 @@ function CapacityBadge({ filled, capacity }: { filled: number; capacity: number 
   );
 }
 
-export function VolunteerTasksPanel({ tasks, assignments, volunteers, teams, readOnly, onOpenVolunteer }: Props) {
+export function VolunteerTasksPanel({ tasks, assignments, volunteers, teams, readOnly, onOpenVolunteer, onMail }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -353,6 +355,15 @@ export function VolunteerTasksPanel({ tasks, assignments, volunteers, teams, rea
                               <CapacityBadge filled={members.length} capacity={task.capacity} />
                               {readOnly ? null : (
                                 <>
+                                  <button
+                                    type="button"
+                                    onClick={() => onMail({ type: "tasks", ids: [task.id] })}
+                                    className="rounded-md p-1.5 text-gray-500 hover:bg-teal-50 hover:text-[#0f766e] dark:hover:bg-teal-900/30 dark:hover:text-teal-300"
+                                    aria-label={`Send mail til alle på ${task.name}`}
+                                    title="Send mail"
+                                  >
+                                    <Mail className="h-4 w-4" aria-hidden />
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => setEditingId(task.id)}

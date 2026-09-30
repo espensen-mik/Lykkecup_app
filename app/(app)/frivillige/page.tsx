@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { VolunteersAdmin } from "@/components/frivillige/volunteers-admin";
 import { getActiveEvent } from "@/lib/active-event-server";
 import { createServerSupabase } from "@/lib/auth-server";
+import { fetchVolunteerEmailHistory } from "@/lib/volunteer-mail-history";
 import { fetchVolunteersBundle, volunteersEnabledFor } from "@/lib/volunteers";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,10 @@ export default async function FrivilligePage() {
     );
   }
 
-  const { volunteers, teams, tasks, assignments, error } = await fetchVolunteersBundle(supabase, event.id);
+  const [{ volunteers, teams, tasks, assignments, error }, mailHistory] = await Promise.all([
+    fetchVolunteersBundle(supabase, event.id),
+    fetchVolunteerEmailHistory(supabase, event.id),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-10 lg:space-y-11">
@@ -40,7 +44,7 @@ export default async function FrivilligePage() {
         </h1>
         <p className="mt-3 text-base leading-relaxed text-gray-500 dark:text-gray-400">
           Tilmeldinger fra <span className="font-medium text-gray-700 dark:text-gray-300">lykkecup.dk/frivillig</span> og
-          manuelt oprettede frivillige. Inddel dem i teams, vælg teamledere og sæt dem på opgaver.
+          manuelt oprettede frivillige. Inddel dem i teams, sæt dem på opgaver og send mails.
         </p>
       </header>
 
@@ -51,6 +55,8 @@ export default async function FrivilligePage() {
             teams={teams}
             tasks={tasks}
             assignments={assignments}
+            mailHistory={mailHistory.emails}
+            mailHistoryError={mailHistory.error}
             fetchError={error}
             readOnly={event.status === "archived"}
           />
