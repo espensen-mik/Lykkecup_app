@@ -1,26 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getActiveEvent } from "@/lib/active-event-server";
-import { createServerSupabase, getCurrentAuthAppUser } from "@/lib/auth-server";
-import { ARCHIVED_EVENT_MESSAGE } from "@/lib/kontrolcenter-lockdown-shared";
 import { supabase as anonSupabase } from "@/lib/supabase";
 import { parseVolunteerForm, VOLUNTEER_SIGNUP_EVENT_ID } from "@/lib/volunteers";
+import { editableContext } from "@/lib/volunteers-server";
 
 export type VolunteerActionResult = { ok: true; message?: string } | { ok: false; message: string };
 
 const PATH = "/frivillige";
-
-type EditableContext =
-  | { error: string }
-  | { error?: undefined; supabase: Awaited<ReturnType<typeof createServerSupabase>>; eventId: string };
-
-async function editableContext(): Promise<EditableContext> {
-  const [user, event] = await Promise.all([getCurrentAuthAppUser(), getActiveEvent()]);
-  if (!user) return { error: "Du skal være logget ind." };
-  if (event.status === "archived") return { error: ARCHIVED_EVENT_MESSAGE };
-  return { supabase: await createServerSupabase(), eventId: event.id };
-}
 
 function uuidOrNull(value: FormDataEntryValue | null): string | null {
   const v = typeof value === "string" ? value.trim() : "";

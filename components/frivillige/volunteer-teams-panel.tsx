@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, Crown, Pencil, Trash2, UserMinus } from "lucide-react";
+import { ClipboardList, Crown, Mail, Pencil, Trash2, UserMinus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { volunteerFieldClass } from "@/components/frivillige/volunteer-fields";
@@ -11,6 +11,7 @@ import {
   setVolunteerTeamAction,
   type VolunteerActionResult,
 } from "@/lib/volunteers-actions";
+import type { MailAudience } from "@/lib/volunteer-mail-audience";
 import { taskTimeLabel, volunteerFullName, type Volunteer, type VolunteerTask, type VolunteerTeam } from "@/lib/volunteers";
 
 type Props = {
@@ -19,6 +20,7 @@ type Props = {
   tasks: VolunteerTask[];
   readOnly: boolean;
   onOpenVolunteer: (id: string) => void;
+  onMail: (audience: MailAudience) => void;
 };
 
 function TeamForm({
@@ -73,7 +75,7 @@ function TeamForm({
   );
 }
 
-export function VolunteerTeamsPanel({ teams, volunteers, tasks, readOnly, onOpenVolunteer }: Props) {
+export function VolunteerTeamsPanel({ teams, volunteers, tasks, readOnly, onOpenVolunteer, onMail }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -159,6 +161,15 @@ export function VolunteerTeamsPanel({ teams, volunteers, tasks, readOnly, onOpen
                     </div>
                     {readOnly ? null : (
                       <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onMail({ type: "teams", ids: [team.id] })}
+                          className="rounded-md p-1.5 text-gray-500 hover:bg-teal-50 hover:text-[#0f766e] dark:hover:bg-teal-900/30 dark:hover:text-teal-300"
+                          aria-label={`Send mail til ${team.name}`}
+                          title="Send mail"
+                        >
+                          <Mail className="h-4 w-4" aria-hidden />
+                        </button>
                         <button
                           type="button"
                           onClick={() => setEditingId(team.id)}

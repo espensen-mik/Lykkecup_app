@@ -4,9 +4,12 @@ import { ChevronRight, Crown, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { volunteerFieldClass } from "@/components/frivillige/volunteer-fields";
 import { VolunteerModal } from "@/components/frivillige/volunteer-modal";
+import { VolunteerMailPanel } from "@/components/frivillige/volunteer-mail-panel";
 import { VolunteerTasksPanel } from "@/components/frivillige/volunteer-tasks-panel";
 import { VolunteerTeamsPanel } from "@/components/frivillige/volunteer-teams-panel";
 import { PickSelect } from "@/components/ui/pick-select";
+import type { MailAudience } from "@/lib/volunteer-mail-audience";
+import type { VolunteerEmailRecord } from "@/lib/volunteer-mail-history";
 import {
   AVAILABILITY_FULL_DAY,
   AVAILABILITY_TIMEBOX,
@@ -26,6 +29,8 @@ type Props = {
   teams: VolunteerTeam[];
   tasks: VolunteerTask[];
   assignments: VolunteerTaskAssignment[];
+  mailHistory: VolunteerEmailRecord[];
+  mailHistoryError: string | null;
   fetchError: string | null;
   readOnly: boolean;
 };
@@ -42,8 +47,9 @@ function Th({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function VolunteersAdmin({ volunteers, teams, tasks, assignments, fetchError, readOnly }: Props) {
-  const [tab, setTab] = useState<"list" | "teams" | "tasks">("list");
+export function VolunteersAdmin({ volunteers, teams, tasks, assignments, mailHistory, mailHistoryError, fetchError, readOnly }: Props) {
+  const [tab, setTab] = useState<"list" | "teams" | "tasks" | "mails">("list");
+  const [mailPreset, setMailPreset] = useState<MailAudience | null>(null);
   const [search, setSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState("");
   const [sizeFilter, setSizeFilter] = useState("");
@@ -98,6 +104,13 @@ export function VolunteersAdmin({ volunteers, teams, tasks, assignments, fetchEr
   const selected = modal?.id ? volunteers.find((v) => v.id === modal.id) ?? null : null;
 
 
+  function openMail(audience: MailAudience) {
+    setMailPreset(audience);
+    setModal(null);
+    setTab("mails");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   if (fetchError) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
@@ -126,6 +139,9 @@ export function VolunteersAdmin({ volunteers, teams, tasks, assignments, fetchEr
           <button type="button" role="tab" aria-selected={tab === "tasks"} onClick={() => setTab("tasks")} className={tabClass(tab === "tasks")}>
             Opgaver ({tasks.length})
           </button>
+          <button type="button" role="tab" aria-selected={tab === "mails"} onClick={() => setTab("mails")} className={tabClass(tab === "mails")}>
+            Mails
+          </button>
         </div>
         {readOnly ? null : (
           <button
@@ -139,7 +155,19 @@ export function VolunteersAdmin({ volunteers, teams, tasks, assignments, fetchEr
         )}
       </div>
 
-      {tab === "tasks" ? (
+      {tab === "mails" ? (
+        <VolunteerMailPanel
+          key={mailPreset ? `${mailPreset.type}:${mailPreset.ids.join(",")}` : "blank"}
+          volunteers={volunteers}
+          teams={teams}
+          tasks={tasks}
+          assignments={assignments}
+          history={mailHistory}
+          historyError={mailHistoryError}
+          readOnly={readOnly}
+          preset={mailPreset}
+        />
+      ) : tab === "tasks" ? (
         <VolunteerTasksPanel
           tasks={tasks}
           assignments={assignments}
@@ -147,6 +175,7 @@ export function VolunteersAdmin({ volunteers, teams, tasks, assignments, fetchEr
           teams={teams}
           readOnly={readOnly}
           onOpenVolunteer={(id) => setModal({ id })}
+          onMail={openMail}
         />
       ) : tab === "teams" ? (
         <VolunteerTeamsPanel
@@ -155,6 +184,7 @@ export function VolunteersAdmin({ volunteers, teams, tasks, assignments, fetchEr
           tasks={tasks}
           readOnly={readOnly}
           onOpenVolunteer={(id) => setModal({ id })}
+          onMail={openMail}
         />
       ) : (
         <>
@@ -347,6 +377,7 @@ export function VolunteersAdmin({ volunteers, teams, tasks, assignments, fetchEr
           tasks={tasks}
           assignments={assignments}
           readOnly={readOnly}
+          onMail={openMail}
           onClose={() => setModal(null)}
         />
       ) : null}
