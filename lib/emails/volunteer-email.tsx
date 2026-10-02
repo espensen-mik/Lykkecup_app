@@ -9,7 +9,7 @@ function InlineParts({ parts }: { parts: Inline[] }) {
   return (
     <>
       {parts.map((p, i) => {
-        const style = p.bold ? { fontWeight: 700 } : undefined;
+        const style = p.bold || p.italic ? { fontWeight: p.bold ? 700 : undefined, fontStyle: p.italic ? ("italic" as const) : undefined } : undefined;
         return p.type === "link" ? (
           <Link key={i} href={p.href} style={{ color: "#138a55", textDecoration: "underline", ...style }}>
             {p.text}
