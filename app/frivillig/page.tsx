@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { CalendarDays, Heart, Hourglass, MapPin, Shirt, UsersRound } from "lucide-react";
+import { CalendarDays, Heart, Hourglass, ListChecks, MapPin, UsersRound } from "lucide-react";
 import Image from "next/image";
+import { VolunteerHighlightVideo } from "@/components/frivillige/volunteer-highlight-video";
 import { VolunteerSignupForm } from "@/components/frivillige/volunteer-signup-form";
 import { eventShortDateLabel } from "@/lib/events";
 import { supabase } from "@/lib/supabase";
@@ -10,10 +11,10 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Bliv frivillig · LykkeCup 2027",
-  description: "Vær med på A-TEAMET og skab det lykkeligste LykkeCup sammen med os.",
+  description: "LykkeCup er årets lykkeligste dag. Bliv frivillig og vær med til at skabe den.",
   openGraph: {
-    title: "Bliv frivillig til LykkeCup 2027",
-    description: "Vær med på A-TEAMET og skab det lykkeligste LykkeCup sammen med os.",
+    title: "Bliv frivillig til LykkeCup",
+    description: "LykkeCup er årets lykkeligste dag. Bliv frivillig og vær med til at skabe den.",
     images: ["/Frontpage.jpg"],
   },
 };
@@ -23,10 +24,35 @@ const DISPLAY = "font-[family-name:var(--font-lc27-display)] uppercase tracking-
 const longDate = new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 const PERKS = [
-  { icon: Heart, title: "Skab lykke", text: "Giv næsten tusind spillere deres bedste dag på året." },
-  { icon: UsersRound, title: "Vær en del af A-TEAMET", text: "Et stort, varmt fællesskab, der løfter dagen sammen." },
-  { icon: Shirt, title: "Vi passer på dig", text: "Du får en LykkeCup T-shirt, og vi tager hensyn til dine ønsker." },
+  { icon: Heart, title: "Skab lykke", text: "Lykkecup er årets største dag for familierne i LykkeLiga" },
+  { icon: UsersRound, title: "Lykkeligt fællesskab", text: "Du får lov at mærke Danmarks nok lykkeligste fællesskab, helt tæt på" },
+  {
+    icon: ListChecks,
+    title: "Masser af spændende opgaver",
+    text: "Lykken skabes på mange måder - og der er spændende opgaver til alle profiler",
+  },
 ];
+
+function PerkList({ className }: { className: string }) {
+  return (
+    <div className={className}>
+      <ul className="grid gap-3">
+        {PERKS.map((perk) => (
+          <li key={perk.title} className="flex items-start gap-4 rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10 backdrop-blur-md">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#22b573]/20 text-[#5ee0a4] ring-1 ring-[#5ee0a4]/25">
+              <perk.icon className="h-5 w-5" aria-hidden />
+            </span>
+            <span>
+              <span className="block font-semibold">{perk.title}</span>
+              <span className="mt-0.5 block text-sm leading-relaxed text-white/65">{perk.text}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <VolunteerHighlightVideo />
+    </div>
+  );
+}
 
 export default async function FrivilligPage() {
   const { data: event } = await supabase
@@ -54,18 +80,19 @@ export default async function FrivilligPage() {
         <section className="lg:sticky lg:top-12 lg:self-start">
           <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] ring-1 ring-white/20 backdrop-blur-md">
             <span className="h-2 w-2 rounded-full bg-[#22b573] shadow-[0_0_12px_#22b573]" aria-hidden />
-            Bliv frivillig
+            Bliv frivillig til LykkeCup
           </p>
           <h1 className={`${DISPLAY} mt-6 text-[2.5rem] leading-[1.02] [text-shadow:0_2px_30px_rgb(0_0_0/0.35)] sm:text-6xl xl:text-7xl`}>
             Lykken
             <br />
             skaber vi
             <br />
-            <span className="text-[#5ee0a4]">sammen!</span>
+            <span className="text-[#5ee0a4]">sammen</span>
           </h1>
           <p className="mt-6 max-w-lg text-base leading-relaxed text-white/80 sm:text-lg">
-            Vi kan ikke lave det lykkeligste LykkeCup uden alle jer fantastiske mennesker på vores A-TEAM. Meld dig til,
-            så hører du fra os, så snart vi er klar med mere info om dagen.
+            LykkeCup er årets lykkeligste dag, hvor næsten 1000 LykkeLiga-spillere samles til sæsonafslutning i Herning. En
+            hel dag med håndbold, hyldest og highfives. LykkeCup bliver lykkelig på grund af dygtige frivillige - vil du
+            være med?
           </p>
 
           {dateText || event?.location ? (
@@ -85,19 +112,7 @@ export default async function FrivilligPage() {
             </div>
           ) : null}
 
-          <ul className="mt-10 hidden max-w-lg gap-3 lg:grid">
-            {PERKS.map((perk) => (
-              <li key={perk.title} className="flex items-start gap-4 rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10 backdrop-blur-md">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#22b573]/20 text-[#5ee0a4] ring-1 ring-[#5ee0a4]/25">
-                  <perk.icon className="h-5 w-5" aria-hidden />
-                </span>
-                <span>
-                  <span className="block font-semibold">{perk.title}</span>
-                  <span className="mt-0.5 block text-sm leading-relaxed text-white/65">{perk.text}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <PerkList className="mt-10 hidden max-w-lg gap-3 lg:grid" />
         </section>
 
         <section aria-label="Tilmelding">
@@ -111,19 +126,7 @@ export default async function FrivilligPage() {
             </div>
           )}
 
-          <ul className="mt-8 grid gap-3 lg:hidden">
-            {PERKS.map((perk) => (
-              <li key={perk.title} className="flex items-start gap-4 rounded-2xl bg-white/[0.07] p-4 ring-1 ring-white/10 backdrop-blur-md">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#22b573]/20 text-[#5ee0a4] ring-1 ring-[#5ee0a4]/25">
-                  <perk.icon className="h-5 w-5" aria-hidden />
-                </span>
-                <span>
-                  <span className="block font-semibold">{perk.title}</span>
-                  <span className="mt-0.5 block text-sm leading-relaxed text-white/65">{perk.text}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <PerkList className="mt-8 grid gap-3 lg:hidden" />
         </section>
       </div>
 
