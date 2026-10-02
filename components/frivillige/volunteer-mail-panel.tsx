@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ChevronDown, Copy, Crown, Loader2, Mail, RefreshCw, Send, Users } from "lucide-react";
+import { AlertTriangle, Bold, ChevronDown, Copy, Crown, Italic, Loader2, Mail, RefreshCw, Send, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { volunteerFieldClass } from "@/components/frivillige/volunteer-fields";
@@ -14,7 +14,7 @@ import {
   type MailAudience,
   type MailAudienceType,
 } from "@/lib/volunteer-mail-audience";
-import { MERGE_FIELDS, applyMergeFields, parseMailBody, type Inline } from "@/lib/volunteer-mail-format";
+import { MERGE_FIELDS, applyInlineMarker, applyMergeFields, parseMailBody, type Inline } from "@/lib/volunteer-mail-format";
 import {
   DELIVERED_STATUSES,
   FAILED_STATUSES,
@@ -44,16 +44,21 @@ type Props = {
 
 const dateFormatter = new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" });
 
+function emphasisClass(part: { bold?: boolean; italic?: boolean }): string | undefined {
+  const cls = [part.bold ? "font-bold" : "", part.italic ? "italic" : ""].filter(Boolean).join(" ");
+  return cls || undefined;
+}
+
 function PreviewInline({ parts }: { parts: Inline[] }) {
   return (
     <>
       {parts.map((p, i) =>
         p.type === "link" ? (
-          <a key={i} href={p.href} target="_blank" rel="noreferrer" className={`text-[#138a55] underline ${p.bold ? "font-bold" : ""}`}>
+          <a key={i} href={p.href} target="_blank" rel="noreferrer" className={`text-[#138a55] underline ${emphasisClass(p) ?? ""}`}>
             {p.text}
           </a>
         ) : (
-          <span key={i} className={p.bold ? "font-bold" : undefined}>
+          <span key={i} className={emphasisClass(p)}>
             {p.text}
           </span>
         ),
@@ -133,6 +138,18 @@ export function VolunteerMailPanel({ volunteers, teams, tasks, assignments, hist
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(start + token.length, start + token.length);
+    });
+  }
+
+  function formatSelection(kind: "bold" | "italic") {
+    const el = bodyRef.current;
+    const start = el?.selectionStart ?? body.length;
+    const end = el?.selectionEnd ?? body.length;
+    const next = applyInlineMarker(body, start, end, kind);
+    setBody(next.text);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(next.selectionStart, next.selectionEnd);
     });
   }
 
@@ -278,7 +295,31 @@ export function VolunteerMailPanel({ volunteers, teams, tasks, assignments, hist
               <div className="flex flex-col gap-1.5">
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Tekst</span>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => formatSelection("bold")}
+                        disabled={pending}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-lc-border text-gray-600 hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:text-teal-300"
+                        title="Fed"
+                        aria-label="Fed"
+                      >
+                        <Bold className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => formatSelection("italic")}
+                        disabled={pending}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-lc-border text-gray-600 hover:border-[#14b8a6] hover:text-[#0f766e] disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:text-teal-300"
+                        title="Kursiv"
+                        aria-label="Kursiv"
+                      >
+                        <Italic className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    </div>
                     {MERGE_FIELDS.map((f) => (
                       <button
                         key={f.token}
@@ -307,6 +348,7 @@ export function VolunteerMailPanel({ volunteers, teams, tasks, assignments, hist
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Tom linje giver nyt afsnit · <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">**fed**</code> ·{" "}
+                  <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">*kursiv*</code> ·{" "}
                   <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">- punkt</code> ·{" "}
                   <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">[tekst](https://…)</code>
                 </p>

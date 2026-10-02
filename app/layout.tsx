@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const FAVICON = "/favicon.png";
+const FAVICON = "/Kontrolcenter27.jpg";
 
 export const metadata: Metadata = {
   title: {
@@ -21,9 +21,9 @@ export const metadata: Metadata = {
   },
   description: "LykkeCup KontrolCenter — spillere, klubber og overblik",
   icons: {
-    icon: [{ url: FAVICON, sizes: "512x512", type: "image/png" }],
+    icon: [{ url: FAVICON, sizes: "512x512", type: "image/jpeg" }],
     shortcut: FAVICON,
-    apple: [{ url: FAVICON, sizes: "512x512", type: "image/png" }],
+    apple: [{ url: FAVICON, sizes: "512x512", type: "image/jpeg" }],
   },
   openGraph: {
     locale: "da_DK",
